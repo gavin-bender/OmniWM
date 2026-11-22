@@ -6,10 +6,10 @@ import Foundation
 import QuartzCore
 
 extension DwindleLayoutHandler {
-    func focusNeighbor(direction: Direction) -> Bool {
+    func focusNeighbor(direction: Direction, in workspaceId: WorkspaceDescriptor.ID? = nil) -> Bool {
         guard let controller else { return false }
         var didMove = false
-        withDwindleContext { engine, wsId in
+        withDwindleContext(in: workspaceId) { engine, wsId in
             if focusGroupMember(
                 direction: direction,
                 wraps: false,
@@ -49,9 +49,9 @@ extension DwindleLayoutHandler {
         return didMove
     }
 
-    func wrapGroupFocus(direction: Direction) -> Bool {
+    func wrapGroupFocus(direction: Direction, in workspaceId: WorkspaceDescriptor.ID? = nil) -> Bool {
         var didMove = false
-        withDwindleContext { engine, workspaceId in
+        withDwindleContext(in: workspaceId) { engine, workspaceId in
             didMove = focusGroupMember(
                 direction: direction,
                 wraps: true,

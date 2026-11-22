@@ -51,7 +51,7 @@ extension MouseEventHandler {
         controller?.settings.onPointerSettingsChanged = { [weak self] in
             self?.reconcileMouseMoveSubscription()
             self?.syncTapFilterSnapshot()
-            self?.controller?.serviceLifecycleManager.reconcileNativeTouchSpaceSwipe()
+            self?.controller?.serviceLifecycleManager.reconcileNativeNavigationGestures()
         }
         reconcileMultitouchSource()
         syncTapFilterSnapshot()

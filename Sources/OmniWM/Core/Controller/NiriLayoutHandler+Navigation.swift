@@ -6,10 +6,10 @@ import Foundation
 import QuartzCore
 
 extension NiriLayoutHandler {
-    func focusNeighbor(direction: Direction) -> Bool {
+    func focusNeighbor(direction: Direction, in workspaceId: WorkspaceDescriptor.ID? = nil) -> Bool {
         guard let controller else { return false }
         guard let engine = controller.niriEngine else { return false }
-        guard let wsId = controller.activeWorkspace()?.id else { return false }
+        guard let wsId = workspaceId ?? controller.activeWorkspace()?.id else { return false }
 
         var state = controller.workspaceManager.niriViewportState(for: wsId)
         guard let currentId = state.selectedNodeId,

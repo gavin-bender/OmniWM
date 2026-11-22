@@ -188,24 +188,100 @@ final class TrackpadWindowGestureTests: XCTestCase {
         XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
     }
 
-    func testTouchDisplayWorkspaceSwipeUsesConfiguredAxisAndDirection() {
-        let left = CGPoint(x: -85, y: 15)
-        let up = CGPoint(x: 15, y: 85)
-        XCTAssertEqual(TouchDisplayWindowGestures.workspaceSwipeDirection(
-            translation: left, axis: .horizontal, naturalDirection: true
-        ), true)
-        XCTAssertEqual(TouchDisplayWindowGestures.workspaceSwipeDirection(
-            translation: up, axis: .vertical, naturalDirection: false
-        ), false)
-        XCTAssertNil(TouchDisplayWindowGestures.workspaceSwipeDirection(
-            translation: left, axis: .vertical, naturalDirection: true
-        ))
-        XCTAssertNil(TouchDisplayWindowGestures.workspaceSwipeDirection(
-            translation: CGPoint(x: 90, y: 90), axis: .vertical, naturalDirection: true
-        ))
+    func testTouchDisplayThreeFingerSwipeMapsBothAxesAndRespectsDirection() {
+        let cases: [(CGPoint, Bool, TouchDisplayWindowGestures.NavigationSwipe.Action)] = [
+            (CGPoint(x: -85, y: 15), true, .focusWindow(.right)),
+            (CGPoint(x: 85, y: 15), true, .focusWindow(.left)),
+            (CGPoint(x: 15, y: 85), true, .switchWorkspace(isNext: true)),
+            (CGPoint(x: 15, y: -85), true, .switchWorkspace(isNext: false)),
+            (CGPoint(x: -85, y: 15), false, .focusWindow(.left)),
+            (CGPoint(x: 15, y: 85), false, .switchWorkspace(isNext: false))
+        ]
+        for (translation, naturalDirection, action) in cases {
+            var swipe = TouchDisplayWindowGestures.NavigationSwipe()
+            XCTAssertEqual(swipe.finish(translation: translation, naturalDirection: naturalDirection), action)
+        }
     }
 
-    func testPauseNativeSpacesSwipesOnlyDropsHorizontalDockGesturesWhileEnabled() throws {
+    func testTouchDisplaySwipeIgnoresDiagonalAndKeepsFirstClearAxis() {
+        var swipe = TouchDisplayWindowGestures.NavigationSwipe()
+        XCTAssertNil(swipe.finish(translation: CGPoint(x: 90, y: 90), naturalDirection: true))
+        XCTAssertNil(swipe.finish(translation: CGPoint(x: 30, y: 5), naturalDirection: true))
+        swipe.observe(translation: CGPoint(x: -75, y: 20))
+        XCTAssertEqual(
+            swipe.finish(translation: CGPoint(x: -75, y: 150), naturalDirection: true),
+            .focusWindow(.right)
+        )
+        XCTAssertNil(swipe.finish(translation: CGPoint(x: -20, y: 150), naturalDirection: true))
+    }
+
+    func testTouchDisplayNavigatesNiriWindowsOnTouchedDisplay() throws {
+        let fixture = try makeNiriFixture(pid: 9_151)
+        let manager = fixture.controller.workspaceManager
+        let otherFrame = workingFrame.offsetBy(dx: workingFrame.width, dy: 0)
+        let otherMonitor = Monitor(
+            id: .init(displayId: 52_002),
+            displayId: 52_002,
+            frame: otherFrame,
+            visibleFrame: otherFrame,
+            hasNotch: false,
+            name: "External Display"
+        )
+        manager.applyMonitorConfigurationChange([fixture.monitor, otherMonitor])
+        manager.updateInteractionMonitor(otherMonitor.id, preservePrevious: true, notify: false)
+        XCTAssertNotEqual(fixture.controller.activeWorkspace()?.id, fixture.workspaceId)
+
+        let workspace = try XCTUnwrap(manager.activeWorkspace(on: fixture.monitor.id))
+        XCTAssertEqual(workspace.id, fixture.workspaceId)
+        manager.commitWorkspaceSelection(nodeId: fixture.first.id, focusedToken: fixture.first.token, in: workspace.id)
+
+        TouchDisplayWindowGestures.performNavigation(
+            .focusWindow(.right), in: workspace, on: fixture.monitor.id, controller: fixture.controller
+        )
+
+        XCTAssertEqual(manager.niriViewportState(for: fixture.workspaceId).selectedNodeId, fixture.second.id)
+    }
+
+    func testTouchDisplayNavigatesDwindleWindows() throws {
+        let fixture = try makeDwindleFixture(pid: 9_205)
+        let manager = fixture.controller.workspaceManager
+        let workspace = try XCTUnwrap(manager.descriptor(for: fixture.workspaceId))
+        let monitor = try XCTUnwrap(manager.monitorId(for: workspace.id))
+        let direction: Direction = fixture.firstFrame.midX < fixture.secondFrame.midX ? .right : .left
+        manager.withEngineMutationScope(in: workspace.id) {
+            fixture.engine.setSelectedNode(fixture.engine.findNode(for: fixture.first, in: workspace.id), in: workspace.id)
+        }
+
+        TouchDisplayWindowGestures.performNavigation(
+            .focusWindow(direction), in: workspace, on: monitor, controller: fixture.controller
+        )
+
+        XCTAssertEqual(fixture.engine.selectedNode(in: workspace.id)?.windowToken, fixture.second)
+    }
+
+    func testTouchDisplayNavigatesBetweenColumnsInVerticalNiriLayout() throws {
+        let fixture = try makeNiriFixture(pid: 9_152)
+        let controller = fixture.controller
+        let manager = controller.workspaceManager
+        let workspace = try XCTUnwrap(manager.descriptor(for: fixture.workspaceId))
+        controller.settings.monitors.updateOrientationSettings(
+            MonitorOrientationSettings(
+                monitorName: fixture.monitor.name,
+                monitorDisplayId: fixture.monitor.displayId,
+                orientation: .vertical
+            ),
+            for: fixture.monitor
+        )
+        manager.commitWorkspaceSelection(nodeId: fixture.first.id, focusedToken: fixture.first.token, in: workspace.id)
+
+        TouchDisplayWindowGestures.performNavigation(
+            .focusWindow(.right), in: workspace, on: fixture.monitor.id, controller: controller
+        )
+
+        XCTAssertEqual(manager.niriViewportState(for: workspace.id).selectedNodeId, fixture.second.id)
+    }
+
+    func testPauseNativeNavigationSwipesDropsHorizontalAndVerticalDockGesturesWhileEnabled() throws {
         let type = try XCTUnwrap(CGEventType(rawValue: InputTapThread.dockSwipeEventType))
         let kind = try XCTUnwrap(CGEventField(rawValue: 110))
         let axis = try XCTUnwrap(CGEventField(rawValue: 123))
@@ -219,6 +295,8 @@ final class TrackpadWindowGestureTests: XCTestCase {
         tap.updateFilterSnapshot { $0.suppressNativeSpaceSwitchGestures = true }
         XCTAssertNil(tap.evaluateTap(type: type, event: event))
         event.setIntegerValueField(axis, value: 2)
+        XCTAssertNil(tap.evaluateTap(type: type, event: event))
+        event.setIntegerValueField(axis, value: 3)
         XCTAssertNotNil(tap.evaluateTap(type: type, event: event))
         event.setIntegerValueField(axis, value: 1)
         event.setIntegerValueField(kind, value: 8)
@@ -240,12 +318,12 @@ final class TrackpadWindowGestureTests: XCTestCase {
         let journal = directory.appendingPathComponent("touch-space-swipe-restore")
         var count: Int32 = 4
         var writes: [Int32] = []
-        let preference = NativeTouchSpaceSwipeLease.Preference(read: { count }, write: { newCount in
+        let preference = NativeNavigationGestureLease.Preference(read: { count }, write: { newCount in
             writes.append(newCount)
             count = newCount
             return true
         })
-        let firstRun = NativeTouchSpaceSwipeLease(restoreURL: journal, preference: preference)
+        let firstRun = NativeNavigationGestureLease(restoreURL: journal, preference: preference)
         firstRun.reconcile(shouldPause: true)
         firstRun.reconcile(shouldPause: true)
         XCTAssertEqual(writes, [0])
@@ -262,7 +340,7 @@ final class TrackpadWindowGestureTests: XCTestCase {
         XCTAssertEqual(count, 3)
 
         firstRun.reconcile(shouldPause: true)
-        let nextRun = NativeTouchSpaceSwipeLease(restoreURL: journal, preference: preference)
+        let nextRun = NativeNavigationGestureLease(restoreURL: journal, preference: preference)
         nextRun.reconcile(shouldPause: false)
         XCTAssertEqual(writes, [0, 4, 0, 0, 3])
         XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))

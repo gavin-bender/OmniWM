@@ -62,7 +62,10 @@ struct MouseTrackpadSettingsTab: View {
 
     private var macOSGestureSection: some View {
         Section("macOS Gestures") {
-            Toggle("Pause macOS Spaces Swipes", isOn: Bindable(settings.gestures).suppressNativeSpaceSwitchGestures)
+            Toggle("Pause macOS Navigation Swipes", isOn: Bindable(settings.gestures).suppressNativeSpaceSwitchGestures)
+            SettingsCaption(
+                localized: "Pauses native swipes for Spaces, Mission Control, and App Exposé while OmniWM is enabled."
+            )
             SettingsCaption(
                 localized: "macOS can also respond to the same fingers. Turn off matching gestures in System Settings → Trackpad → More Gestures if both actions fire."
             )

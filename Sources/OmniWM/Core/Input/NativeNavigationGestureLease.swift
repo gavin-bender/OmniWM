@@ -5,27 +5,31 @@ import Foundation
 import OmniWMSystemGestures
 
 @MainActor
-final class NativeTouchSpaceSwipeLease {
+final class NativeNavigationGestureLease {
     @MainActor struct Preference {
         var read: () -> Int32?
         var write: (Int32) -> Bool
 
-        static let live = Self(
-            read: {
-                var count: Int32 = 0
-                return omniwm_touch_spaces_finger_count(&count) ? count : nil
-            },
-            write: { omniwm_set_touch_spaces_finger_count($0) }
-        )
+        static func system(_ gesture: OmniWMNativeGesturePreference) -> Self {
+            Self(
+                read: {
+                    var value: Int32 = 0
+                    return omniwm_native_gesture_value(gesture, &value) ? value : nil
+                },
+                write: { omniwm_set_native_gesture_value(gesture, $0) }
+            )
+        }
     }
 
     private let restoreURL: URL
+    private let enabledValues: Set<Int32>
     private let preference: Preference
     private var original: Int32?
     private var didCheckForPendingRestore = false
 
-    init(restoreURL: URL, preference: Preference = .live) {
+    init(restoreURL: URL, enabledValues: Set<Int32> = [3, 4], preference: Preference) {
         self.restoreURL = restoreURL
+        self.enabledValues = enabledValues
         self.preference = preference
     }
 
@@ -33,9 +37,9 @@ final class NativeTouchSpaceSwipeLease {
         if !didCheckForPendingRestore {
             didCheckForPendingRestore = true
             if let data = try? Data(contentsOf: restoreURL),
-               let count = Int32(String(decoding: data, as: UTF8.self)), count == 3 || count == 4
+               let value = Int32(String(decoding: data, as: UTF8.self)), enabledValues.contains(value)
             {
-                original = count
+                original = value
                 restore()
             }
         }
@@ -43,18 +47,18 @@ final class NativeTouchSpaceSwipeLease {
             restore()
             return
         }
-        guard original == nil, let count = preference.read(), count == 3 || count == 4 else { return }
+        guard original == nil, let value = preference.read(), enabledValues.contains(value) else { return }
         do {
             try FileManager.default.createDirectory(
                 at: restoreURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             guard !FileManager.default.fileExists(atPath: restoreURL.path) else { return }
-            try Data(String(count).utf8).write(to: restoreURL, options: .atomic)
+            try Data(String(value).utf8).write(to: restoreURL, options: .atomic)
         } catch {
             return
         }
-        original = count
-        if !preference.write(0), preference.read() == count {
+        original = value
+        if !preference.write(0), preference.read() == value {
             clearJournal()
         }
     }

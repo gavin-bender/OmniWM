@@ -3,6 +3,7 @@
 
 import AppKit
 import Darwin
+import OmniWMSystemGestures
 
 extension MouseEventHandler {
     var canStartTouchDisplayWindowGestures: Bool {
@@ -21,8 +22,40 @@ extension MouseEventHandler {
 
 @MainActor
 final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
+    struct NavigationSwipe {
+        enum Action: Equatable {
+            case focusWindow(Direction)
+            case switchWorkspace(isNext: Bool)
+        }
+
+        private static let minimumTravel: CGFloat = 60
+        private var axis: WorkspaceSwipeAxis?
+
+        mutating func observe(translation: CGPoint) {
+            guard axis == nil else { return }
+            let horizontal = abs(translation.x)
+            let vertical = abs(translation.y)
+            guard max(horizontal, vertical) >= Self.minimumTravel,
+                  max(horizontal, vertical) > min(horizontal, vertical) * 1.25
+            else { return }
+            axis = horizontal > vertical ? .horizontal : .vertical
+        }
+
+        mutating func finish(translation: CGPoint, naturalDirection: Bool) -> Action? {
+            observe(translation: translation)
+            guard let axis else { return nil }
+            let travel = axis == .horizontal ? translation.x : translation.y
+            guard abs(travel) >= Self.minimumTravel,
+                  let isNext = TrackpadGestureIntent.isNextWorkspace(
+                      axis: axis, displacement: travel, naturalDirection: naturalDirection
+                  )
+            else { return nil }
+            return axis == .horizontal ? .focusWindow(isNext ? .right : .left) : .switchWorkspace(isNext: isNext)
+        }
+    }
+
     private static let surfaceId = "touch-display-window-gestures"
-    private static let isPROLEDMac: Bool = {
+    static let isPROLEDMac: Bool = {
         // macOS can report touch capability on every screen when Sidecar is connected.
         var model = [UInt8](repeating: 0, count: 32)
         var length = model.count
@@ -38,6 +71,8 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
     private var activePan: NSPanGestureRecognizer?
     private var display: CGDirectDisplayID?
     private var workspace: WorkspaceDescriptor.ID?
+    private var navigationSwipe = NavigationSwipe()
+    private var usesNativeGesturePreferenceFallback = false
     private var timeout: Task<Void, Never>?
     private let dismissalMonitor = PanelDismissalMonitor()
 
@@ -75,8 +110,7 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         let content = NSView(frame: CGRect(origin: .zero, size: screen.visibleFrame.size))
         // AppKit delivers direct touch to the hit-tested view. Capture it only while this panel is open.
         content.allowedTouchTypes = .direct
-        // macOS uses three fingers for its built-in Touch Display swipes by default.
-        for fingerCount in [1, 2, 4] {
+        for fingerCount in 1 ... 3 {
             let pan = NSPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
             pan.allowedTouchTypes = .direct
             pan.buttonMask = 0
@@ -86,7 +120,7 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         }
 
         let instructions = NSTextField(wrappingLabelWithString: String(
-            localized: "One-finger drag to move. Two-finger drag near an edge to resize. Four-finger swipe to switch workspaces."
+            localized: "One-finger drag to move. Two-finger drag near an edge to resize. Swipe with three fingers left or right for windows, or up or down for workspaces."
         ))
         instructions.alignment = .center
         instructions.textColor = .labelColor
@@ -127,6 +161,10 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
                 suppressesManagedFocusRecovery: true
             )
         )
+        if !omniwm_set_window_direct_touch_system_gestures_disabled(Unmanaged.passUnretained(panel).toOpaque(), true) {
+            usesNativeGesturePreferenceFallback = true
+            controller.serviceLifecycleManager.setTouchDisplayGestureCapture(active: true)
+        }
         panel.makeKeyAndOrderFront(nil)
         dismissalMonitor.start(
             panels: [panel],
@@ -150,6 +188,7 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         activePan = nil
         workspace = nil
         display = nil
+        navigationSwipe = NavigationSwipe()
         timeout?.cancel()
         timeout = nil
         dismissalMonitor.stop()
@@ -158,6 +197,10 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         }
         panel.delegate = nil
         panel.orderOut(nil)
+        if usesNativeGesturePreferenceFallback {
+            usesNativeGesturePreferenceFallback = false
+            mouse?.controller?.serviceLifecycleManager.setTouchDisplayGestureCapture(active: false)
+        }
         mouse?.controller?.ownedWindowRegistry.unregister(surfaceId: Self.surfaceId)
         panel.close()
     }
@@ -170,13 +213,36 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         dismiss()
     }
 
-    nonisolated static func workspaceSwipeDirection(
-        translation: CGPoint, axis: WorkspaceSwipeAxis, naturalDirection: Bool
-    ) -> Bool? {
-        let primary = axis == .horizontal ? translation.x : translation.y
-        let cross = axis == .horizontal ? translation.y : translation.x
-        guard abs(primary) >= 60, abs(primary) > abs(cross) * 1.25 else { return nil }
-        return TrackpadGestureIntent.isNextWorkspace(axis: axis, displacement: primary, naturalDirection: naturalDirection)
+    static func performNavigation(
+        _ action: NavigationSwipe.Action,
+        in workspace: WorkspaceDescriptor,
+        on monitor: Monitor.ID,
+        controller: WMController
+    ) {
+        switch action {
+        case let .focusWindow(direction):
+            switch controller.settings.workspaces.layoutType(for: workspace.name) {
+            case .dwindle:
+                if !controller.dwindleLayoutHandler.focusNeighbor(direction: direction, in: workspace.id) {
+                    _ = controller.dwindleLayoutHandler.wrapGroupFocus(direction: direction, in: workspace.id)
+                }
+            case .niri,
+                 .defaultLayout:
+                guard let engine = controller.niriEngine,
+                      let display = controller.workspaceManager.monitor(byId: monitor)
+                else { return }
+                let handler = controller.niriLayoutHandler
+                let orientation = handler.resolvedOrientation(for: workspace.id, monitor: display, engine: engine)
+                let columnDirection: Direction = switch (orientation, direction) {
+                case (.vertical, .left): .down
+                case (.vertical, .right): .up
+                default: direction
+                }
+                _ = handler.focusNeighbor(direction: columnDirection, in: workspace.id)
+            }
+        case let .switchWorkspace(isNext):
+            controller.workspaceNavigationHandler.switchWorkspaceBySwipe(isNext: isNext, monitorId: monitor)
+        }
     }
 
     @available(macOS 27.0, *)
@@ -195,7 +261,7 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         case .began:
             guard activePan == nil, mouse.state.activeInteractionSource == nil,
                   !mouse.isTrackpadSwipeSessionActive else { return }
-            if pan.minimumNumberOfTouches == 4 {
+            if pan.minimumNumberOfTouches == 3 {
                 activePan = pan
                 workspace = currentWorkspace.id
                 return
@@ -225,16 +291,21 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
                 dismiss()
                 return
             }
-            if pan.minimumNumberOfTouches == 4 {
-                if pan.state == .ended,
-                   let isNext = Self.workspaceSwipeDirection(
-                       translation: pan.translation(in: view), axis: controller.settings.gestures.workspaceSwipeAxis,
-                       naturalDirection: controller.settings.gestures.invertDirection
-                   )
-                {
-                    dismiss()
-                    controller.workspaceNavigationHandler.switchWorkspaceBySwipe(isNext: isNext, monitorId: monitor.id)
+            if pan.minimumNumberOfTouches == 3 {
+                let translation = pan.translation(in: view)
+                if pan.state == .changed {
+                    navigationSwipe.observe(translation: translation)
+                    return
                 }
+                guard pan.state == .ended,
+                      mouse.state.activeInteractionSource == nil, !mouse.isTrackpadSwipeSessionActive,
+                      let action = navigationSwipe.finish(
+                          translation: translation,
+                          naturalDirection: controller.settings.gestures.invertDirection
+                      )
+                else { return }
+                dismiss()
+                Self.performNavigation(action, in: currentWorkspace, on: monitor.id, controller: controller)
                 return
             }
             guard mouse.state.activeInteractionSource == .touchDisplay else {

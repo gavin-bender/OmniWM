@@ -372,7 +372,7 @@ extension WMController {
             && !serviceLifecycleManager.isStoppingForUser && !serviceLifecycleManager.quitRequested
         if hasStartedServices {
             mouseEventHandler.syncTapFilterSnapshot()
-            serviceLifecycleManager.reconcileNativeTouchSpaceSwipe()
+            serviceLifecycleManager.reconcileNativeNavigationGestures()
         }
 
         let shouldEnableHotkeys = desiredHotkeysEnabled

@@ -23,12 +23,17 @@ private struct TouchCountProviderBox: Sendable {
 }
 
 final class InputTapThread: @unchecked Sendable {
-    // Dock's gesture stream also carries vertical swipes and pinches. Only the horizontal swipe changes Spaces.
     static let dockSwipeEventType: UInt32 = 30
     private static let hidDockSwipeType: UInt32 = 23
     private static let hidDockSwipeMotionField = (hidDockSwipeType << 16) | 1
     private static let dockGestureKindField = CGEventField(rawValue: 110)!
     private static let dockGestureAxisField = CGEventField(rawValue: 123)!
+
+    private enum DockSwipeMotion: Int64 {
+        case horizontal = 1
+        case vertical = 2
+        case pinch = 3
+    }
 
     private var thread: Thread?
     private var runLoopRef: CFRunLoop?
@@ -125,7 +130,7 @@ final class InputTapThread: @unchecked Sendable {
             return event
         }
         if snap.suppressNativeSpaceSwitchGestures, type.rawValue == Self.dockSwipeEventType,
-           Self.isHorizontalDockSwipe(event)
+           let motion = Self.dockSwipeMotion(event), motion != .pinch
         {
             return nil
         }
@@ -165,15 +170,16 @@ final class InputTapThread: @unchecked Sendable {
         }
     }
 
-    private nonisolated static func isHorizontalDockSwipe(_ event: CGEvent) -> Bool {
-        // macOS 27 carries the swipe motion in the attached HID event.
+    private nonisolated static func dockSwipeMotion(_ event: CGEvent) -> DockSwipeMotion? {
+        // macOS 27 can carry the motion in an attached HID event. Fall back to the CGEvent fields if it is incomplete.
         if #available(macOS 27.0, *), let hidEvent = CGEventCopyIOHIDEvent(event)?.takeRetainedValue(),
-           IOHIDEventGetType(hidEvent) == hidDockSwipeType
+           IOHIDEventGetType(hidEvent) == hidDockSwipeType,
+           let motion = DockSwipeMotion(rawValue: Int64(IOHIDEventGetIntegerValue(hidEvent, hidDockSwipeMotionField)))
         {
-            return IOHIDEventGetIntegerValue(hidEvent, hidDockSwipeMotionField) == 1
+            return motion
         }
-        return event.getIntegerValueField(dockGestureKindField) == Int64(hidDockSwipeType)
-            && event.getIntegerValueField(dockGestureAxisField) == 1
+        guard event.getIntegerValueField(dockGestureKindField) == Int64(hidDockSwipeType) else { return nil }
+        return DockSwipeMotion(rawValue: event.getIntegerValueField(dockGestureAxisField))
     }
 
     private nonisolated func evaluateLeftMouse(

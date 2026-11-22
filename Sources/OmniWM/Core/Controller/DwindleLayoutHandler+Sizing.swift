@@ -94,11 +94,12 @@ extension DwindleLayoutHandler {
     }
 
     func withDwindleContext(
+        in workspaceId: WorkspaceDescriptor.ID? = nil,
         perform: (DwindleLayoutEngine, WorkspaceDescriptor.ID) -> Void
     ) {
         guard let controller,
               let engine = controller.dwindleEngine,
-              let wsId = controller.activeWorkspace()?.id,
+              let wsId = workspaceId ?? controller.activeWorkspace()?.id,
               let monitor = controller.workspaceManager.monitor(for: wsId)
         else { return }
         controller.workspaceManager.withEngineMutationScope {

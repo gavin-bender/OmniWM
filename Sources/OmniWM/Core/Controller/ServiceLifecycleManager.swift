@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import OmniWMSystemGestures
 
 enum ActivationEventSource: String, Sendable {
     case focusedWindowChanged
@@ -24,9 +25,16 @@ final class ServiceLifecycleManager {
     private var workspaceObservation = WorkspaceEventObservation()
     private var screenParametersObserver: NSObjectProtocol?
     private var permissionCheckerTask: Task<Void, Never>?
-    private lazy var nativeTouchSpaceSwipeLease = NativeTouchSpaceSwipeLease(
-        restoreURL: OmniWMStoragePaths.live.stateDirectory.appendingPathComponent("touch-space-swipe-restore")
-    )
+    private var touchDisplayGestureCaptureActive = false
+    private lazy var trackpadNavigationGestures = [
+        nativeNavigationGesture(.system(OmniWMNativeGestureTrackpadMissionControl), "trackpad-mission-control-restore"),
+        nativeNavigationGesture(.system(OmniWMNativeGestureTrackpadAppExpose), "trackpad-app-expose-restore")
+    ]
+    private lazy var touchDisplayNavigationGestures = [
+        nativeNavigationGesture(.system(OmniWMNativeGestureTouchSpaces), "touch-space-swipe-restore", enabledValues: [3, 4]),
+        nativeNavigationGesture(.system(OmniWMNativeGestureTouchMissionControl), "touch-mission-control-restore"),
+        nativeNavigationGesture(.system(OmniWMNativeGestureTouchAppExpose), "touch-app-expose-restore")
+    ]
 
     var userStopPhase = UserStopPhase.idle
     var quitRequested = false
@@ -46,7 +54,7 @@ final class ServiceLifecycleManager {
 
     func start() {
         guard let controller, !isStoppingForUser, !quitRequested else { return }
-        reconcileNativeTouchSpaceSwipe()
+        reconcileNativeNavigationGestures()
         controller.startAppTheming()
         let initialPermissionGranted = AccessibilityPermissionMonitor.shared.isGranted
         controller.updateAccessibilityPermissionGranted(initialPermissionGranted)
@@ -55,12 +63,36 @@ final class ServiceLifecycleManager {
         startPermissionMonitoring()
     }
 
-    func reconcileNativeTouchSpaceSwipe() {
-        guard #available(macOS 27.2, *), let controller else { return }
-        let shouldPause = controller.hasStartedServices && controller.isEnabled
-            && controller.settings.gestures.suppressNativeSpaceSwitchGestures
-            && TouchDisplayWindowGestures.builtInTouchScreen() != nil
-        nativeTouchSpaceSwipeLease.reconcile(shouldPause: shouldPause)
+    private func nativeNavigationGesture(
+        _ preference: NativeNavigationGestureLease.Preference,
+        _ fileName: String,
+        enabledValues: Set<Int32> = [1]
+    ) -> NativeNavigationGestureLease {
+        NativeNavigationGestureLease(
+            restoreURL: OmniWMStoragePaths.live.stateDirectory.appendingPathComponent(fileName),
+            enabledValues: enabledValues,
+            preference: preference
+        )
+    }
+
+    func reconcileNativeNavigationGestures() {
+        guard let controller else { return }
+        let servicesActive = controller.hasStartedServices && controller.isEnabled
+        let pauseNative = servicesActive && controller.settings.gestures.suppressNativeSpaceSwitchGestures
+        for gesture in trackpadNavigationGestures {
+            gesture.reconcile(shouldPause: pauseNative)
+        }
+        guard #available(macOS 27.2, *), TouchDisplayWindowGestures.isPROLEDMac else { return }
+        let pauseTouchDisplay = pauseNative || (servicesActive && touchDisplayGestureCaptureActive)
+        for gesture in touchDisplayNavigationGestures {
+            gesture.reconcile(shouldPause: pauseTouchDisplay)
+        }
+    }
+
+    func setTouchDisplayGestureCapture(active: Bool) {
+        guard touchDisplayGestureCaptureActive != active else { return }
+        touchDisplayGestureCaptureActive = active
+        reconcileNativeNavigationGestures()
     }
 
     func restart() {
@@ -116,10 +148,7 @@ final class ServiceLifecycleManager {
             queue: .main
         ) { [weak self] _ in
             ScreenCoordinateSpace.invalidateCache()
-            Task { @MainActor in
-                self?.maybeStartServices()
-                self?.reconcileNativeTouchSpaceSwipe()
-            }
+            Task { @MainActor in self?.maybeStartServices() }
         }
     }
 
@@ -316,7 +345,8 @@ final class ServiceLifecycleManager {
             controller.cancelManagedFocusRequestAndRestoreSource(request)
         }
         controller.hasStartedServices = false
-        reconcileNativeTouchSpaceSwipe()
+        touchDisplayGestureCaptureActive = false
+        reconcileNativeNavigationGestures()
         let hostedRestorations = controller.shellAppWindowManager.prepareManagementStop()
         controller.updateWorkspaceBarNotificationBadgeSettings()
         controller.invalidateOverviewDeferredActionsForServiceStop()

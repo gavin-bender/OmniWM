@@ -37,7 +37,10 @@
     "The bundled launcher helper could not be found." : {
 
     },
-    "Pause macOS Spaces Swipes" : {
+    "Pause macOS Navigation Swipes" : {
+
+    },
+    "Pauses native swipes for Spaces, Mission Control, and App Exposé while OmniWM is enabled." : {
 
     },
     "Pause Palette Paste During Secure Input" : {
@@ -92893,7 +92896,7 @@
         }
       }
     },
-    "One-finger drag to move. Two-finger drag near an edge to resize. Four-finger swipe to switch workspaces." : {
+    "One-finger drag to move. Two-finger drag near an edge to resize. Swipe with three fingers left or right for windows, or up or down for workspaces." : {
 
     },
     "Only affects resizable windows in Niri when they create or claim a container. Primary span is width in horizontal orientation and height in vertical orientation." : {
