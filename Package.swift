@@ -38,6 +38,10 @@ let package = Package(
             path: "Frameworks/GhosttyKit.xcframework"
         ),
         .target(
+            name: "OmniWMSystemGestures",
+            cSettings: [.treatAllWarnings(as: .error)]
+        ),
+        .target(
             name: "OmniWMIPC",
             path: "Sources/OmniWMIPC",
             swiftSettings: [
@@ -130,6 +134,7 @@ let package = Package(
                 "OmniWMMaterialColor",
                 "OmniWMScriptHost",
                 "OmniWMShellCore",
+                "OmniWMSystemGestures",
                 .product(name: "TOML", package: "swift-toml")
             ],
             path: "Sources/OmniWM",

@@ -294,6 +294,7 @@ extension CanonicalTOMLConfig {
         gestures.dwindleGroupDragAcrossDisplays = gestures.dwindleGroupDragAcrossDisplays ?? .group
         gestures.adoptNativeResize = gestures.adoptNativeResize ?? false
         gestures.adoptNativeMoveAcrossDisplays = gestures.adoptNativeMoveAcrossDisplays ?? false
+        gestures.suppressNativeSpaceSwitchGestures = gestures.suppressNativeSpaceSwitchGestures ?? false
         return gestures
     }
 }

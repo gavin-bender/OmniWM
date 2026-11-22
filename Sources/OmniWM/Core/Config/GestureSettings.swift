@@ -102,6 +102,10 @@ final class GestureSettings {
         didSet { notifyChange() }
     }
 
+    var suppressNativeSpaceSwitchGestures = GestureSettings.defaults.suppressNativeSpaceSwitchGestures ?? false {
+        didSet { notifyChange() }
+    }
+
     var overviewGestureEnabled = GestureSettings.defaults.overviewGestureEnabled ?? false {
         didSet {
             guard oldValue != overviewGestureEnabled else { return }
@@ -204,7 +208,8 @@ final class GestureSettings {
             dwindleGroupDragAcrossDisplays: dwindleGroupDragAcrossDisplays,
             adoptNativeResize: adoptNativeResize,
             adoptNativeMoveAcrossDisplays: adoptNativeMoveAcrossDisplays,
-            mouseWheelSensitivity: mouseWheelSensitivity
+            mouseWheelSensitivity: mouseWheelSensitivity,
+            suppressNativeSpaceSwitchGestures: suppressNativeSpaceSwitchGestures
         )
     }
 
@@ -229,6 +234,7 @@ final class GestureSettings {
         workspaceSwipeFingerCount = gestures.workspaceSwipeFingerCount
         workspaceSwipeAxis = gestures.workspaceSwipeAxis
         workspaceSwipeEdgeBehavior = gestures.workspaceSwipeEdgeBehavior ?? .cycle
+        suppressNativeSpaceSwitchGestures = gestures.suppressNativeSpaceSwitchGestures ?? false
         overviewGestureEnabled = gestures.overviewGestureEnabled ?? false
         overviewGestureFingerCount = gestures.overviewGestureFingerCount ?? .four
         windowMoveEnabled = gestures.windowMoveEnabled ?? false

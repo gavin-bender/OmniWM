@@ -370,6 +370,10 @@ extension WMController {
     func reconcileEnabledAndHotkeysState() {
         isEnabled = desiredEnabled && accessibilityPermissionGranted
             && !serviceLifecycleManager.isStoppingForUser && !serviceLifecycleManager.quitRequested
+        if hasStartedServices {
+            mouseEventHandler.syncTapFilterSnapshot()
+            serviceLifecycleManager.reconcileNativeTouchSpaceSwipe()
+        }
 
         let shouldEnableHotkeys = desiredHotkeysEnabled
             && isEnabled

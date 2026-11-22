@@ -16,7 +16,8 @@ extension MouseEventHandler {
             (1 << CGEventType.otherMouseDown.rawValue) |
             (1 << CGEventType.otherMouseDragged.rawValue) |
             (1 << CGEventType.otherMouseUp.rawValue) |
-            (1 << CGEventType.scrollWheel.rawValue)
+            (1 << CGEventType.scrollWheel.rawValue) |
+            (1 << InputTapThread.dockSwipeEventType)
         if !annotatedMoveTapInstalled {
             mask |= 1 << CGEventType.mouseMoved.rawValue
         }
@@ -50,6 +51,7 @@ extension MouseEventHandler {
         controller?.settings.onPointerSettingsChanged = { [weak self] in
             self?.reconcileMouseMoveSubscription()
             self?.syncTapFilterSnapshot()
+            self?.controller?.serviceLifecycleManager.reconcileNativeTouchSpaceSwipe()
         }
         reconcileMultitouchSource()
         syncTapFilterSnapshot()

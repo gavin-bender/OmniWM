@@ -62,39 +62,9 @@ extension MouseEventHandler {
               let token = lockedContext.windowGestureTarget,
               let workspace = controller.workspaceManager.descriptor(for: lockedContext.workspaceId)
         else { return false }
-        let wsId = lockedContext.workspaceId
         let location = lockedContext.startLocation
-        let began: Bool
-        switch (controller.settings.workspaces.layoutType(for: workspace.name), mode) {
-        case (.dwindle, .windowMove):
-            guard let engine = controller.dwindleEngine else { return false }
-            began = beginDwindleMove(token: token, engine: engine, wsId: wsId, at: location, source: .trackpadGesture)
-        case (.dwindle, .windowResize):
-            guard let engine = controller.dwindleEngine else { return false }
-            began = beginDwindleResize(
-                token: token,
-                engine: engine,
-                wsId: wsId,
-                at: location,
-                edgePolicy: .nearestMovable,
-                source: .trackpadGesture
-            )
-        case (_, .windowMove):
-            guard let engine = controller.niriEngine, let window = engine.findNode(for: token, in: wsId) else {
-                return false
-            }
-            began = beginNiriMove(window: window, engine: engine, wsId: wsId, at: location, source: .trackpadGesture)
-        case (_, .windowResize):
-            guard let engine = controller.niriEngine, let window = engine.findNode(for: token, in: wsId) else {
-                return false
-            }
-            began = beginNiriResize(window: window, engine: engine, wsId: wsId, at: location, source: .trackpadGesture)
-        case (_, .overview),
-             (_, .columnScroll),
-             (_, .workspaceSwitch):
-            return false
-        }
-        guard began else {
+        guard beginWindowInteraction(mode, target: token, workspace: workspace, at: location, source: .trackpadGesture)
+        else {
             MouseTrace.record("gesture: \(mode) begin refused for \(token) at \(TraceFormat.point(location))")
             return false
         }
@@ -103,6 +73,46 @@ extension MouseEventHandler {
                 + (mode == .windowResize ? " edges=\(state.currentHoveredEdges)" : "")
         )
         return true
+    }
+
+    func beginWindowInteraction(
+        _ mode: TrackpadGestureMode,
+        target token: WindowToken,
+        workspace: WorkspaceDescriptor,
+        at location: CGPoint,
+        source: MouseInputState.InteractionSource
+    ) -> Bool {
+        guard let controller else { return false }
+        let wsId = workspace.id
+        switch (controller.settings.workspaces.layoutType(for: workspace.name), mode) {
+        case (.dwindle, .windowMove):
+            guard let engine = controller.dwindleEngine else { return false }
+            return beginDwindleMove(token: token, engine: engine, wsId: wsId, at: location, source: source)
+        case (.dwindle, .windowResize):
+            guard let engine = controller.dwindleEngine else { return false }
+            return beginDwindleResize(
+                token: token,
+                engine: engine,
+                wsId: wsId,
+                at: location,
+                edgePolicy: .nearestMovable,
+                source: source
+            )
+        case (_, .windowMove):
+            guard let engine = controller.niriEngine, let window = engine.findNode(for: token, in: wsId) else {
+                return false
+            }
+            return beginNiriMove(window: window, engine: engine, wsId: wsId, at: location, source: source)
+        case (_, .windowResize):
+            guard let engine = controller.niriEngine, let window = engine.findNode(for: token, in: wsId) else {
+                return false
+            }
+            return beginNiriResize(window: window, engine: engine, wsId: wsId, at: location, source: source)
+        case (_, .overview),
+             (_, .columnScroll),
+             (_, .workspaceSwitch):
+            return false
+        }
     }
 
     func gestureWindowLocation(for lockedContext: MouseInputState.LockedGestureContext) -> CGPoint {

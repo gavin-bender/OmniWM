@@ -15,6 +15,7 @@ struct TapFilterSnapshot: Sendable {
     var minGestureFingers: Int = 3
     var gestureActiveOrLatched: Bool = false
     var isInputSuppressed: Bool = false
+    var suppressNativeSpaceSwitchGestures = false
 }
 
 private struct TouchCountProviderBox: Sendable {
@@ -22,6 +23,13 @@ private struct TouchCountProviderBox: Sendable {
 }
 
 final class InputTapThread: @unchecked Sendable {
+    // Dock's gesture stream also carries vertical swipes and pinches. Only the horizontal swipe changes Spaces.
+    static let dockSwipeEventType: UInt32 = 30
+    private static let hidDockSwipeType: UInt32 = 23
+    private static let hidDockSwipeMotionField = (hidDockSwipeType << 16) | 1
+    private static let dockGestureKindField = CGEventField(rawValue: 110)!
+    private static let dockGestureAxisField = CGEventField(rawValue: 123)!
+
     private var thread: Thread?
     private var runLoopRef: CFRunLoop?
     private var sessionTapRef: CFMachPort?
@@ -116,6 +124,11 @@ final class InputTapThread: @unchecked Sendable {
         if snap.isInputSuppressed {
             return event
         }
+        if snap.suppressNativeSpaceSwitchGestures, type.rawValue == Self.dockSwipeEventType,
+           Self.isHorizontalDockSwipe(event)
+        {
+            return nil
+        }
 
         switch type {
         case .mouseMoved:
@@ -150,6 +163,17 @@ final class InputTapThread: @unchecked Sendable {
         default:
             return event
         }
+    }
+
+    private nonisolated static func isHorizontalDockSwipe(_ event: CGEvent) -> Bool {
+        // macOS 27 carries the swipe motion in the attached HID event.
+        if #available(macOS 27.0, *), let hidEvent = CGEventCopyIOHIDEvent(event)?.takeRetainedValue(),
+           IOHIDEventGetType(hidEvent) == hidDockSwipeType
+        {
+            return IOHIDEventGetIntegerValue(hidEvent, hidDockSwipeMotionField) == 1
+        }
+        return event.getIntegerValueField(dockGestureKindField) == Int64(hidDockSwipeType)
+            && event.getIntegerValueField(dockGestureAxisField) == 1
     }
 
     private nonisolated func evaluateLeftMouse(

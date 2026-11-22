@@ -62,6 +62,7 @@ struct MouseTrackpadSettingsTab: View {
 
     private var macOSGestureSection: some View {
         Section("macOS Gestures") {
+            Toggle("Pause macOS Spaces Swipes", isOn: Bindable(settings.gestures).suppressNativeSpaceSwitchGestures)
             SettingsCaption(
                 localized: "macOS can also respond to the same fingers. Turn off matching gestures in System Settings → Trackpad → More Gestures if both actions fire."
             )

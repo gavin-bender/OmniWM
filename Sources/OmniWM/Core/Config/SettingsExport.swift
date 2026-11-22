@@ -199,6 +199,7 @@ struct SettingsExport: Equatable {
         var adoptNativeResize: Bool? = false
         var adoptNativeMoveAcrossDisplays: Bool? = false
         var mouseWheelSensitivity: Double? = 1.0
+        var suppressNativeSpaceSwitchGestures: Bool? = false
     }
 
     struct StatusBar: Codable, Equatable {

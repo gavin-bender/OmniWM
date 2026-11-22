@@ -10,6 +10,7 @@ struct MouseInputState {
     enum InteractionSource: Hashable {
         case mouse(MouseEventHandler.MouseButton)
         case trackpadGesture
+        case touchDisplay
 
         var mouseButton: MouseEventHandler.MouseButton? {
             if case let .mouse(button) = self { button } else { nil }

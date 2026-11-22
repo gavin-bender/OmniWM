@@ -10,6 +10,12 @@ func CGEventCopyIOHIDEvent(_ event: CGEvent) -> Unmanaged<CFTypeRef>?
 @_silgen_name("IOHIDEventGetSenderID")
 func IOHIDEventGetSenderID(_ event: CFTypeRef) -> UInt64
 
+@_silgen_name("IOHIDEventGetType")
+func IOHIDEventGetType(_ event: CFTypeRef) -> UInt32
+
+@_silgen_name("IOHIDEventGetIntegerValue")
+func IOHIDEventGetIntegerValue(_ event: CFTypeRef, _ field: UInt32) -> Int
+
 typealias SLPSMode = UInt32
 let kCPSUserGenerated: SLPSMode = 0x200
 

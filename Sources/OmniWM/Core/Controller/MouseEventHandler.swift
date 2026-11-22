@@ -11,6 +11,7 @@ final class MouseEventHandler {
     weak var controller: WMController?
     let eventIntake: EventIntake
     let inputTapThread = InputTapThread()
+    lazy var touchDisplayWindowGestures = TouchDisplayWindowGestures(mouse: self)
     var state = MouseInputState() {
         didSet {
             if oldValue.capturedInteractionButton != state.capturedInteractionButton
@@ -79,6 +80,7 @@ final class MouseEventHandler {
     }
 
     func cleanup() {
+        touchDisplayWindowGestures.dismiss()
         state.latestFocusFollowsMouseSample = nil
         clearNativeTitleBarDrag()
         state.nativeResizeCorrectionsByWindowId.removeAll()
@@ -166,6 +168,7 @@ final class MouseEventHandler {
     }
 
     func suspendMultitouchForSleep() {
+        touchDisplayWindowGestures.dismiss()
         multitouchSource?.suspendForSleep()
     }
 
@@ -293,6 +296,8 @@ final class MouseEventHandler {
             || state.consumeTrackpadScrollUntilAllTouchesLift
             || state.suppressTrackpadMomentumScroll
         let inputSuppressed = isInputSuppressed
+        let suppressNativeSpaceSwitchGestures = controller?.isEnabled == true
+            && controller?.settings.gestures.suppressNativeSpaceSwitchGestures == true
 
         inputTapThread.updateFilterSnapshot { snapshot in
             snapshot.activeCapture = capturedButton
@@ -304,6 +309,7 @@ final class MouseEventHandler {
             snapshot.minGestureFingers = minFingers
             snapshot.gestureActiveOrLatched = latched
             snapshot.isInputSuppressed = inputSuppressed
+            snapshot.suppressNativeSpaceSwitchGestures = suppressNativeSpaceSwitchGestures
         }
     }
 

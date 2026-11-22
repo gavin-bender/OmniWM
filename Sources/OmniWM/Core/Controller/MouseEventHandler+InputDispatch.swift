@@ -111,6 +111,7 @@ extension MouseEventHandler {
             handleInputSuppressionBegan()
             return
         }
+        guard state.activeInteractionSource != .touchDisplay else { return }
         warpDraggedPointer(at: location)
         controller?.workspaceBarManager.handleAutoHideMouseMoved(at: location)
         confirmNativeMouseDrag(at: location, button: button)
@@ -129,6 +130,7 @@ extension MouseEventHandler {
             handleInputSuppressionBegan()
             return
         }
+        guard state.activeInteractionSource != .touchDisplay else { return }
         markNativeTitleBarDragFallbackReleased(button: button, at: location)
         finishNativeTitleBarDragIfNeeded(button: button)
         if !isCapturedInteraction(button), shouldBlockOwnWindowInput(at: location) {

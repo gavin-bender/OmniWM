@@ -191,6 +191,12 @@ struct StatusMenuPrimaryView: View {
                 }
                 MenuDivider()
             }
+            if let mouse = model.controller?.mouseEventHandler, mouse.canStartTouchDisplayWindowGestures {
+                MenuActionRow(icon: "hand.tap", label: String(localized: "Touch Display Gestures")) {
+                    mouse.startTouchDisplayWindowGestures()
+                }
+                MenuDivider()
+            }
             if model.hasVisiblePrimaryRows {
                 if model.canShowHiddenIcons, model.isMenuItemVisible(.hiddenIcons) {
                     MenuActionRow(

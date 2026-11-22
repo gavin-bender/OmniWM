@@ -163,6 +163,111 @@ final class TrackpadWindowGestureTests: XCTestCase {
         XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
     }
 
+    func testTouchDisplayMoveUsesAbsolutePositionAndHasNoMouseButton() throws {
+        let fixture = try makeNiriFixture(pid: 9_150)
+        let handler = fixture.handler
+        let workspace = try XCTUnwrap(fixture.controller.workspaceManager.descriptor(for: fixture.workspaceId))
+        XCTAssertTrue(handler.beginWindowInteraction(
+            .windowMove,
+            target: fixture.first.token,
+            workspace: workspace,
+            at: fixture.firstFrame.center,
+            source: .touchDisplay
+        ))
+        XCTAssertNil(handler.state.activeInteractionButton)
+        XCTAssertFalse(handler.state.gestureOwnsWindowInteraction)
+        handler.pressedMouseButtonsProvider = { 0 }
+        handler.dispatchMouseDragged(at: fixture.firstFrame.center)
+        handler.dispatchMouseUp(at: fixture.firstFrame.center)
+        XCTAssertEqual(handler.state.activeInteractionSource, .touchDisplay)
+
+        handler.updateActiveMove(at: fixture.secondFrame.center)
+        handler.completeActiveMove(at: fixture.secondFrame.center)
+
+        XCTAssertNil(handler.state.activeInteractionSource)
+        XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
+    }
+
+    func testTouchDisplayWorkspaceSwipeUsesConfiguredAxisAndDirection() {
+        let left = CGPoint(x: -85, y: 15)
+        let up = CGPoint(x: 15, y: 85)
+        XCTAssertEqual(TouchDisplayWindowGestures.workspaceSwipeDirection(
+            translation: left, axis: .horizontal, naturalDirection: true
+        ), true)
+        XCTAssertEqual(TouchDisplayWindowGestures.workspaceSwipeDirection(
+            translation: up, axis: .vertical, naturalDirection: false
+        ), false)
+        XCTAssertNil(TouchDisplayWindowGestures.workspaceSwipeDirection(
+            translation: left, axis: .vertical, naturalDirection: true
+        ))
+        XCTAssertNil(TouchDisplayWindowGestures.workspaceSwipeDirection(
+            translation: CGPoint(x: 90, y: 90), axis: .vertical, naturalDirection: true
+        ))
+    }
+
+    func testPauseNativeSpacesSwipesOnlyDropsHorizontalDockGesturesWhileEnabled() throws {
+        let type = try XCTUnwrap(CGEventType(rawValue: InputTapThread.dockSwipeEventType))
+        let kind = try XCTUnwrap(CGEventField(rawValue: 110))
+        let axis = try XCTUnwrap(CGEventField(rawValue: 123))
+        let event = try XCTUnwrap(CGEvent(source: nil))
+        let tap = InputTapThread()
+        event.type = type
+        event.setIntegerValueField(kind, value: 23)
+        event.setIntegerValueField(axis, value: 1)
+        XCTAssertNotNil(tap.evaluateTap(type: type, event: event))
+
+        tap.updateFilterSnapshot { $0.suppressNativeSpaceSwitchGestures = true }
+        XCTAssertNil(tap.evaluateTap(type: type, event: event))
+        event.setIntegerValueField(axis, value: 2)
+        XCTAssertNotNil(tap.evaluateTap(type: type, event: event))
+        event.setIntegerValueField(axis, value: 1)
+        event.setIntegerValueField(kind, value: 8)
+        XCTAssertNotNil(tap.evaluateTap(type: type, event: event))
+        event.setIntegerValueField(kind, value: 23)
+
+        tap.updateFilterSnapshot { $0.isInputSuppressed = true }
+        XCTAssertNotNil(tap.evaluateTap(type: type, event: event))
+        tap.updateFilterSnapshot {
+            $0.isInputSuppressed = false
+            $0.suppressNativeSpaceSwitchGestures = false
+        }
+        XCTAssertNotNil(tap.evaluateTap(type: type, event: event))
+    }
+
+    func testTouchDisplaySpacesSettingIsRestoredAndRespectsSystemSettingsChanges() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let journal = directory.appendingPathComponent("touch-space-swipe-restore")
+        var count: Int32 = 4
+        var writes: [Int32] = []
+        let preference = NativeTouchSpaceSwipeLease.Preference(read: { count }, write: { newCount in
+            writes.append(newCount)
+            count = newCount
+            return true
+        })
+        let firstRun = NativeTouchSpaceSwipeLease(restoreURL: journal, preference: preference)
+        firstRun.reconcile(shouldPause: true)
+        firstRun.reconcile(shouldPause: true)
+        XCTAssertEqual(writes, [0])
+        XCTAssertEqual(try String(contentsOf: journal, encoding: .utf8), "4")
+
+        firstRun.reconcile(shouldPause: false)
+        XCTAssertEqual(writes, [0, 4])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))
+
+        firstRun.reconcile(shouldPause: true)
+        count = 3
+        firstRun.reconcile(shouldPause: false)
+        XCTAssertEqual(writes, [0, 4, 0])
+        XCTAssertEqual(count, 3)
+
+        firstRun.reconcile(shouldPause: true)
+        let nextRun = NativeTouchSpaceSwipeLease(restoreURL: journal, preference: preference)
+        nextRun.reconcile(shouldPause: false)
+        XCTAssertEqual(writes, [0, 4, 0, 0, 3])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))
+    }
+
     func testThreeFingerResizePreservesLifecycleAcrossSensitivities() throws {
         let cases: [(Double, CGFloat, pid_t)] = [(1, 160, 9_102), (0.5, 80, 9_103)]
         for (sensitivity, delta, pid) in cases {
