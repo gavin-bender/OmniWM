@@ -43,6 +43,30 @@ final class MenuBarAutohideHoldTests: XCTestCase {
         RuntimeStateStore(directory: directory, deferSaves: false)
     }
 
+    func testExplicitModesRespectPanelAccessAndRestoreOriginalNativePreference() {
+        for initial in [nil, false, true] as [Bool?] {
+            let menu = FakeMenuBarAutohide()
+            menu.preference = initial
+            let hold = MenuBarAutohideHold(system: menu.system, runtimeState: store())
+            hold.update(topBarMode: .native, configuredHiding: true)
+            XCTAssertEqual(menu.preference, false)
+            XCTAssertTrue(hold.setMenuAccess(true))
+            hold.update(topBarMode: .omniWM, configuredHiding: false)
+            XCTAssertEqual(menu.preference, false)
+            XCTAssertTrue(hold.setMenuAccess(false))
+            XCTAssertEqual(menu.preference, true)
+            hold.update(topBarMode: .hidden, configuredHiding: false)
+            XCTAssertEqual(menu.preference, true)
+            hold.update(topBarMode: .native, configuredHiding: false)
+            XCTAssertTrue(hold.setMenuAccess(true))
+            XCTAssertTrue(hold.setMenuAccess(false))
+            XCTAssertEqual(menu.preference, false)
+            hold.update(topBarMode: nil, configuredHiding: false)
+            XCTAssertEqual(menu.preference, initial)
+            XCTAssertNil(store().menuBarHideHold)
+        }
+    }
+
     func testStartupLeavesOrdinaryPersistentHoldForCurrentBarPolicy() {
         for preference in [nil, false, true] {
             let menuBar = FakeMenuBarAutohide()

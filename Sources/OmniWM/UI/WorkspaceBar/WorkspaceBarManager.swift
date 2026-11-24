@@ -136,7 +136,7 @@ final class WorkspaceBarManager {
         updateShellHiddenBarPlacement()
         rebuildAutoHideTargets()
         if let menuBarHold, let controller {
-            menuBarHold.update(hiding: bars.contains { bar in
+            menuBarHold.update(topBarMode: controller.topBarMode, configuredHiding: bars.contains { bar in
                 let resolved = settings.workspaceBar.resolved(for: bar.monitor)
                 return controller.isWorkspaceBarEnabled(on: bar.monitor, resolved: resolved)
                     && Self.hidesMenuBar(resolved)
@@ -265,7 +265,7 @@ final class WorkspaceBarManager {
             stopShellHost()
         }
         syncNotificationBadges()
-        menuBarHold?.update(hiding: false)
+        menuBarHold?.update(topBarMode: nil, configuredHiding: false)
     }
 
     private func updateBarFrameAndPosition(

@@ -280,6 +280,12 @@ extension CommandHandler {
 
     func perform(_ action: IPCPresentationCommand, controller: WMController) -> ExternalCommandResult {
         switch action {
+        case .hideTopBar:
+            controller.setTopBarMode(.hidden)
+        case .toggleTopBar:
+            controller.setTopBarMode(controller.currentTopBarMode == .omniWM ? .native : .omniWM)
+        case .cycleTopBar:
+            controller.setTopBarMode(controller.currentTopBarMode.next)
         case .workspaceBar:
             controller.toggleWorkspaceBarVisibility()
         case .hiddenBar:

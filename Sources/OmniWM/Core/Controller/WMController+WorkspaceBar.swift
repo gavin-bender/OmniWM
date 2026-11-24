@@ -5,14 +5,48 @@ import AppKit
 import Foundation
 import OmniWMIPC
 
+enum TopBarMode {
+    case native, omniWM, hidden
+
+    var next: Self {
+        switch self {
+        case .native: .omniWM
+        case .omniWM: .hidden
+        case .hidden: .native
+        }
+    }
+}
+
 extension WMController {
+    var currentTopBarMode: TopBarMode {
+        if let topBarMode { return topBarMode }
+        if let monitor = monitorForInteraction(),
+           isWorkspaceBarEnabled(on: monitor, resolved: settings.workspaceBar.resolved(for: monitor))
+        {
+            return .omniWM
+        }
+        return workspaceBarManager.menuBarHold?.nativeAutoHideEnabled == true ? .hidden : .native
+    }
+
+    func setTopBarMode(_ mode: TopBarMode) {
+        topBarMode = mode
+        hiddenWorkspaceBarMonitorIds.removeAll()
+        hiddenBarController.dismissPanel()
+        workspaceBarManager.menuBarHold?.update(topBarMode: mode, configuredHiding: false)
+        cachedMonitorLayout = nil
+        workspaceManager.invalidateAllLayouts()
+        layoutRefreshController.requestRelayout(reason: .monitorSettingsChanged)
+        surfaceReconciler.noteWorldChanged()
+        syncWorkspaceBarRevealMonitor()
+    }
+
     @discardableResult
     func toggleWorkspaceBarVisibility() -> Bool {
         pruneHiddenWorkspaceBarMonitorIds()
 
         guard let monitor = monitorForInteraction() else { return false }
         let resolved = settings.workspaceBar.resolved(for: monitor)
-        guard resolved.enabled else { return false }
+        guard topBarMode == .omniWM || resolved.enabled else { return false }
 
         if hiddenWorkspaceBarMonitorIds.contains(monitor.id) {
             hiddenWorkspaceBarMonitorIds.remove(monitor.id)
@@ -80,6 +114,7 @@ extension WMController {
     }
 
     func cleanupUIOnStop() {
+        topBarMode = nil
         niriEdgePictures.reset()
         windowSwitcherControllerStorage?.dismiss()
         workspaceBarRevealMonitor.stop()
@@ -87,7 +122,7 @@ extension WMController {
     }
 
     var workspaceBarRefreshIsEnabled: Bool {
-        settings.workspaceBar.enabled
+        topBarMode.map { $0 == .omniWM } ?? settings.workspaceBar.enabled
     }
 
     var statusBarRefreshIsEnabled: Bool {
@@ -107,6 +142,7 @@ extension WMController {
     }
 
     func setWorkspaceBarEnabled(_ enabled: Bool) {
+        topBarMode = nil
         if settings.workspaceBar.enabled != enabled {
             settings.workspaceBar.enabled = enabled
         }
@@ -288,12 +324,13 @@ extension WMController {
     }
 
     func isWorkspaceBarEnabled(on monitor: Monitor, resolved: ResolvedBarSettings) -> Bool {
-        resolved.enabled && !hiddenWorkspaceBarMonitorIds.contains(monitor.id)
+        (topBarMode.map { $0 == .omniWM } ?? resolved.enabled) && !hiddenWorkspaceBarMonitorIds.contains(monitor.id)
     }
 
     func isWorkspaceBarConfiguredVisible(on monitor: Monitor, resolved: ResolvedBarSettings) -> Bool {
         guard isWorkspaceBarEnabled(on: monitor, resolved: resolved) else { return false }
-        return !resolved.autoHide || isWorkspaceBarRevealHeld || workspaceBarManager.isPointerRevealed(on: monitor.id)
+        return topBarMode == .omniWM || !resolved.autoHide || isWorkspaceBarRevealHeld || workspaceBarManager
+            .isPointerRevealed(on: monitor.id)
     }
 
     func isWorkspaceBarVisible(on monitor: Monitor, resolved: ResolvedBarSettings? = nil) -> Bool {
@@ -303,7 +340,7 @@ extension WMController {
     }
 
     func canAutoHideWorkspaceBar(on monitor: Monitor, resolved: ResolvedBarSettings) -> Bool {
-        resolved.autoHide && isWorkspaceBarEnabled(on: monitor, resolved: resolved)
+        topBarMode != .omniWM && resolved.autoHide && isWorkspaceBarEnabled(on: monitor, resolved: resolved)
             && !isWorkspaceBarSuppressedByNativeFullscreen(on: monitor, resolved: resolved)
     }
 

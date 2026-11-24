@@ -64,6 +64,8 @@ final class MenuBarAutohideHold {
     private var request: Bool?
     private var deferredRequest: Bool?
     private var menuAccess = false
+    private var panelRequestsMenu = false
+    private var modeRequestsMenu = false
 
     init(system: System = .live, runtimeState: RuntimeStateStore) {
         self.system = system
@@ -77,6 +79,16 @@ final class MenuBarAutohideHold {
         request == true
     }
 
+    var nativeAutoHideEnabled: Bool {
+        system.preference() == true
+    }
+
+    func update(topBarMode: TopBarMode?, configuredHiding: Bool) {
+        update(hiding: topBarMode.map { $0 != .native } ?? configuredHiding)
+        modeRequestsMenu = topBarMode == .native
+        _ = reconcileMenuAccess()
+    }
+
     func update(hiding: Bool) {
         if menuAccess {
             deferredRequest = hiding
@@ -87,6 +99,14 @@ final class MenuBarAutohideHold {
 
     @discardableResult
     func setMenuAccess(_ active: Bool) -> Bool {
+        panelRequestsMenu = active
+        let applied = reconcileMenuAccess()
+        if active, !applied { panelRequestsMenu = false }
+        return applied
+    }
+
+    private func reconcileMenuAccess() -> Bool {
+        let active = panelRequestsMenu || modeRequestsMenu
         guard menuAccess != active else { return true }
         if active {
             let current = system.preference()

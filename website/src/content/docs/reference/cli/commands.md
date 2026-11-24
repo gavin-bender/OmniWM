@@ -210,6 +210,9 @@ Workspace IDs are global, so `switch-workspace 3` targets workspace `3` wherever
 | `command window-switcher` | `<next\|previous>` | shared | **Unreleased:** available when building from `main`. Open the window switcher in the remembered scope, or move its selection if open; releasing the held modifiers focuses the selection |
 | `command window-switcher` | `<next\|previous> <active-workspace\|visible-workspaces\|all-workspaces>` | shared | **Unreleased:** available when building from `main`. Open the window switcher in a scope, or move its selection if open; releasing the held modifiers focuses the selection |
 | `command open-menu-anywhere` | — | shared | Open the menu surface |
+| `command hide-top-bar` | — | shared | Hide the workspace bar and auto-hide the macOS menu bar |
+| `command toggle-top-bar` | — | shared | Switch between the native menu bar and OmniWM workspace bar |
+| `command cycle-top-bar` | — | shared | Cycle through native, OmniWM, and hidden top bars |
 | `command toggle-workspace-bar` | — | shared | Toggle workspace bar visibility |
 | `command hidden-bar panel` | — | shared | Toggle the panel containing configured hidden menu-bar items |
 | `command toggle-quake-terminal` | — | shared | Toggle the configured Quake terminal |

@@ -117,6 +117,7 @@ final class WMController {
     @ObservationIgnored
     let floatDemotionTracker = FloatDemotionTracker()
     @ObservationIgnored
+    var topBarMode: TopBarMode?
     var hiddenWorkspaceBarMonitorIds: Set<Monitor.ID> = []
     @ObservationIgnored
     var isWorkspaceBarRevealHeld = false

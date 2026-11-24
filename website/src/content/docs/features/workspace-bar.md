@@ -15,6 +15,12 @@ Window hover previews can be turned off separately. Turning off the global Works
 
 Open **Settings > Styles & Widgets > Bar** to arrange widgets, select a widget for its options, and adjust placement, appearance and behavior. Use **Display** for display-specific settings. The enable switches, exclusions and icon overrides apply to every style. Select a style in the strip to edit it; choose **Use Style** to activate it. The bar’s controls remain editable while its enable switch is off.
 
+## Top bar shortcuts
+
+**Control–Option–Shift–B** cycles all displays through the native macOS menu bar, the OmniWM workspace bar, and hidden mode. Hidden mode hides the workspace bar and lets macOS reveal its menu bar at the screen edge. Quitting OmniWM restores the previous native menu-bar preference.
+
+In **Settings → Keyboard Shortcuts**, search for **Top Bar** to change the cycle shortcut or assign keys to **Hide Top Bar** and **Switch Native and OmniWM Top Bars**. The existing **Toggle Workspace Bar** action controls the workspace bar on the display you’re using. Existing shortcut configurations leave new actions unassigned until you bind them.
+
 ## Clicking the bar
 
 - Click a workspace chip to switch to that workspace.

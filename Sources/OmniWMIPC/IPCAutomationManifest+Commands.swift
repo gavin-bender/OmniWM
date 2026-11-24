@@ -430,6 +430,9 @@ extension IPCAutomationManifest {
             name: .openMenuAnywhere,
             summary: "Open the menu surface anywhere."
         ),
+        .init(name: .presentation(.hideTopBar), summary: "Hide Top Bar."),
+        .init(name: .presentation(.toggleTopBar), summary: "Switch Native and OmniWM Top Bars."),
+        .init(name: .presentation(.cycleTopBar), summary: "Cycle Top Bar Mode."),
         .init(
             name: .presentation(.workspaceBar),
             summary: "Toggle runtime workspace bar visibility."

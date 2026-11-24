@@ -11,7 +11,7 @@ extension WorkspaceBarManager {
 
     func prepareShell(for bars: [DesiredBarSurface], settings: SettingsStore) {
         lastBars = bars
-        if settings.workspaceBar.enabled || settings.island.enabled {
+        if (controller?.workspaceBarRefreshIsEnabled ?? settings.workspaceBar.enabled) || settings.island.enabled {
             startShellHostIfNeeded(settings: settings)
         } else {
             if shellHost != nil { stopShellHost() }

@@ -82,6 +82,9 @@ toggle-system-stats
 toggle-quake-terminal
 toggle-workspace-bar
 hidden-bar-panel
+hide-top-bar
+toggle-top-bar
+cycle-top-bar
 volume-up
 volume-down
 volume-mute

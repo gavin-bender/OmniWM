@@ -3,6 +3,7 @@
 
 import AppKit
 @testable import OmniWM
+import OmniWMIPC
 import SwiftUI
 import XCTest
 
@@ -37,6 +38,34 @@ final class WorkspaceBarManagerTests: XCTestCase {
     override func tearDown() async throws {
         controller = nil
         try await super.tearDown()
+    }
+
+    func testTopBarShortcutsCycleAndToggleWithWorkspaceBarInitiallyDisabled() {
+        controller.settings.workspaceBar.enabled = false
+        controller.workspaceManager.applyMonitorConfigurationChange([monitor])
+        let menu = FakeMenuBarAutohide()
+        controller.workspaceBarManager.menuBarHold = MenuBarAutohideHold(
+            system: menu.system, runtimeState: RuntimeStateStore(
+                directory: controller.settings.settingsFileURL.deletingLastPathComponent(), deferSaves: false
+            )
+        )
+        let handler = controller.commandHandler
+        for (action, expected) in [
+            (IPCPresentationCommand.cycleTopBar, TopBarMode.omniWM),
+            (.cycleTopBar, .hidden),
+            (.cycleTopBar, .native),
+            (.toggleTopBar, .omniWM),
+            (.toggleTopBar, .native),
+            (.hideTopBar, .hidden)
+        ] {
+            XCTAssertEqual(handler.perform(action, controller: controller), .executed)
+            XCTAssertEqual(controller.currentTopBarMode, expected)
+            XCTAssertEqual(controller.isWorkspaceBarVisible(on: monitor), expected == .omniWM)
+            XCTAssertEqual(menu.preference, expected != .native)
+        }
+        XCTAssertFalse(controller.settings.workspaceBar.enabled)
+        controller.cleanupUIOnStop()
+        XCTAssertEqual(menu.preference, false)
     }
 
     func testPrimaryBarFrameChangesWithContent() async throws {

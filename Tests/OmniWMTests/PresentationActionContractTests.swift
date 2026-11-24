@@ -142,6 +142,21 @@ private struct PresentationExpectation {
                 id: "toggleHiddenBarPanel",
                 title: "Toggle Hidden Icons Panel",
                 binding: .unassigned
+            ),
+            PresentationExpectation(
+                ipc: .hideTopBar, command: .presentation(.hideTopBar), id: "hideTopBar",
+                title: "Hide Top Bar", binding: .unassigned
+            ),
+            PresentationExpectation(
+                ipc: .toggleTopBar, command: .presentation(.toggleTopBar), id: "toggleTopBar",
+                title: "Switch Native and OmniWM Top Bars", binding: .unassigned
+            ),
+            PresentationExpectation(
+                ipc: .cycleTopBar, command: .presentation(.cycleTopBar), id: "cycleTopBar",
+                title: "Cycle Top Bar Mode", binding: KeyBinding(
+                    keyCode: UInt32(kVK_ANSI_B),
+                    modifiers: UInt32(controlKey | optionKey | shiftKey)
+                )
             )
         ]
     }

@@ -7,4 +7,7 @@ public enum IPCPresentationCommand: String, CaseIterable, Hashable, Sendable {
     case quakeTerminal = "toggle-quake-terminal"
     case workspaceBar = "toggle-workspace-bar"
     case hiddenBar = "hidden-bar-panel"
+    case hideTopBar = "hide-top-bar"
+    case toggleTopBar = "toggle-top-bar"
+    case cycleTopBar = "cycle-top-bar"
 }

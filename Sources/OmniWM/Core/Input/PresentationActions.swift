@@ -23,6 +23,18 @@ extension IPCPresentationCommand {
                 "command.presentation.workspaceBar", defaultValue: "Toggle Workspace Bar", table: "Commands",
                 bundle: .omniWM
             )
+        case .hideTopBar: LocalizedStringResource(
+                "command.presentation.hideTopBar", defaultValue: "Hide Top Bar", table: "Commands", bundle: .omniWM
+            )
+        case .toggleTopBar: LocalizedStringResource(
+                "command.presentation.toggleTopBar", defaultValue: "Switch Native and OmniWM Top Bars",
+                table: "Commands",
+                bundle: .omniWM
+            )
+        case .cycleTopBar: LocalizedStringResource(
+                "command.presentation.cycleTopBar", defaultValue: "Cycle Top Bar Mode", table: "Commands",
+                bundle: .omniWM
+            )
         case .hiddenBar: LocalizedStringResource(
                 "command.presentation.hiddenBar", defaultValue: "Toggle Hidden Icons Panel", table: "Commands",
                 bundle: .omniWM
@@ -51,6 +63,18 @@ extension IPCPresentationCommand {
             id = "toggleWorkspaceBarVisibility"
             keywords = ["workspace bar", "bar"]
             binding = .unassigned
+        case .hideTopBar:
+            id = "hideTopBar"
+            keywords = ["hide", "top bar", "menu bar"]
+            binding = .unassigned
+        case .toggleTopBar:
+            id = "toggleTopBar"
+            keywords = ["switch", "top bar", "native", "workspace bar"]
+            binding = .unassigned
+        case .cycleTopBar:
+            id = "cycleTopBar"
+            keywords = ["cycle", "top bar", "native", "hidden", "workspace bar"]
+            binding = KeyBinding(keyCode: UInt32(kVK_ANSI_B), modifiers: UInt32(controlKey | optionKey | shiftKey))
         case .hiddenBar:
             id = "toggleHiddenBarPanel"
             keywords = ["hidden bar", "icons", "menu bar"]

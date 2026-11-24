@@ -9171,6 +9171,39 @@
         }
       }
     },
+    "command.presentation.hideTopBar" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hide Top Bar"
+          }
+        }
+      }
+    },
+    "command.presentation.toggleTopBar" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Switch Native and OmniWM Top Bars"
+          }
+        }
+      }
+    },
+    "command.presentation.cycleTopBar" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cycle Top Bar Mode"
+          }
+        }
+      }
+    },
     "command.presentation.hiddenBar" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
