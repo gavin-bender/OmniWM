@@ -64,6 +64,9 @@ final class WorkspaceBarManager {
     var shellHiddenBarBitmaps: Set<String> = []
     var retiredShellHiddenBarBitmaps: Set<String> = []
     var menuBarHold: MenuBarAutohideHold?
+    let nativeMenuBarReveal = NativeMenuBarReveal()
+    var monitorsYieldingToMenuBar: Set<Monitor.ID> = []
+    var revealedMenuMonitor: Monitor.ID?
 
     isolated deinit {
         if let commandPaletteColorsObserver {
@@ -106,6 +109,7 @@ final class WorkspaceBarManager {
     func apply(_ bars: [DesiredBarSurface]) {
         guard controller != nil, let settings else { return }
 
+        updateMenuBarRevealTracking(bars, settings: settings)
         prepareShell(for: bars, settings: settings)
         var staleMonitorIds = Set(barsByMonitor.keys)
         for bar in bars where bar.isRetained {
@@ -246,6 +250,9 @@ final class WorkspaceBarManager {
     }
 
     func cleanup(keepingShell: Bool = false) {
+        nativeMenuBarReveal.stop()
+        monitorsYieldingToMenuBar = []
+        revealedMenuMonitor = nil
         autoHideDelays.cancelAll()
         autoHideTargets = []
         handleAutoHideMouseMoved(at: .zero)

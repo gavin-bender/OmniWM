@@ -31,6 +31,7 @@ extension WorkspaceBarSettings {
             autoHideHideDelayMilliseconds: autoHideHideDelayMilliseconds,
             revealModifier: revealModifier,
             revealHoldMilliseconds: revealHoldMilliseconds,
+            yieldToNativeMenuBar: yieldToNativeMenuBar,
             hideInNativeFullscreen: hideInNativeFullscreen,
             height: height,
             backgroundOpacity: backgroundOpacity,

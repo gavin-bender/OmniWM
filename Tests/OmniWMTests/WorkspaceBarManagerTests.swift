@@ -142,6 +142,27 @@ final class WorkspaceBarManagerTests: XCTestCase {
         XCTAssertEqual(manager.barsByMonitor[monitor.id]?.primary.lastAppliedFrame, originalFrame)
     }
 
+    func testNativeMenuRevealYieldsAcrossRefreshAndRestoresThePanel() async throws {
+        let manager = makeManager()
+        defer { manager.cleanup() }
+        try await manager.shellConfiguration.set(true, key: "yieldToNativeMenuBar")
+        try await manager.shellConfiguration.set(WorkspaceBarPosition.overlappingMenuBar, key: "position")
+        let bar = barSurface(itemCount: 1)
+        manager.apply([bar])
+        let panel = try XCTUnwrap(manager.barsByMonitor[monitor.id]?.primary.panel)
+
+        manager.nativeMenuBarVisibilityChanged(on: monitor.id)
+        XCTAssertFalse(panel.isVisible)
+        manager.apply([bar])
+        XCTAssertFalse(panel.isVisible)
+        manager.nativeMenuBarVisibilityChanged(on: nil)
+        XCTAssertTrue(panel.isVisible)
+        try await manager.shellConfiguration.set(false, key: "yieldToNativeMenuBar")
+        manager.apply([bar])
+        manager.nativeMenuBarVisibilityChanged(on: monitor.id)
+        XCTAssertTrue(panel.isVisible)
+    }
+
     func testSavingBelowMenuBarMovesTheExistingPanelWhenTheSystemMenuBarIsHidden() async throws {
         let manager = makeManager()
         manager.screenProvider = { _ in nil }

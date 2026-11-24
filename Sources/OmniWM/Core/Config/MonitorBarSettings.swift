@@ -176,6 +176,7 @@ struct ResolvedBarSettings: Equatable {
     let hideEmptyWorkspaces: Bool
     let excludedBundleIDs: Set<String>
     let reserveLayoutSpace: Bool
+    var yieldToNativeMenuBar = false
     var autoHide = false
     let notchMode: WorkspaceBarNotchMode
     let notchActiveZoneWidth: Double
@@ -250,6 +251,7 @@ struct WorkspaceBarProfileOverride: Equatable {
     var textColor: SettingsColor?
     var hoverPreviewsEnabled: Bool?
     var systemStatsButton: Bool?
+    var yieldToNativeMenuBar: Bool?
     var hideInNativeFullscreen: Bool?
     var notificationBadges: WorkspaceBarNotificationBadgeMode?
     var notificationBadgeRefreshIntervalSeconds: Double?
@@ -273,6 +275,7 @@ struct WorkspaceBarProfileOverride: Equatable {
     static let flagKeys: [(key: String, path: WritableKeyPath<WorkspaceBarProfileOverride, Bool?> & Sendable)] = [
         ("hoverPreviewsEnabled", \.hoverPreviewsEnabled),
         ("systemStatsButton", \.systemStatsButton),
+        ("yieldToNativeMenuBar", \.yieldToNativeMenuBar),
         ("hideInNativeFullscreen", \.hideInNativeFullscreen)
     ]
 

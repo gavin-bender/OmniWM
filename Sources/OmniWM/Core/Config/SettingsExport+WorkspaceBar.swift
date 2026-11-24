@@ -28,6 +28,7 @@ extension SettingsExport {
         var autoHideHideDelayMilliseconds: Double = 0
         var revealModifier: WorkspaceBarRevealModifier
         var revealHoldMilliseconds: Double
+        var yieldToNativeMenuBar = false
         var hideInNativeFullscreen: Bool
         var height: Double
         var backgroundOpacity: Double
@@ -79,6 +80,7 @@ extension SettingsExport.WorkspaceBar {
         )
         revealModifier = try container.decode(WorkspaceBarRevealModifier.self, forKey: .revealModifier)
         revealHoldMilliseconds = try container.decode(Double.self, forKey: .revealHoldMilliseconds)
+        yieldToNativeMenuBar = try container.decode(.yieldToNativeMenuBar, or: defaults.yieldToNativeMenuBar)
         hideInNativeFullscreen = try container.decode(Bool.self, forKey: .hideInNativeFullscreen)
         height = try container.decode(Double.self, forKey: .height)
         backgroundOpacity = try container.decode(Double.self, forKey: .backgroundOpacity)

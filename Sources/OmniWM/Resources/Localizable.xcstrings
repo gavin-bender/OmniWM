@@ -60086,6 +60086,9 @@
         }
       }
     },
+    "Hide When macOS Menu Bar Appears" : {
+
+    },
     "Hide in Native Fullscreen" : {
       "localizations" : {
         "ja" : {

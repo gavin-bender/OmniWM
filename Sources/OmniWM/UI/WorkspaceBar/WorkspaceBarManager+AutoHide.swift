@@ -101,6 +101,7 @@ extension WorkspaceBarManager {
     func applyVisibility(_ visible: Bool, on monitorId: Monitor.ID) {
         guard let instance = barsByMonitor[monitorId] else { return }
         let panels = [instance.primary.panel, instance.secondary?.panel].compactMap { $0 }
+        let visible = visible && !(revealedMenuMonitor == monitorId && monitorsYieldingToMenuBar.contains(monitorId))
         for panel in panels where panel.isVisible != visible {
             if visible { panel.orderFrontRegardless() } else { panel.orderOut(nil) }
         }

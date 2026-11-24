@@ -201,6 +201,9 @@ struct ShellDesktopBarInspector: View {
                     format: { String(localized: "\(Int($0)) ms") }
                 )
             }
+            Toggle("Hide When macOS Menu Bar Appears", isOn: binding(
+                "yieldToNativeMenuBar", value: style?.yieldToNativeMenuBar ?? bar.yieldToNativeMenuBar
+            ))
             Toggle("Hide in Native Fullscreen", isOn: binding(
                 "hideInNativeFullscreen", value: style?.hideInNativeFullscreen ?? bar.hideInNativeFullscreen
             ))

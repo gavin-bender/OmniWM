@@ -118,6 +118,10 @@ final class WorkspaceBarSettings {
         didSet { onChange?() }
     }
 
+    var yieldToNativeMenuBar = WorkspaceBarSettings.defaults.yieldToNativeMenuBar {
+        didSet { onChange?() }
+    }
+
     var hideInNativeFullscreen = WorkspaceBarSettings.defaults.hideInNativeFullscreen {
         didSet { onChange?() }
     }
@@ -238,6 +242,7 @@ extension WorkspaceBarSettings {
         revealHoldMilliseconds = WorkspaceBarSettings.validatedRevealHoldMilliseconds(
             bar.revealHoldMilliseconds
         )
+        yieldToNativeMenuBar = bar.yieldToNativeMenuBar
         hideInNativeFullscreen = bar.hideInNativeFullscreen
         height = bar.height
         backgroundOpacity = bar.backgroundOpacity
@@ -350,6 +355,7 @@ extension WorkspaceBarSettings {
             hideEmptyWorkspaces: override?.hideEmptyWorkspaces ?? hideEmptyWorkspaces,
             excludedBundleIDs: excludedBundleIDs,
             reserveLayoutSpace: override?.reserveLayoutSpace ?? reserveLayoutSpace,
+            yieldToNativeMenuBar: _profileOverride?.yieldToNativeMenuBar ?? yieldToNativeMenuBar,
             autoHide: override?.autoHide ?? autoHide,
             notchMode: notchMode,
             notchActiveZoneWidth: override?.notchActiveZoneWidth ?? notchActiveZoneWidth,
