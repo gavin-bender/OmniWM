@@ -65,6 +65,7 @@ struct SettingsExport: Equatable {
     var appTheming = AppTheming()
 
     var tabRailAppIcons: Bool
+    var tabbedBar = TabbedBarOptions()
     var shellPermissions = ShellPermissionDecisions()
 
     struct Island: Codable, Equatable {

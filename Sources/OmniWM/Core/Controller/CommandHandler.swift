@@ -54,7 +54,7 @@ final class CommandHandler {
 
     static func isLayoutCompatible(_ compatibility: LayoutCompatibility, with layoutType: LayoutType) -> Bool {
         switch (compatibility, layoutType) {
-        case (.niri, .dwindle),
+        case (.niri, .tabbed), (.niri, .dwindle),
              (.dwindle, .niri),
              (.dwindle, .defaultLayout):
             false
@@ -126,7 +126,7 @@ final class CommandHandler {
         guard let controller else { return nil }
         let layoutType = currentLayoutType()
         let handler: AnyObject = switch layoutType {
-        case .dwindle:
+        case .dwindle, .tabbed:
             controller.layoutRefreshController.dwindleHandler
         case .niri,
              .defaultLayout:
@@ -137,7 +137,7 @@ final class CommandHandler {
 
     private func moveWindow(direction: Direction) -> WindowMoveOutcome {
         switch currentLayoutType() {
-        case .dwindle:
+        case .dwindle, .tabbed:
             controller?.dwindleLayoutHandler.moveWindow(direction: direction) ?? .blocked
         case .niri,
              .defaultLayout:
@@ -148,7 +148,7 @@ final class CommandHandler {
     private func focusWindow(direction: Direction) {
         guard let controller else { return }
         switch currentLayoutType() {
-        case .dwindle:
+        case .dwindle, .tabbed:
             if controller.dwindleLayoutHandler.focusNeighbor(direction: direction) {
                 return
             }
@@ -170,7 +170,7 @@ final class CommandHandler {
 
     func moveWindowWithinContainer(direction: Direction) {
         switch currentLayoutType() {
-        case .dwindle:
+        case .dwindle, .tabbed:
             controller?.dwindleLayoutHandler.moveGroupMember(direction: direction)
         case .niri,
              .defaultLayout:
@@ -180,7 +180,7 @@ final class CommandHandler {
 
     private func moveContainer(direction: Direction) {
         switch currentLayoutType() {
-        case .dwindle:
+        case .dwindle, .tabbed:
             _ = controller?.dwindleLayoutHandler.swapWindow(direction: direction)
         case .niri,
              .defaultLayout:
@@ -190,7 +190,7 @@ final class CommandHandler {
 
     func focusWindowWrapping(direction: Direction) {
         switch currentLayoutType() {
-        case .dwindle:
+        case .dwindle, .tabbed:
             _ = controller?.dwindleLayoutHandler.wrapGroupFocus(direction: direction)
         case .niri,
              .defaultLayout:
@@ -204,7 +204,7 @@ final class CommandHandler {
 
     func toggleFullscreen() {
         switch currentLayoutType() {
-        case .dwindle:
+        case .dwindle, .tabbed:
             controller?.dwindleLayoutHandler.toggleFullscreen()
         case .niri,
              .defaultLayout:
@@ -298,7 +298,8 @@ final class CommandHandler {
         let newLayout: LayoutType = switch currentLayout {
         case .niri,
              .defaultLayout: .dwindle
-        case .dwindle: .niri
+        case .dwindle: .tabbed
+        case .tabbed: .niri
         }
 
         _ = setWorkspaceLayout(newLayout, forWorkspaceNamed: workspaceName)
@@ -311,11 +312,17 @@ final class CommandHandler {
         guard let resolvedWorkspaceName else { return false }
 
         var configs = controller.settings.workspaces.configurations
-        guard let index = configs.firstIndex(where: { $0.name == resolvedWorkspaceName }) else { return false }
-
-        guard configs[index].layoutType != newLayout else { return false }
-
-        configs[index] = configs[index].with(layoutType: newLayout)
+        if let index = configs.firstIndex(where: { $0.name == resolvedWorkspaceName }) {
+            guard configs[index].layoutType != newLayout else { return false }
+            configs[index] = configs[index].with(layoutType: newLayout)
+        } else {
+            guard let id = controller.workspaceManager.workspaceId(named: resolvedWorkspaceName),
+                  let monitor = controller.workspaceManager.monitor(for: id),
+                  newLayout != .defaultLayout else { return false }
+            configs.append(WorkspaceConfiguration(name: resolvedWorkspaceName,
+                                                  monitorAssignment: .specificDisplay(OutputId(from: monitor)),
+                                                  layoutType: newLayout))
+        }
         controller.settings.workspaces.configurations = configs
         controller.refreshStatusBar()
         controller.layoutRefreshController.requestRelayout(reason: .workspaceLayoutToggled)

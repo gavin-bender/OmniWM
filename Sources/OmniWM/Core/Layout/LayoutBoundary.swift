@@ -34,6 +34,8 @@ struct LayoutWindowSnapshot {
 }
 
 struct LayoutMonitorSnapshot {
+    var tabbedWorkingFrame: CGRect { workingFrame.intersection(visibleFrame) }
+
     let monitorId: Monitor.ID
     let displayId: CGDirectDisplayID
     let frame: CGRect

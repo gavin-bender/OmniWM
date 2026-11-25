@@ -14,6 +14,9 @@ extension DwindleLayoutEngine {
         calculationSettings: DwindleSettings? = nil
     ) -> [WindowToken: CGRect] {
         guard let state = existingState(for: workspaceId) else { return [:] }
+        if state.tabbedMembers != nil {
+            return tabbedFrames(state: state, screen: screen, fullscreen: fullscreenScreen ?? screen)
+        }
         let calculationSettings = calculationSettings ?? settings
         let excludedTokens = state.excludedTokens
         prepareProjectedLayoutFacts(

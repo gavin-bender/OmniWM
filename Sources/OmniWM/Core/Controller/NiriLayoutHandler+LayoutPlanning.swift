@@ -27,7 +27,7 @@ extension NiriLayoutHandler {
             else { continue }
 
             let layoutType = controller.settings.workspaces.layoutType(for: workspace.name)
-            if layoutType == .dwindle { continue }
+            if layoutType.usesGroupedTiles { continue }
             let isActiveWorkspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)?.id == wsId
 
             guard let snapshot = makeWorkspaceSnapshot(

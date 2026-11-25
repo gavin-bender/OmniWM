@@ -12,8 +12,25 @@ extension DwindleLayoutHandler {
         engine: DwindleLayoutEngine,
         now: TimeInterval
     ) -> Bool {
+        var movement = transition
+        if let state = engine.existingState(for: snapshot.workspaceId), state.tabbedMembers != nil {
+            // Free placement follows the hand directly. Animate only groups displaced to fit their strip.
+            var starts: [WindowToken: CGRect] = [:]
+            var previous: [WindowToken: CGRect] = [:]
+            for (token, target) in transition.newFrames {
+                guard let leaf = state.leafByToken[token], let tile = leaf.tile else { continue }
+                guard tile.isGrouped, !tile.activeMember.isFullscreen,
+                      let requested = tile.freeFrame, requested != target else {
+                    leaf.clearAnimations()
+                    continue
+                }
+                starts[token] = transition.oldFrames[token] ?? requested
+                previous[token] = transition.previousTargetFrames[token] ?? requested
+            }
+            movement = DwindleFrameTransition(oldFrames: starts, previousTargetFrames: previous, newFrames: transition.newFrames)
+        }
         engine.animateWindowMovements(
-            transition,
+            movement,
             in: snapshot.workspaceId,
             startTime: now,
             motion: controller?.motionPolicy.snapshot() ?? .enabled

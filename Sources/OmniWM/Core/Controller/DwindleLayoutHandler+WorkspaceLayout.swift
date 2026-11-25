@@ -17,7 +17,7 @@ extension DwindleLayoutHandler {
 
             let wsName = workspace.name
             let layoutType = controller.settings.workspaces.layoutType(for: wsName)
-            guard layoutType == .dwindle else { continue }
+            guard layoutType.usesGroupedTiles else { continue }
             let isActiveWorkspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)?.id == wsId
 
             guard let snapshot = makeWorkspaceSnapshot(

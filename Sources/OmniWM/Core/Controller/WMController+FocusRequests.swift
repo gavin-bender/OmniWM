@@ -70,7 +70,7 @@ extension WMController {
         let workspaceId = entry.workspaceId
         guard entry.mode == .tiling,
               entry.layoutReason == .standard,
-              workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
+              workspaceManager.activeLayoutKind(for: workspaceId).usesGroupedTiles,
               let monitorId = workspaceManager.monitorId(for: workspaceId),
               workspaceManager.activeWorkspace(on: monitorId)?.id == workspaceId,
               let snapshot = dwindleEngine?.tileSnapshot(for: entry.token, in: workspaceId),

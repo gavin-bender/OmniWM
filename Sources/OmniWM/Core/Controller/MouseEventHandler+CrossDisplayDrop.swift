@@ -59,7 +59,7 @@ extension MouseEventHandler {
         else {
             return .cancel
         }
-        let resolved = manager.activeLayoutKind(for: workspaceId) == .dwindle
+        let resolved = manager.activeLayoutKind(for: workspaceId).usesGroupedTiles
             ? resolveDwindleDrop(at: point, in: workspaceId, monitor: monitor)
             : resolveNiriDrop(
                 at: point,

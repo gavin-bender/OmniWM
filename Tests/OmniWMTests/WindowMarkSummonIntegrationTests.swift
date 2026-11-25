@@ -121,7 +121,7 @@ final class WindowMarkSummonIntegrationTests: XCTestCase {
             let manager = controller.workspaceManager
             manager.withEngineMutationScope {
                 switch layoutType {
-                case .dwindle:
+                case .dwindle, .tabbed:
                     controller.dwindleEngine?.removeWindow(token: fixture.markedToken, from: fixture.sourceWorkspaceId)
                 case .niri,
                      .defaultLayout:
@@ -273,7 +273,7 @@ final class WindowMarkSummonIntegrationTests: XCTestCase {
         _ = WindowAdmissionTestSupport.track(anchorToken, in: targetWorkspaceId, controller: controller)
 
         switch layoutType {
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(controller.dwindleEngine)
             controller.workspaceManager.withEngineMutationScope {
                 _ = engine.addWindow(token: markedToken, to: sourceWorkspaceId, activeWindowFrame: nil)

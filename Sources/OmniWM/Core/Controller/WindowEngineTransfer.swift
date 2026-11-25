@@ -27,8 +27,8 @@ struct WindowEngineTransfer {
             .map { controller.settings.workspaces.layoutType(for: $0) } ?? .defaultLayout
         let targetLayout: LayoutType = controller.workspaceManager.descriptor(for: targetWsId)
             .map { controller.settings.workspaces.layoutType(for: $0.name) } ?? .defaultLayout
-        self.sourceIsDwindle = sourceLayout == .dwindle
-        self.targetIsDwindle = targetLayout == .dwindle
+        self.sourceIsDwindle = sourceLayout.usesGroupedTiles
+        self.targetIsDwindle = targetLayout.usesGroupedTiles
     }
 }
 

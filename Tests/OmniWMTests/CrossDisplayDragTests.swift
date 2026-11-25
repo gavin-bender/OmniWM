@@ -49,7 +49,7 @@ final class CrossDisplayDragTests: XCTestCase {
             guard let workspaceId = manager.workspace(for: token) else { return nil }
             return switch manager.activeLayoutKind(for: workspaceId) {
             case .niri: niri.findNode(for: token, in: workspaceId)?.frame
-            case .dwindle: dwindle.presentedFrame(for: token, in: workspaceId, at: 0)
+            case .dwindle, .tabbed: dwindle.presentedFrame(for: token, in: workspaceId, at: 0)
             }
         }
 
@@ -66,7 +66,7 @@ final class CrossDisplayDragTests: XCTestCase {
                         gaps: (horizontal: gap, vertical: gap),
                         orientation: .horizontal
                     )
-                case .dwindle:
+                case .dwindle, .tabbed:
                     _ = dwindle.calculateLayout(for: workspaceId, screen: workingFrame)
                     dwindle.cancelAnimations(in: workspaceId)
                 }
@@ -1254,7 +1254,7 @@ final class CrossDisplayDragTests: XCTestCase {
             case .niri:
                 let selection = fixture.niri.columns(in: workspaceId).last?.windowNodes.last?.id
                 _ = fixture.niri.addWindow(token: token, to: workspaceId, afterSelection: selection)
-            case .dwindle:
+            case .dwindle, .tabbed:
                 _ = fixture.dwindle.addWindow(token: token, to: workspaceId, activeWindowFrame: nil)
             }
         }

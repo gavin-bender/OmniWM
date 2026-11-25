@@ -34,7 +34,8 @@ extension DwindleLayoutEngine {
                 placements[member.token] = PersistedDwindlePlacement(
                     steps: steps,
                     memberIndex: memberIndex,
-                    isActiveMember: member.token == tile.activeToken
+                    isActiveMember: member.token == tile.activeToken,
+                    tabbedFrame: tile.freeFrame
                 )
             }
         }
@@ -55,6 +56,7 @@ extension DwindleLayoutEngine {
         var placedTokens: [PlacedToken] = []
         for token in tokens where seenTokens.insert(token).inserted {
             guard let placement = placements[token], placement.memberIndex >= 0 else { continue }
+            guard (placement.tabbedFrame != nil) == (state.tabbedMembers != nil) else { continue }
             placedTokens.append(PlacedToken(token: token, placement: placement, order: placedTokens.count))
         }
         let placedTokenSet = Set(placedTokens.map(\.token))
@@ -86,6 +88,7 @@ extension DwindleLayoutEngine {
         state.leafByToken.removeAll(keepingCapacity: true)
         state.tileCount = 0
         indexLeaves(from: root, into: state)
+        state.tabbedMembers?.formUnion(placedTokenSet)
         state.selectedNodeId = nil
         state.preselection = nil
         state.pendingMovementFrameSeeds.removeAll()
@@ -166,6 +169,7 @@ extension DwindleLayoutEngine {
         guard let first = members.first else { return }
 
         let tile = DwindleTile(token: first.token)
+        tile.freeFrame = first.placement.tabbedFrame
         for member in members.dropFirst() {
             tile.insertAfterActive(DwindleTileMember(token: member.token, isFullscreen: false))
         }

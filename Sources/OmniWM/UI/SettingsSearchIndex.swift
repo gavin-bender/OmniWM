@@ -38,6 +38,9 @@ enum SettingsSearchIndex {
         setting("Check for Updates Automatically", section: .general, anchor: "Check for Updates Automatically"),
         setting("Check for Updates...", section: .general, anchor: "Check for Updates..."),
         setting("Appearance", section: .appearance, tab: "app", anchor: "Appearance"),
+        setting("Tab bar position", section: .appearance, tab: "app", anchor: "Tab bar position"),
+        setting("Tab bar size", section: .appearance, tab: "app", anchor: "Tab bar size"),
+        setting("Tab contents", section: .appearance, tab: "app", anchor: "Tab contents"),
         setting("Show app icons in tab rails", section: .appearance, tab: "app", anchor: "Show app icons in tab rails"),
         setting("Capture-Free Workspace Swipes", section: .appearance, tab: "app", anchor: "Capture-Free Workspace Swipes"),
         setting("Enable Animations", section: .appearance, tab: "app", anchor: "Enable Animations"),
@@ -422,7 +425,7 @@ extension SettingsSearchIndex {
                 "organization",
                 "mdm"
             ]
-        case .layouts: ["spacing", "gaps", "margins", "niri", "dwindle", "columns", "tiling"]
+        case .layouts: ["spacing", "gaps", "margins", "niri", "dwindle", "tabbed", "columns", "tiling"]
         case .monitors: ["monitors", "displays", "screens", "routing"]
         case .appRules: ["app rules", "float", "tile", "bundle", "match"]
         case .windowSwitcher: ["alt-tab", "command-tab", "option-tab", "app switcher", "previews"]

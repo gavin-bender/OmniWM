@@ -231,7 +231,7 @@ extension DwindleGroupRevealTransactions {
         _ transaction: PendingGroupRevealTransaction
     ) {
         guard let controller,
-              controller.workspaceManager.activeLayoutKind(for: transaction.workspaceId) == .dwindle,
+              controller.workspaceManager.activeLayoutKind(for: transaction.workspaceId).usesGroupedTiles,
               controller.workspaceManager.visibleWorkspaceIds().contains(transaction.workspaceId),
               let engine = controller.dwindleEngine,
               let revealTile = engine.tileSnapshot(for: transaction.token, in: transaction.workspaceId),
@@ -321,7 +321,7 @@ extension DwindleGroupRevealTransactions {
         _ transaction: PendingGroupRevealTransaction
     ) {
         guard let controller,
-              controller.workspaceManager.activeLayoutKind(for: transaction.workspaceId) == .dwindle,
+              controller.workspaceManager.activeLayoutKind(for: transaction.workspaceId).usesGroupedTiles,
               controller.workspaceManager.visibleWorkspaceIds().contains(transaction.workspaceId),
               let engine = controller.dwindleEngine,
               let revealTile = engine.tileSnapshot(for: transaction.token, in: transaction.workspaceId),

@@ -101,7 +101,7 @@ enum WorkspaceBarDropResolver {
             return noOp
         }
         switch workspace.layout {
-        case .dwindle:
+        case .dwindle, .tabbed:
             return resolveDwindleSwap(token: token, at: point, in: workspace)
         case .niri:
             guard let sourcePlacement = workspace.icons.first(where: { $0.tokens == [token] })?.placement,

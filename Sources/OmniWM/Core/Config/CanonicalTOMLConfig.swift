@@ -63,12 +63,14 @@ struct CanonicalTOMLConfig: Codable, Equatable {
 
     struct Appearance: Codable, Equatable {
         var tabRailAppIcons: Bool
+        var tabbedBar = TabbedBarOptions()
     }
 }
 
 extension CanonicalTOMLConfig.Appearance {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        tabbedBar = try container.decodeIfPresent(TabbedBarOptions.self, forKey: .tabbedBar) ?? TabbedBarOptions()
         tabRailAppIcons = try container.decodeIfPresent(Bool.self, forKey: .tabRailAppIcons) ?? false
     }
 }
@@ -171,7 +173,7 @@ extension CanonicalTOMLConfig {
         clipboard = export.clipboard
         quakeTerminal = export.quakeTerminal
         scratchpads = export.scratchpads
-        appearance = Appearance(tabRailAppIcons: export.tabRailAppIcons)
+        appearance = Appearance(tabRailAppIcons: export.tabRailAppIcons, tabbedBar: export.tabbedBar)
         hotkeys = export.hotkeyBindings
         workspaces = export.workspaceConfigurations
         appRules = export.appRules
@@ -232,6 +234,7 @@ extension CanonicalTOMLConfig {
             quakeTerminal: quakeTerminal,
             appTheming: appTheming,
             tabRailAppIcons: appearance.tabRailAppIcons,
+            tabbedBar: appearance.tabbedBar,
             shellPermissions: shellPermissions
         )
     }

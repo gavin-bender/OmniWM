@@ -25,9 +25,11 @@ final class DwindleLayoutEngine {
     }
 
     private var states: [WorkspaceDescriptor.ID: DwindleWorkspaceState] = [:]
+    private var alternateWorkspaceStates: [WorkspaceDescriptor.ID: DwindleWorkspaceState] = [:]
     private var windowConstraints: [WindowToken: WindowSizeConstraints] = [:]
 
     var settings: DwindleSettings = DwindleSettings()
+    var tabbedBar = TabbedBarOptions()
     var tabRailWidth: CGFloat = 12
     var animationClock: AnimationClock?
     var isMutationSanctioned = true
@@ -70,8 +72,19 @@ final class DwindleLayoutEngine {
         return state
     }
 
+    /// Keep manual group positions and BSP splits independent when cycling layouts.
+    func selectWorkspaceStyle(tabbed: Bool, in workspaceId: WorkspaceDescriptor.ID) {
+        assertSanctionedMutation()
+        let current = ensureState(for: workspaceId)
+        guard tabbed != (current.tabbedMembers != nil) else { return }
+        let next = alternateWorkspaceStates.updateValue(current, forKey: workspaceId) ?? DwindleWorkspaceState()
+        if tabbed, next.tabbedMembers == nil { next.tabbedMembers = [] }
+        states[workspaceId] = next
+    }
+
     func removeLayout(for workspaceId: WorkspaceDescriptor.ID) {
         assertSanctionedMutation()
+        alternateWorkspaceStates.removeValue(forKey: workspaceId)
         guard let state = states.removeValue(forKey: workspaceId) else { return }
         if interactiveResize?.workspaceId == workspaceId {
             clearInteractiveResize()

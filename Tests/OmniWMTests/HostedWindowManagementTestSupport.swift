@@ -163,7 +163,7 @@ final class HostedManagementFixture {
         switch world.activeLayoutKind(for: workspace) {
         case .niri:
             return try XCTUnwrap(controller.niriLayoutHandler.settledFrames(in: workspace))
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(controller.dwindleEngine)
             return engine.calculateLayout(
                 for: workspace, screen: controller.insetWorkingFrame(for: monitor),

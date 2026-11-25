@@ -76,7 +76,7 @@ extension WMController {
 
     func crossDisplayDragUnit(for token: WindowToken, in workspaceId: WorkspaceDescriptor.ID) -> CrossDisplayDragUnit {
         guard settings.gestures.dwindleGroupDragAcrossDisplays == .group,
-              workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
+              workspaceManager.activeLayoutKind(for: workspaceId).usesGroupedTiles,
               let tile = dwindleEngine?.tile(containing: token, in: workspaceId),
               tile.members.count > 1,
               let activeIndex = tile.memberIndex(for: token)
@@ -98,7 +98,7 @@ extension WMController {
         case .niri:
             guard let engine = niriEngine, let node = engine.findNode(for: token, in: workspaceId) else { return false }
             return !node.isFullscreen && !engine.projectionExclusions(in: workspaceId).contains(token)
-        case .dwindle:
+        case .dwindle, .tabbed:
             guard let engine = dwindleEngine,
                   engine.tile(containing: token, in: workspaceId) != nil else { return false }
             return !engine.isWindowFullscreen(token, in: workspaceId)
@@ -141,7 +141,7 @@ extension WMController {
                 in: workspaceId,
                 geometry: niriSizingGeometry(for: monitor)
             )
-        case .dwindle:
+        case .dwindle, .tabbed:
             guard incoming.isGroup else { return true }
             return dwindleEngine?.tile(containing: partner.activeToken, in: workspaceId)?.members.count
                 == partner.tokens.count

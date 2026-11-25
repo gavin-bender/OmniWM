@@ -70,6 +70,8 @@ extension MouseEventHandler {
     }
 
     func handleInputSuppressionBegan() {
+        state.tabbedTitleDrag = nil
+        tabDropFeedback.hide()
         state.latestFocusFollowsMouseSample = nil
         clearNativeTitleBarDrag()
         cancelActiveMouseInteraction()
@@ -96,6 +98,7 @@ extension MouseEventHandler {
     }
 
     func cancelActiveMouseInteraction() {
+        state.tabbedTitleDrag = nil
         guard let controller else { return }
         let wasActive = state.isMoving || state.isResizing
 

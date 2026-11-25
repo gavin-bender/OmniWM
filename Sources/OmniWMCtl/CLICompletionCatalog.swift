@@ -212,7 +212,7 @@ enum CLICompletionCatalog {
         case .direction:
             return ["left", "right", "up", "down"]
         case .layout:
-            return ["default", "niri", "dwindle"]
+            return ["default", "niri", "dwindle", "tabbed"]
         case .paletteMode:
             return IPCCommandPaletteMode.allCases.map(\.rawValue)
         case .switcherDirection:

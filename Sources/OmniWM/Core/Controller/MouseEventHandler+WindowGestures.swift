@@ -10,7 +10,7 @@ extension MouseEventHandler {
         case .niri,
              .defaultLayout:
             controller.niriEngine != nil
-        case .dwindle:
+        case .dwindle, .tabbed:
             false
         }
     }
@@ -45,7 +45,7 @@ extension MouseEventHandler {
         case .niri,
              .defaultLayout:
             return controller.niriEngine?.hitTestTiled(point: location, in: wsId)?.token
-        case .dwindle:
+        case .dwindle, .tabbed:
             return controller.dwindleEngine?.hitTestFocusableWindow(
                 point: location,
                 in: wsId,
@@ -85,6 +85,8 @@ extension MouseEventHandler {
         guard let controller else { return false }
         let wsId = workspace.id
         switch (controller.settings.workspaces.layoutType(for: workspace.name), mode) {
+        case (.tabbed, .windowMove), (.tabbed, .windowResize):
+            return false
         case (.dwindle, .windowMove):
             guard let engine = controller.dwindleEngine else { return false }
             return beginDwindleMove(token: token, engine: engine, wsId: wsId, at: location, source: source)

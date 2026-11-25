@@ -39,6 +39,13 @@ final class TabRailView: NSView {
 
     private var activeVisualIndex = 0
 
+    var onTabAction: ((WindowToken, TabBarAction) -> Void)?
+    private var pressedTab: (token: WindowToken, start: CGPoint)?
+    private var isDraggingTab = false
+    var groupContentFrame: CGRect?
+    private var chromePress: (token: WindowToken, start: CGPoint, frame: CGRect, edge: TabChromeHandle)?
+    private var menuToken: WindowToken?
+
     var onSelect: ((Int) -> Void)?
     var onHoverChange: ((TabRailTabInfo?, CGRect?) -> Void)?
 
@@ -68,7 +75,7 @@ final class TabRailView: NSView {
         let countChanged = self.tabs.count != tabs.count
         self.tabs = tabs
         self.activeVisualIndex = activeVisualIndex
-        if style == .appIcons {
+        if style != .compact {
             iconView?.update(tabs: tabs, activeVisualIndex: activeVisualIndex)
         }
         updateTrackView(rebuildLayout: countChanged || activeChanged || styleChanged)
@@ -168,12 +175,119 @@ final class TabRailView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if let handle = chromeHandle(at: point), let frame = groupContentFrame,
+           let active = tabs.first(where: { $0.visualIndex == activeVisualIndex })?.token {
+            chromePress = (active, screenPoint(event), frame, handle)
+            invalidateHover()
+            return
+        }
         guard let item = item(at: point) else { return }
+        if style.options != nil, let token = tabs.first(where: { $0.visualIndex == item.visualIndex })?.token {
+            pressedTab = (token, screenPoint(event))
+            isDraggingTab = false
+        }
         onSelect?(item.visualIndex)
     }
 
+    private func screenPoint(_ event: NSEvent) -> CGPoint {
+        window?.convertToScreen(CGRect(origin: event.locationInWindow, size: .zero)).origin ?? NSEvent.mouseLocation
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if updateChromePress(event, released: false) { return }
+        guard let press = pressedTab else { return }
+        let point = screenPoint(event)
+        guard isDraggingTab || hypot(point.x - press.start.x, point.y - press.start.y) >= 5 else { return }
+        isDraggingTab = true
+        invalidateHover()
+        let local = convert(event.locationInWindow, from: nil)
+        if bounds.contains(local), let slot = insertion(at: local) {
+            iconView?.previewDrag(token: press.token, at: point, from: press.start, before: slot.before)
+        } else {
+            iconView?.clearDragPreview()
+        }
+        onTabAction?(press.token, .drag(point, released: false))
+    }
+
+    func cancelDrag() -> Bool {
+        guard isDraggingTab, let press = pressedTab else { return false }
+        pressedTab = nil
+        isDraggingTab = false
+        iconView?.clearDragPreview()
+        onTabAction?(press.token, .cancel)
+        return true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if updateChromePress(event, released: true) { return }
+        defer {
+            pressedTab = nil
+            isDraggingTab = false
+            iconView?.clearDragPreview()
+        }
+        guard let press = pressedTab, isDraggingTab else { return }
+        onTabAction?(press.token, .drag(screenPoint(event), released: true))
+    }
+
+    private func chromeHandle(at point: CGPoint) -> TabChromeHandle? {
+        guard style.options?.position == .top else { return nil }
+        return TabChromeHandle.hit(point, bounds: bounds, gripWidth: iconView?.gripWidth ?? 0)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        guard style.options?.position == .top else { return }
+        let grip = CGRect(x: 4, y: 3, width: max(0, (iconView?.gripWidth ?? 0) - 4), height: max(0, bounds.height - 6))
+        addCursorRect(grip, cursor: .openHand)
+        for y in [bounds.minY, bounds.maxY - 3] {
+            addCursorRect(CGRect(x: 0, y: y, width: bounds.width, height: 3), cursor: .resizeUpDown)
+        }
+        for x in [bounds.minX, bounds.maxX - 4] {
+            addCursorRect(CGRect(x: x, y: 0, width: 4, height: bounds.height), cursor: .resizeLeftRight)
+        }
+    }
+
+    private func updateChromePress(_ event: NSEvent, released: Bool) -> Bool {
+        guard let press = chromePress else { return false }
+        if released { chromePress = nil }
+        let point = screenPoint(event)
+        let frame = press.edge.frame(from: press.frame, dx: point.x - press.start.x, dy: point.y - press.start.y)
+        onTabAction?(press.token, .geometry(frame, released: released, resizing: press.edge != .grip))
+        return true
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard style.options != nil, let item = item(at: convert(event.locationInWindow, from: nil)),
+              let token = tabs.first(where: { $0.visualIndex == item.visualIndex })?.token else { return nil }
+        menuToken = token
+        let menu = NSMenu()
+        menu.addItem(withTitle: String(localized: "Move Tab to New Window"), action: #selector(popTab), keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "Close Tab"), action: #selector(closeTab), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: String(localized: "Ungroup All Windows"), action: #selector(ungroupAll), keyEquivalent: "").target = self
+        return menu
+    }
+
+    @objc private func ungroupAll() { if let menuToken { onTabAction?(menuToken, .ungroupAll) } }
+    @objc private func popTab() { if let menuToken { onTabAction?(menuToken, .detach) } }
+    @objc private func closeTab() { if let menuToken { onTabAction?(menuToken, .close) } }
+
+    func insertion(at point: CGPoint) -> (before: WindowToken?, marker: CGRect)? {
+        let horizontal = style.options?.position == .top
+        let items = currentLayout().items.filter { !$0.hitRect.isEmpty }
+        guard let last = items.last else { return nil }
+        let next = items.first { horizontal ? point.x < $0.hitRect.midX : point.y > $0.hitRect.midY }
+        let rect = (next ?? last).hitRect
+        let index = next?.visualIndex ?? last.visualIndex + 1
+        let before = tabs.first(where: { $0.visualIndex == index })?.token
+        let marker = horizontal
+            ? CGRect(x: (next == nil ? rect.maxX - 3 : rect.minX), y: rect.minY + 3, width: 3, height: max(1, rect.height - 6))
+            : CGRect(x: rect.minX + 3, y: (next == nil ? rect.minY : rect.maxY - 3), width: max(1, rect.width - 6), height: 3)
+        return (before, screenFrame(for: marker))
+    }
+
     override func scrollWheel(with event: NSEvent) {
-        if style == .appIcons {
+        if style != .compact {
             iconView?.scrollWheel(with: event)
         } else {
             super.scrollWheel(with: event)
@@ -181,7 +295,7 @@ final class TabRailView: NSView {
     }
 
     func item(at point: CGPoint) -> TabRailLayout.Item? {
-        if style == .appIcons {
+        if style != .compact {
             return currentLayout().items.first { !$0.hitRect.isEmpty && $0.hitRect.contains(point) }
         }
         guard railLayout.railRect.contains(point) else { return nil }
@@ -220,7 +334,10 @@ final class TabRailView: NSView {
     }
 
     override func accessibilityHelp() -> String? {
-        style == .appIcons
+        if style.options != nil {
+            return String(localized: "Drag a tab to reorder it, move it to another group, or place its window on the desktop.")
+        }
+        return style != .compact
             ? String(localized: "Click an app icon to select its window. Scroll to see more tabs.")
             : String(localized: "Click a segment to select that tab.")
     }
@@ -271,13 +388,15 @@ final class TabRailView: NSView {
     }
 
     private func currentLayout() -> TabRailLayout {
-        style == .appIcons ? (iconView?.railLayout(in: self) ?? .empty) : railLayout
+        style != .compact ? (iconView?.railLayout(in: self) ?? .empty) : railLayout
     }
 
     private func configureStyle() {
+        iconView?.removeFromSuperview()
         trackView.isHidden = style != .compact
-        if style == .appIcons {
+        if style != .compact {
             let icons = TabRailIconView(motionPolicy: motionPolicy, appInfoCache: appInfoCache)
+            icons.options = style.options
             icons.frame = bounds
             icons.onWillScroll = { [weak self] in self?.invalidateHover() }
             icons.onDidScroll = { [weak self] in

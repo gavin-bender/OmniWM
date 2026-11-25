@@ -78,7 +78,7 @@ extension LayoutRefreshController {
 
         for payload in payloads {
             switch payload.layoutType {
-            case .dwindle:
+            case .dwindle, .tabbed:
                 dwindleWorkspaces.insert(payload.workspaceId)
             case .niri,
                  .defaultLayout:
@@ -135,7 +135,7 @@ extension LayoutRefreshController {
             }
             let layoutType = controller.settings.workspaces.layoutType(for: ws.name)
             switch layoutType {
-            case .dwindle:
+            case .dwindle, .tabbed:
                 dwindleWorkspaces.insert(wsId)
             case .niri,
                  .defaultLayout:

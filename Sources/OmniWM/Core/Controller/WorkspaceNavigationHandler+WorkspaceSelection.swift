@@ -328,9 +328,7 @@ extension WorkspaceNavigationHandler {
         while candidateNumber > 0 {
             let candidateName = String(candidateNumber)
             if wm.workspaceId(named: candidateName) == nil {
-                let candidateLayoutKind: ActiveLayoutKind = controller.settings.workspaces
-                    .layoutType(for: candidateName)
-                    == .dwindle ? .dwindle : .niri
+                let candidateLayoutKind: ActiveLayoutKind = ActiveLayoutKind(rawValue: controller.settings.workspaces.layoutType(for: candidateName).rawValue) ?? .niri
                 guard requiredLayoutKind == nil || candidateLayoutKind == requiredLayoutKind else { return nil }
                 guard let workspace = wm.createDynamicWorkspace(named: candidateName, on: monitorId) else {
                     return nil

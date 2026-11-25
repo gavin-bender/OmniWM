@@ -60715,6 +60715,51 @@
         }
       }
     },
+    "Tabbed" : {
+
+    },
+    "App icons" : {
+
+    },
+    "App icons and window titles" : {
+
+    },
+    "Large" : {
+
+    },
+    "Medium" : {
+
+    },
+    "Small" : {
+
+    },
+    "Close Tab" : {
+
+    },
+    "Drag a tab to reorder it, move it to another group, or place its window on the desktop." : {
+
+    },
+    "Move Tab to New Window" : {
+
+    },
+    "Ungroup All Windows" : {
+
+    },
+    "Tab bar position" : {
+
+    },
+    "Tab bar size" : {
+
+    },
+    "Tab contents" : {
+
+    },
+    "Tabbed layout" : {
+
+    },
+    "Window titles" : {
+
+    },
     "Tabbed mode off" : {
       "localizations" : {
         "ja" : {
@@ -70530,6 +70575,7 @@
       }
     },
     "Layout (configured workspaces only)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

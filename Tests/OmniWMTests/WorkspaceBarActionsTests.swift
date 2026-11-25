@@ -435,6 +435,143 @@ final class WorkspaceBarActionsTests: XCTestCase {
         try XCTUnwrap(fixture.controller.niriEngine).columns(in: workspaceId).map { $0.windowNodes.map(\.token) }
     }
 
+    func testTabbedBoundaryAnimatesAfterNativeFrameChangeWithoutMouseEvents() async throws {
+        let fixture = try makeFixture(followsFocus: false)
+        let controller = fixture.controller
+        let ws = fixture.ws1
+        let engine = try XCTUnwrap(controller.dwindleEngine)
+        for index in 1...2 {
+            _ = try addWindow(pid: pid_t(731_000 + index), windowId: 500 + index, to: ws, fixture: fixture)
+        }
+        XCTAssertTrue(controller.commandHandler.setWorkspaceLayout(.tabbed))
+        func layout() {
+            _ = controller.layoutRefreshController.buildRelayoutEffectPlan(
+                useScrollAnimationPath: false, recoverFocus: false, affectedWorkspaceIds: [ws]
+            )
+        }
+        layout()
+        let token = try XCTUnwrap(engine.projectedActiveToken(in: ws))
+        let leaf = try XCTUnwrap(engine.findNode(for: token, in: ws))
+        controller.layoutRefreshController.resetState()
+        let refresh = controller.layoutRefreshController
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        refresh.layoutState.activeRefreshTask = Task { for await _ in stream {} }
+        refresh.layoutState.activeRefresh = .init(kind: .immediateRelayout, reason: .layoutCommand, affectedWorkspaceIds: [ws])
+        defer {
+            continuation.finish()
+            controller.axEventHandler.cancelFrameObservations()
+            controller.layoutRefreshController.resetState()
+        }
+        let monitor = controller.layoutRefreshController.buildMonitorSnapshot(for: fixture.mainMonitor)
+        let working = monitor.tabbedWorkingFrame
+        let moved = CGRect(x: working.midX - 200, y: working.maxY - 300, width: 400, height: 300)
+        let id = UInt32(token.windowId)
+        controller.axEventHandler.frameObservations.query = { _ in
+            WindowServerInfo(id: id, pid: token.pid, level: 0, frame: ScreenCoordinateSpace.toWindowServer(rect: moved))
+        }
+        controller.motionPolicy.animationsEnabled = true
+        controller.axEventHandler.handleCGSEvent(.frameChanged(windowId: id))
+        await controller.axEventHandler.frameObservations.byWindowId[id]?.task.value
+        XCTAssertEqual(leaf.cachedContentFrame, moved)
+        let settlement = try XCTUnwrap(controller.axEventHandler.frameObservations.tabBoundarySettlements[id])
+        await settlement.value
+        XCTAssertNotNil(refresh.layoutState.pendingRefresh)
+        layout()
+        let animation = try XCTUnwrap(leaf.frameAnimation)
+        XCTAssertEqual(animation.fromFrame, moved)
+        XCTAssertEqual(animation.toFrame, moved.offsetBy(dx: 0, dy: -controller.settings.tabbedBar.thickness))
+        XCTAssertTrue(working.contains(try XCTUnwrap(leaf.cachedFrame)))
+    }
+
+    func testTabbedWorkspaceMoveCommandsSplitAndJoinGroups() throws {
+        let fixture = try makeFixture(followsFocus: false)
+        let controller = fixture.controller
+        let ws = fixture.ws1
+        let engine = try XCTUnwrap(controller.dwindleEngine)
+        for index in 1...3 {
+            _ = try addWindow(pid: pid_t(710_000 + index), windowId: index, to: ws, fixture: fixture)
+        }
+        XCTAssertTrue(controller.commandHandler.setWorkspaceLayout(.tabbed))
+        func layout() {
+            _ = controller.layoutRefreshController.buildRelayoutEffectPlan(
+                useScrollAnimationPath: false, recoverFocus: false, affectedWorkspaceIds: [ws]
+            )
+        }
+        layout()
+        XCTAssertEqual(engine.tileCount(in: ws), 1)
+        let selected = try XCTUnwrap(engine.projectedActiveToken(in: ws))
+        _ = controller.commandHandler.performCommand(.move(.right))
+        layout()
+        XCTAssertEqual(engine.tileCount(in: ws), 2)
+        XCTAssertEqual(engine.tileSnapshot(for: selected, in: ws)?.members.count, 1)
+        _ = controller.commandHandler.performCommand(.move(.left))
+        layout()
+        XCTAssertEqual(engine.tileCount(in: ws), 1)
+        XCTAssertEqual(engine.tileSnapshot(for: selected, in: ws)?.members.count, 3)
+    }
+
+    func testTabbedNativeTitleDropHonorsOcclusionAndTabBarDropUsesVisibleSlot() throws {
+        let fixture = try makeFixture(followsFocus: false)
+        let controller = fixture.controller
+        let ws = fixture.ws1
+        let engine = try XCTUnwrap(controller.dwindleEngine)
+        let mouse = controller.mouseEventHandler
+        defer {
+            controller.tabRailManager.removeAll()
+            mouse.tabDropFeedback.hide()
+            controller.layoutRefreshController.resetState()
+        }
+        let tokens = try (1...4).map { try addWindow(pid: pid_t(710_000 + $0), windowId: $0, to: ws, fixture: fixture).id }
+        XCTAssertTrue(controller.commandHandler.setWorkspaceLayout(.tabbed))
+        func layout() {
+            _ = controller.layoutRefreshController.buildRelayoutEffectPlan(
+                useScrollAnimationPath: false, recoverFocus: false, affectedWorkspaceIds: [ws]
+            )
+        }
+        layout()
+        let nativeFrame = CGRect(x: 600, y: 100, width: 400, height: 300)
+        controller.workspaceManager.withEngineMutationScope {
+            XCTAssertTrue(engine.detachTab(tokens[0], to: nativeFrame, in: ws))
+            XCTAssertTrue(engine.detachTab(tokens[1], to: nativeFrame, in: ws))
+        }
+        layout()
+        mouse.nativeWindowFrameProvider = { _ in nativeFrame }
+        let mouseUp = CGPoint(x: 700, y: 390)
+        func dragWindow(blocked: Bool) {
+            mouse.state.tabbedTitleDrag = (tokens[0], CGPoint(x: 450, y: 390), nativeFrame.offsetBy(dx: -250, dy: 0))
+            mouse.tabWindowStackAtPoint = { _ in
+                let ids = blocked ? [tokens[0].windowId, 999, tokens[1].windowId] : [tokens[0].windowId, tokens[1].windowId]
+                return ids.map { ($0, nativeFrame) }
+            }
+            mouse.updateTabbedTitleDrag(at: mouseUp, released: false)
+            mouse.updateTabbedTitleDrag(at: mouseUp, released: true)
+        }
+        dragWindow(blocked: true)
+        XCTAssertEqual(engine.tileCount(in: ws), 3)
+        dragWindow(blocked: false)
+        XCTAssertEqual(engine.tileCount(in: ws), 2)
+        layout()
+        let infos = controller.dwindleLayoutHandler.desiredTabRailInfos()
+        let target = try XCTUnwrap(infos.first { $0.tabs.contains { $0.token == tokens[0] } })
+        let source = try XCTUnwrap(infos.first { $0.tabs.contains { $0.token == tokens[2] } })
+        controller.tabRailManager.updateRails(infos)
+        let rail = try XCTUnwrap(controller.tabRailManager.existingWindow(for: target.key) as? TabRailWindow)
+        let point = CGPoint(x: rail.appliedFrame.minX + 26, y: rail.appliedFrame.midY)
+        mouse.tabWindowStackAtPoint = { _ in [(rail.windowNumber, rail.appliedFrame)] }
+        mouse.performTabBarAction(.drag(point, released: true), token: tokens[2], info: source)
+        XCTAssertEqual(engine.tile(containing: tokens[0], in: ws)?.members.first?.token, tokens[2])
+        mouse.ungroupTabbedWorkspace(ws)
+        XCTAssertEqual(engine.tileCount(in: ws), 4)
+    }
+
+    func testToggleWorkspaceLayoutCyclesThroughTabbed() throws {
+        let controller = try makeFixture(followsFocus: false).controller
+        for expected in [ActiveLayoutKind.dwindle, .tabbed, .niri] {
+            controller.commandHandler.toggleWorkspaceLayout()
+            XCTAssertEqual(controller.activeStatusBarWorkspaceSummary()?.layout, expected)
+        }
+    }
+
     func testStatusSummaryResolvesLayoutAcrossWorkspacesAndMonitors() throws {
         let fixture = try makeFixture(followsFocus: false)
         let controller = fixture.controller
@@ -643,7 +780,7 @@ final class WorkspaceBarActionsTests: XCTestCase {
             switch manager.activeLayoutKind(for: workspaceId) {
             case .niri:
                 _ = fixture.controller.niriEngine?.addWindow(token: token, to: workspaceId, afterSelection: nil)
-            case .dwindle:
+            case .dwindle, .tabbed:
                 _ = fixture.controller.dwindleEngine?.addWindow(token: token, to: workspaceId, activeWindowFrame: nil)
             }
         }

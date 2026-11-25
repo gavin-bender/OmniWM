@@ -23,7 +23,7 @@ extension MouseEventHandler {
         let layoutType = controller.workspaceManager.descriptor(for: workspaceId)
             .map { controller.settings.workspaces.layoutType(for: $0.name) }
         let token: WindowToken?
-        if layoutType == .dwindle {
+        if layoutType?.usesGroupedTiles == true {
             token = controller.dwindleEngine?.hitTestFocusableWindow(
                 point: location,
                 in: workspaceId,

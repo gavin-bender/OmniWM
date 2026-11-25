@@ -77,7 +77,7 @@ extension AXEventHandler {
         guard controller.workspaceManager.nativeManagedFocusToken == entry.token else { return false }
         guard !controller.workspaceManager.isScratchpadToken(entry.token) else { return false }
         guard let descriptor = controller.workspaceManager.descriptor(for: entry.workspaceId) else { return false }
-        guard controller.settings.workspaces.layoutType(for: descriptor.name) != .dwindle else { return false }
+        guard !controller.settings.workspaces.layoutType(for: descriptor.name).usesGroupedTiles else { return false }
         if entry.observedState.isNativeFullscreen {
             return true
         }

@@ -129,6 +129,7 @@ public enum IPCWorkspaceLayout: String, Codable, Equatable, Sendable {
     case defaultLayout = "default"
     case niri
     case dwindle
+    case tabbed
 }
 
 public enum IPCWindowSwitcherDirection: String, Codable, CaseIterable, Equatable, Sendable {

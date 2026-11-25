@@ -117,6 +117,13 @@ struct StatusMenuPanelView: View {
         VStack(spacing: 0) {
             if page == .root {
                 StatusMenuPrimaryView(model: model)
+                if let controller = model.controller, let workspace = controller.activeWorkspace()?.id,
+                   controller.workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
+                   controller.dwindleEngine?.groupedTileSnapshots(in: workspace).isEmpty == false {
+                    MenuActionRow(icon: "rectangle.on.rectangle.slash", label: String(localized: "Ungroup All Windows")) {
+                        controller.mouseEventHandler.ungroupTabbedWorkspace(workspace)
+                    }
+                }
                 if model.hasVisiblePageRows {
                     ForEach(
                         StatusMenuPage.allCases.filter { page in

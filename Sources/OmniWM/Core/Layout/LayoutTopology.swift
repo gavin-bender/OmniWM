@@ -6,6 +6,9 @@ import Foundation
 enum ActiveLayoutKind: String, Equatable {
     case niri
     case dwindle
+    case tabbed
+
+    var usesGroupedTiles: Bool { self == .dwindle || self == .tabbed }
 }
 
 struct LayoutTopology: Equatable {

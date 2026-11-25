@@ -34,7 +34,7 @@ extension MouseEventHandler {
     ) -> Bool {
         guard let controller else { return false }
         if drag.dwindleResizeWorkspaceId != nil
-            || controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) == .dwindle
+            || controller.workspaceManager.activeLayoutKind(for: entry.workspaceId).usesGroupedTiles
         {
             let wasResizing = drag.dwindleResizeWorkspaceId != nil
             controller.axManager.forceApplyNextFrame(for: entry.windowId)
@@ -282,7 +282,7 @@ extension MouseEventHandler {
         let workspaceId = entry.workspaceId
         guard let controller,
               let engine = controller.dwindleEngine,
-              controller.workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
+              controller.workspaceManager.activeLayoutKind(for: workspaceId).usesGroupedTiles,
               drag.dwindleResizeWorkspaceId == nil || drag.dwindleResizeWorkspaceId == workspaceId,
               let monitor = controller.workspaceManager.monitor(for: workspaceId),
               let start = nativeResizeStartFrame(drag, entry: entry)

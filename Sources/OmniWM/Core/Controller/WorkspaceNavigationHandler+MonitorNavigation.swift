@@ -45,7 +45,7 @@ extension WorkspaceNavigationHandler {
 
         let sourceFrame = controller.workspaceManager.selectedManagedToken
             .flatMap { controller.preferredKeyboardFocusFrame(for: $0) }
-        let dwindleEngine = controller.workspaceManager.activeLayoutKind(for: targetWorkspace.id) == .dwindle
+        let dwindleEngine = controller.workspaceManager.activeLayoutKind(for: targetWorkspace.id).usesGroupedTiles
             ? controller.dwindleEngine
             : nil
         let candidates = controller.workspaceManager.tiledEntries(in: targetWorkspace.id)

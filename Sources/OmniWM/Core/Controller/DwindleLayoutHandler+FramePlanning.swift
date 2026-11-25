@@ -12,7 +12,8 @@ extension DwindleLayoutHandler {
     ) -> WorkspaceLayoutPlan {
         let frames = engine.calculateLayout(
             for: snapshot.workspaceId,
-            screen: snapshot.monitor.workingFrame,
+            screen: engine.existingState(for: snapshot.workspaceId)?.tabbedMembers != nil
+                ? snapshot.monitor.tabbedWorkingFrame : snapshot.monitor.workingFrame,
             borderSafeFillScreen: snapshot.monitor.borderSafeFillFrame,
             fullscreenScreen: snapshot.monitor.fullscreenLayoutFrame,
             calculationSettings: calculationSettings(snapshot.settings, from: engine)

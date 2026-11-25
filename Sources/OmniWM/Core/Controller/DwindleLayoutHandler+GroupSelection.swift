@@ -14,7 +14,7 @@ extension DwindleLayoutHandler {
         guard let controller,
               let engine = controller.dwindleEngine,
               case let .dwindleTile(tileId) = info.owner,
-              controller.workspaceManager.activeLayoutKind(for: info.workspaceId) == .dwindle,
+              controller.workspaceManager.activeLayoutKind(for: info.workspaceId).usesGroupedTiles,
               controller.workspaceManager.isSeqCurrent(
                   info.plannedSeq,
                   for: info.workspaceId,

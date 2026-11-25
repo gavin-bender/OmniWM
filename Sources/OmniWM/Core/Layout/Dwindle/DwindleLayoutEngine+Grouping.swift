@@ -99,6 +99,19 @@ extension DwindleLayoutEngine {
         let member = tile.remove(at: memberIndex)
         state.leafByToken.removeValue(forKey: token)
         let newTile = DwindleTile(token: member.token, fullscreen: member.isFullscreen)
+        if state.tabbedMembers != nil, let frame = tile.freeFrame ?? leaf.cachedContentFrame {
+            // Give the new group a distinct position even when the original filled the display.
+            let edge: CGRectEdge = switch direction {
+            case .left: .minXEdge
+            case .right: .maxXEdge
+            case .up: .maxYEdge
+            case .down: .minYEdge
+            }
+            let span = direction == .left || direction == .right ? frame.width : frame.height
+            let halves = frame.divided(atDistance: span / 2, from: edge)
+            tile.freeFrame = halves.remainder
+            newTile.freeFrame = halves.slice
+        }
         let newLeaf = splitLeaf(
             leaf,
             tiles: (new: newTile, existing: tile),

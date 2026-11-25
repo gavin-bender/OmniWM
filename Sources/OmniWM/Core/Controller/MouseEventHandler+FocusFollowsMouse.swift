@@ -189,7 +189,7 @@ extension MouseEventHandler {
             }
             return niriFocusFollowsMouseTarget(window, in: workspaceId, at: location)
 
-        case .dwindle:
+        case .dwindle, .tabbed:
             guard let engine = controller.dwindleEngine else { return nil }
             let presentationTime = controller.animationClock.now()
             guard let token = engine.hitTestFocusableWindow(
@@ -236,7 +236,7 @@ extension MouseEventHandler {
                 }
                 return niriFocusFollowsMouseTarget(window, in: entry.workspaceId, at: location)
 
-            case .dwindle:
+            case .dwindle, .tabbed:
                 guard controller.dwindleEngine?.findNode(
                     for: entry.token,
                     in: entry.workspaceId

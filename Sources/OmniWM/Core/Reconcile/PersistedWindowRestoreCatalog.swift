@@ -110,15 +110,16 @@ struct PersistedDwindlePlacement: Codable, Equatable, Sendable {
     let steps: [PersistedDwindleSplitStep]
     let memberIndex: Int
     let isActiveMember: Bool
+    var tabbedFrame: CGRect? = nil
 
     func preservingPrunedSteps(of stored: PersistedDwindlePlacement?) -> PersistedDwindlePlacement {
-        guard let stored, steps.count < stored.steps.count else { return self }
+        guard let stored, (tabbedFrame == nil) == (stored.tabbedFrame == nil), steps.count < stored.steps.count else { return self }
         var remaining = stored.steps[...]
         for step in steps {
             guard let index = remaining.firstIndex(of: step) else { return self }
             remaining = remaining[(index + 1)...]
         }
-        return PersistedDwindlePlacement(steps: stored.steps, memberIndex: memberIndex, isActiveMember: isActiveMember)
+        return PersistedDwindlePlacement(steps: stored.steps, memberIndex: memberIndex, isActiveMember: isActiveMember, tabbedFrame: tabbedFrame)
     }
 }
 

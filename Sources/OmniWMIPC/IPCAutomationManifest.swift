@@ -72,7 +72,7 @@ public enum IPCCommandArgumentKind: String, Codable, CaseIterable, Equatable, Se
              .scratchpadIndex:
             "<number>"
         case .layout:
-            "<default|niri|dwindle>"
+            "<default|niri|dwindle|tabbed>"
         case .paletteMode:
             "<windows|menu|clipboard|commands|applications|files>"
         case .switcherDirection:

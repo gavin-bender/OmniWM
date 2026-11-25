@@ -233,7 +233,7 @@ extension NiriLayoutHandler {
         guard let controller, let engine = controller.niriEngine else { return }
         var changed: Set<WorkspaceDescriptor.ID> = []
         for descriptor in controller.workspaceManager.workspaces {
-            guard controller.settings.workspaces.layoutType(for: descriptor.name) != .dwindle else { continue }
+            guard !controller.settings.workspaces.layoutType(for: descriptor.name).usesGroupedTiles else { continue }
             if let monitorId, controller.workspaceManager.monitorId(for: descriptor.id) != monitorId { continue }
             if onlyAutomaticSpans,
                engine.effectiveSettings(in: descriptor.id).defaultContainerPrimarySpan != nil { continue }

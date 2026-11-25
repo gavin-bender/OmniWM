@@ -10,7 +10,7 @@ extension DwindleLayoutHandler {
         guard let controller else { return false }
         var didMove = false
         withDwindleContext(in: workspaceId) { engine, wsId in
-            if focusGroupMember(
+            if controller.workspaceManager.activeLayoutKind(for: wsId) != .tabbed, focusGroupMember(
                 direction: direction,
                 wraps: false,
                 engine: engine,

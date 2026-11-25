@@ -8,6 +8,9 @@ enum LayoutType: String, Codable, CaseIterable, Identifiable {
     case defaultLayout = "default"
     case niri
     case dwindle
+    case tabbed
+
+    var usesGroupedTiles: Bool { self == .dwindle || self == .tabbed }
 
     var id: String {
         rawValue
@@ -16,6 +19,7 @@ enum LayoutType: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .defaultLayout: "Default"
+        case .tabbed: "Tabbed"
         case .niri: "Niri (Scrolling)"
         case .dwindle: "Dwindle (BSP)"
         }

@@ -203,7 +203,7 @@ final class NativeAppUnhideTests: XCTestCase {
                 switch controller.workspaceManager.activeLayoutKind(for: targetWorkspace) {
                 case .niri:
                     _ = controller.niriEngine?.addWindow(token: token, to: targetWorkspace, afterSelection: nil)
-                case .dwindle:
+                case .dwindle, .tabbed:
                     _ = controller.dwindleEngine?.addWindow(token: token, to: targetWorkspace, activeWindowFrame: nil)
                 }
             }

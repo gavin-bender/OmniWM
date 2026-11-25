@@ -40,6 +40,8 @@ extension DwindleLayoutHandler {
         engine: DwindleLayoutEngine
     ) -> WorkspaceLayoutPlan {
         applyResolvedSettings(snapshot.settings, to: engine)
+        engine.selectWorkspaceStyle(tabbed: controller?.workspaceManager.activeLayoutKind(for: snapshot.workspaceId) == .tabbed,
+                                    in: snapshot.workspaceId)
         engine.setExcludedTokens(
             snapshot.excludedTokens,
             authoritativeTokens: Set(snapshot.windows.lazy.map(\.token)),

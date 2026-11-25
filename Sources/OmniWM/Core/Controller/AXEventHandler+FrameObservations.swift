@@ -22,6 +22,7 @@ extension AXEventHandler {
         }
 
         var byWindowId: [UInt32: FrameObservation] = [:]
+        var tabBoundarySettlements: [UInt32: Task<Void, Never>] = [:]
         var nextGeneration: UInt64 = 1
     }
 
@@ -58,10 +59,13 @@ extension AXEventHandler {
     }
 
     func cancelFrameObservation(windowId: UInt32) {
+        frameObservations.tabBoundarySettlements.removeValue(forKey: windowId)?.cancel()
         frameObservations.byWindowId.removeValue(forKey: windowId)?.task.cancel()
     }
 
     func cancelFrameObservations() {
+        for task in frameObservations.tabBoundarySettlements.values { task.cancel() }
+        frameObservations.tabBoundarySettlements.removeAll()
         for observation in frameObservations.byWindowId.values {
             observation.task.cancel()
         }
@@ -126,6 +130,32 @@ extension AXEventHandler {
         {
             controller.surfaceReconciler.noteBorderChanged()
         }
+        if entry.mode == .tiling, entry.hiddenState == nil, entry.layoutReason == .standard,
+           controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) == .tabbed,
+           isWorkspaceActive(entry.workspaceId),
+           let engine = controller.dwindleEngine,
+           let leaf = engine.existingState(for: entry.workspaceId)?.leafByToken[entry.token],
+           let tile = leaf.tile, tile.activeToken == entry.token, !tile.activeMember.isFullscreen
+        {
+            let frame = ScreenCoordinateSpace.toAppKit(rect: windowInfo.frame)
+            if !controller.axManager.isAwaitingFrameWrite(entry.windowId),
+               !shouldSuppressFrameChangedRelayout(for: entry, observedFrame: frame),
+               frame.width > 0, frame.height > 0, frame != leaf.cachedContentFrame,
+               !leaf.hasActiveAnimations(at: controller.animationClock.now()),
+               let monitor = controller.workspaceManager.monitor(for: entry.workspaceId), monitor.frame.intersects(frame)
+            {
+                tile.freeFrame = frame
+                leaf.cachedContentFrame = frame
+                leaf.cachedFrame = engine.tabbedBar.tileFrame(around: frame, grouped: tile.isGrouped)
+                controller.surfaceReconciler.noteWorldChanged()
+                frameObservations.tabBoundarySettlements.removeValue(forKey: windowId)?.cancel()
+                let working = controller.insetWorkingFrame(for: monitor).intersection(monitor.visibleFrame)
+                if tile.isGrouped, !working.contains(leaf.cachedFrame ?? frame) {
+                    settleTabbedBoundary(windowId: windowId, entry: entry, observed: frame)
+                }
+            }
+            return
+        }
         if entry.mode == .tiling,
            controller.mouseEventHandler.handleNativeTitleBarDragFrameChanged(for: entry)
         {
@@ -141,6 +171,31 @@ extension AXEventHandler {
         guard isWindowDisplayable(token: windowServerToken) else { return }
 
         applyObservedFrameChange(entry, focusedObservedFrame: focusedObservedFrame, controller: controller)
+    }
+
+    // WindowServer reports native touch moves even without a mouse drag session. Wait for motion
+    // to settle so the compositor and OmniWM don't simultaneously position the same window.
+    private func settleTabbedBoundary(windowId: UInt32, entry: WindowState, observed: CGRect) {
+        let token = entry.token
+        let workspace = entry.workspaceId
+        frameObservations.tabBoundarySettlements[windowId] = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(110)) } catch { return }
+            guard let self else { return }
+            frameObservations.tabBoundarySettlements[windowId] = nil
+            guard let controller, controller.isEnabled, !controller.isOverviewOpen(), isWorkspaceActive(workspace),
+                  controller.workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
+                  let current = controller.workspaceManager.entry(for: token), current.workspaceId == workspace,
+                  current.hiddenState == nil, current.layoutReason == .standard, current.mode == .tiling,
+                  let state = controller.dwindleEngine?.existingState(for: workspace),
+                  let tile = state.leafByToken[token]?.tile,
+                  tile.activeToken == token, tile.isGrouped, !tile.activeMember.isFullscreen,
+                  tile.freeFrame == observed else { return }
+            // The native compositor has already moved the window. Supersede any seed from a previous group operation.
+            controller.workspaceManager.withEngineMutationScope(in: workspace) {
+                state.pendingMovementFrameSeeds[token] = observed
+            }
+            controller.layoutRefreshController.requestLayoutCommandRelayout(affectedWorkspaceIds: [workspace])
+        }
     }
 
     private func retryAdmissionForFrameChange(windowId: UInt32, windowServerToken: WindowToken) -> Bool {

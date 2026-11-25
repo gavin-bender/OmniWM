@@ -62,7 +62,7 @@ extension WindowActionHandler {
                 return false
             }
             switch controller.settings.workspaces.layoutType(for: workspaceName) {
-            case .dwindle:
+            case .dwindle, .tabbed:
                 return controller.dwindleEngine != nil
             case .niri,
                  .defaultLayout:

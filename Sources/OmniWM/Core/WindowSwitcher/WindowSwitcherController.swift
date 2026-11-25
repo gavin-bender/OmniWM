@@ -199,7 +199,7 @@ final class WindowSwitcherController {
 
     private func orderedEntries(in workspaceId: WorkspaceDescriptor.ID, manager: WorkspaceManager) -> [WindowState] {
         let entries = manager.entries(in: workspaceId)
-        if manager.activeLayoutKind(for: workspaceId) == .dwindle,
+        if manager.activeLayoutKind(for: workspaceId).usesGroupedTiles,
            let root = manager.dwindleEngine?.root(for: workspaceId)
         {
             let byToken = Dictionary(uniqueKeysWithValues: entries.map { ($0.token, $0) })

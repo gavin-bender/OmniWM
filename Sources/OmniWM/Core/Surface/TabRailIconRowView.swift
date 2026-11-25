@@ -5,6 +5,8 @@ import AppKit
 
 final class TabRailIconRowView: NSView {
     let imageView = NSImageView()
+    private let titleField = NSTextField(labelWithString: "")
+    private var options: TabbedBarOptions?
     let selectionLayer = CAShapeLayer()
     private let motionPolicy: MotionPolicy
     private var selected = false
@@ -24,6 +26,11 @@ final class TabRailIconRowView: NSView {
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.setAccessibilityElement(false)
         addSubview(imageView)
+        titleField.lineBreakMode = .byTruncatingTail
+        titleField.maximumNumberOfLines = 1
+        titleField.setAccessibilityElement(false)
+        titleField.isHidden = true
+        addSubview(titleField)
     }
 
     @available(*, unavailable)
@@ -33,8 +40,29 @@ final class TabRailIconRowView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        let size = TabRailStyle.iconSize
-        imageView.frame = CGRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
+        layoutContents()
+    }
+
+    func configure(tab: TabRailTabInfo, options: TabbedBarOptions?, appInfoCache: AppInfoCache) {
+        self.options = options
+        titleField.isHidden = options == nil || options?.content == .icons
+        imageView.isHidden = options?.content == .titles
+        titleField.stringValue = tab.title?.nilIfEmpty ?? tab.appName?.nilIfEmpty ?? String(localized: "Tab \(tab.visualIndex + 1)")
+        if let image = tab.icon ?? tab.token.flatMap({ appInfoCache.info(for: $0.pid)?.icon }) {
+            imageView.image = image
+        }
+        layoutContents()
+    }
+
+    private func layoutContents() {
+        let size = min(bounds.height, options.map { $0.rowHeight - 10 } ?? TabRailStyle.iconSize)
+        imageView.frame = CGRect(x: titleField.isHidden ? (bounds.width - size) / 2 : 5, y: (bounds.height - size) / 2, width: size, height: size)
+        if !titleField.isHidden {
+            titleField.font = .systemFont(ofSize: options?.size == .large ? 15 : 13)
+            let start = imageView.isHidden ? 7 : imageView.frame.maxX + 5
+            let height = titleField.intrinsicContentSize.height
+            titleField.frame = CGRect(x: start, y: (bounds.height - height) / 2, width: max(0, bounds.width - start - 5), height: height)
+        }
         selectionLayer.frame = bounds
         selectionLayer.path = CGPath(
             roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), cornerWidth: 5, cornerHeight: 5, transform: nil

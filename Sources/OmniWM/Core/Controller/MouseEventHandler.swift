@@ -12,6 +12,8 @@ final class MouseEventHandler {
     let eventIntake: EventIntake
     let inputTapThread = InputTapThread()
     lazy var touchDisplayWindowGestures = TouchDisplayWindowGestures(mouse: self)
+    var tabWindowStackAtPoint: @MainActor (CGPoint) -> [(id: Int, frame: CGRect)] = MouseEventHandler.tabWindowStack
+    let tabDropFeedback = TabDropFeedback()
     var state = MouseInputState() {
         didSet {
             if oldValue.capturedInteractionButton != state.capturedInteractionButton

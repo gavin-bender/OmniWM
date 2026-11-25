@@ -224,6 +224,10 @@ final class SettingsStore {
         quakeTerminalCustomFrame = nil
     }
 
+    var tabbedBar = TabbedBarOptions() {
+        didSet { scheduleSave() }
+    }
+
     var tabRailAppIcons = SettingsStore.defaultExport.tabRailAppIcons {
         didSet { scheduleSave() }
     }
@@ -484,6 +488,7 @@ extension SettingsStore {
         quakeTerminal.apply(export.quakeTerminal, baseline: SettingsStore.defaultExport.quakeTerminal)
 
         tabRailAppIcons = export.tabRailAppIcons
+        tabbedBar = export.tabbedBar
         shellPermissions.apply(export.shellPermissions)
         appTheming.apply(export.appTheming)
     }

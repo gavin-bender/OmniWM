@@ -83,7 +83,8 @@ final class WorkspaceBarMenuModelTests: XCTestCase {
         XCTAssertEqual(action(items, titled: "Rename…"), .action("Rename…", .renameWorkspace(ws2)))
         XCTAssertEqual(action(items, titled: "Layout"), .submenu("Layout", [
             .action(LayoutType.niri.localizedDisplayName, .setLayout(ws2, .niri), isChecked: true),
-            .action(LayoutType.dwindle.localizedDisplayName, .setLayout(ws2, .dwindle))
+            .action(LayoutType.dwindle.localizedDisplayName, .setLayout(ws2, .dwindle)),
+            .action(LayoutType.tabbed.localizedDisplayName, .setLayout(ws2, .tabbed))
         ]))
         XCTAssertEqual(action(items, titled: "Move Workspace to Monitor"), .submenu(
             "Move Workspace to Monitor",
@@ -109,12 +110,12 @@ final class WorkspaceBarMenuModelTests: XCTestCase {
             action(items, titled: "Rename… (configured workspaces only)"),
             .action("Rename… (configured workspaces only)", .renameWorkspace(ws1), isEnabled: false)
         )
-        guard case let .submenu(_, _, layoutEnabled)? = action(items, titled: "Layout (configured workspaces only)"),
+        guard case let .submenu(_, _, layoutEnabled)? = action(items, titled: "Layout"),
               case let .submenu(_, monitors, monitorEnabled)? = action(items, titled: "Move Workspace to Monitor")
         else {
             return XCTFail("missing submenus")
         }
-        XCTAssertFalse(layoutEnabled)
+        XCTAssertTrue(layoutEnabled)
         XCTAssertTrue(monitors.isEmpty)
         XCTAssertFalse(monitorEnabled)
     }

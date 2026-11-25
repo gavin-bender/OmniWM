@@ -33,6 +33,23 @@ extension WMController {
             guard let self else { return true }
             return secureInputMonitor.isSecureInputActive || isLockScreenActive
         }
+        hotkeys.cancelTabDrag = { [weak self] in
+            guard let self else { return false }
+            let cancelled = tabRailManager.cancelDrag()
+            let native = mouseEventHandler.state.tabbedTitleDrag != nil
+            mouseEventHandler.state.tabbedTitleDrag = nil
+            mouseEventHandler.tabDropFeedback.hide()
+            // Let the native application receive Escape to cancel its title-bar drag.
+            return cancelled && !native
+        }
+        hotkeys.cycleFocusedTabGroup = { [weak self] reverse in
+            guard let self, isEnabled, !isOverviewOpen(), let workspace = activeWorkspace()?.id,
+                  workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
+                  let token = focusedManagedTokenForCommand(),
+                  let tile = dwindleEngine?.tileSnapshot(for: token, in: workspace), tile.isGrouped,
+                  tile.activeToken == token else { return false }
+            return dwindleLayoutHandler.wrapGroupFocus(direction: reverse ? .up : .down, in: workspace)
+        }
         hotkeys.onWindowSwitcherAction = { [weak self] action, generation in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
@@ -75,6 +92,9 @@ extension WMController {
             self?.statusBarController?.openSettings(section: .hotkeys)
         }
         tabRailManager.ringOrderedAbove = { [weak self] in self?.surfaceReconciler.ringWindowId(orderedAbove: $0) }
+        tabRailManager.onTabAction = { [weak self] info, token, action in
+            self?.mouseEventHandler.performTabBarAction(action, token: token, info: info)
+        }
         tabRailManager.onSelect = { [weak self] info, visualIndex, token in
             guard let self else { return }
             switch info.owner {

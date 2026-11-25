@@ -14,6 +14,7 @@ struct DwindleTileMember: Equatable {
 }
 
 final class DwindleTile {
+    var freeFrame: CGRect?
     let id: DwindleTileId
     private(set) var members: [DwindleTileMember]
     private(set) var activeIndex: Int
@@ -49,6 +50,15 @@ final class DwindleTile {
         guard let index = memberIndex(for: token), index != activeIndex else { return false }
         activeIndex = index
         return true
+    }
+
+    func place(_ token: WindowToken, before anchor: WindowToken?) {
+        guard anchor != token, let source = memberIndex(for: token) else { return }
+        let active = activeToken
+        let member = members.remove(at: source)
+        let destination = anchor.flatMap(memberIndex(for:)) ?? members.endIndex
+        members.insert(member, at: destination)
+        activeIndex = memberIndex(for: active)!
     }
 
     func insertAfterActive(_ member: DwindleTileMember) {

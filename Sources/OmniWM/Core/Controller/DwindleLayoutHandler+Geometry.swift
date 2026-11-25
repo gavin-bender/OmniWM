@@ -42,6 +42,7 @@ extension DwindleLayoutHandler {
         engine.settings.splitWidthMultiplier = settings.splitWidthMultiplier
         engine.settings.singleWindowFit = settings.singleWindowFit
         engine.settings.innerGap = settings.innerGap
+        engine.tabbedBar = controller?.settings.tabbedBar ?? TabbedBarOptions()
         engine.tabRailWidth = (controller?.tabRailStyle ?? .compact).reservedWidth
     }
 

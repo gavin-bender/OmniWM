@@ -50,6 +50,7 @@ extension SettingsStore {
             quakeTerminal: quakeTerminal.export(),
             appTheming: appTheming.export(),
             tabRailAppIcons: tabRailAppIcons,
+            tabbedBar: tabbedBar,
             shellPermissions: shellPermissions.export()
         )
     }

@@ -79,6 +79,7 @@ extension MouseEventHandler {
             return false
         }
         guard controller != nil else { return false }
+        if button == .left { state.tabbedTitleDrag = nil }
         let blocked = shouldBlockOwnWindowInput(at: location, windowIdUnderPointer: windowIdUnderPointer)
         if MouseTrace.shared.isActive {
             let geometric = controller?.ownedWindowRegistry.containsGeometric(point: location) ?? false
@@ -112,6 +113,7 @@ extension MouseEventHandler {
             return
         }
         guard state.activeInteractionSource != .touchDisplay else { return }
+        if button == .left { updateTabbedTitleDrag(at: location, released: false) }
         warpDraggedPointer(at: location)
         controller?.workspaceBarManager.handleAutoHideMouseMoved(at: location)
         confirmNativeMouseDrag(at: location, button: button)
@@ -131,6 +133,7 @@ extension MouseEventHandler {
             return
         }
         guard state.activeInteractionSource != .touchDisplay else { return }
+        if button == .left { updateTabbedTitleDrag(at: location, released: true) }
         markNativeTitleBarDragFallbackReleased(button: button, at: location)
         finishNativeTitleBarDragIfNeeded(button: button)
         if !isCapturedInteraction(button), shouldBlockOwnWindowInput(at: location) {

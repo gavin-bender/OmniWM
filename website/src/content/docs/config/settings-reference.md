@@ -43,7 +43,7 @@ Global switches: hotkeys, Hyper key, default layout, sleep, updates, IPC, animat
 | `hotkeysEnabled` | boolean | `true` | Master switch for all global hotkeys. |
 | `systemHyperTrigger` | string | `"None"` | Physical trigger for Hyper: `None`, a key name (`CapsLock`, `F13`–`F20`, `LeftControl`/`RightControl`, `LeftOption`/`RightOption`, `LeftShift`/`RightShift`, `LeftCommand`/`RightCommand`; OmniWM writes these with a space, for example `"Left Control"` and `"Caps Lock"`, and accepts both spellings), or `MouseButton3`/`MouseButton4`/`MouseButton5`. |
 | `hyperKeyModifiers` | string | `"Control+Option+Shift+Command"` | Modifier set Hyper expands to: `+`-joined names, at least two of Control/Option/Shift/Command. |
-| `defaultLayoutType` | string | `"niri"` | Layout used by workspaces whose own `layoutType` is `default`: `niri` or `dwindle`. |
+| `defaultLayoutType` | string | `"niri"` | Layout used by workspaces whose own `layoutType` is `default`: `niri`, `dwindle`, or `tabbed`. |
 | `preventSleepEnabled` | boolean | `false` | Prevents idle display sleep while your user session is active. |
 | `updateChecksEnabled` | boolean | `true` | Automatic update checks. |
 | `ipcEnabled` | boolean | `false` | Enables the IPC server used by `omniwmctl`. |
@@ -584,11 +584,18 @@ Appearance of OmniWM's own UI.
 | --- | --- | --- | --- |
 | `tabRailAppIcons` *(optional)* | boolean | `false` | Replaces compact tab markers with app icons in Niri and Dwindle. Each tab group reserves a 28-point rail instead of 10 points; crowded rails scroll vertically. |
 
+In **Settings → Appearance → App & Motion → Tabbed layout**, choose the bar position (top or left), size (small, medium, or large), and contents (app icons, window titles, or both). Tabbed defaults to a 36-point top bar showing both. The small and large sizes use 28 and 48 points.
+
 The **Show app icons in tab rails** toggle in **Settings → Appearance → App & Motion** controls the same option. Changes apply live without restarting.
 
 ```toml
 [appearance]
 tabRailAppIcons = true
+
+[appearance.tabbedBar]
+position = "top"
+size = "medium"
+content = "iconsAndTitles"
 ```
 
 ## hotkeys
@@ -624,7 +631,9 @@ Array of workspace definitions.
 | `name` | string | Workspace name; numeric names define the ordering and number-key targets. |
 | `displayName` *(optional)* | string | Label shown in the bar instead of `name` (emoji welcome). |
 | `monitorAssignment` | table | `type` = `main`, `secondary`, `tertiary`, or `specificDisplay`. For `specificDisplay`, the `output` sub-table contains a required `name` (string), optional `displayUUID` (string), and optional `displayId` (integer). The role types resolve through the [`monitors`](#monitors) ranking. |
-| `layoutType` | string | `default` (follow `general.defaultLayoutType`), `niri`, or `dwindle`. |
+| `layoutType` | string | `default` (follow `general.defaultLayoutType`), `niri`, `dwindle`, or `tabbed`. |
+
+**Tabbed** groups new tiled windows with the focused group. Click its tab rail or use Option–Up/Down to select a member. Option–Shift–Arrow moves the selected window into a neighboring group. At an edge, the same shortcut splits the window into a new group. Drag or resize the active window to position its group. Drag one title bar onto another to join them. Option–Shift–L cycles the current workspace through Niri, Dwindle, and Tabbed. These are the default bindings in Keyboard Shortcuts.
 
 For `specificDisplay`, `displayUUID` takes precedence when present. Without it, `displayId` and `name` must match a monitor that has no display UUID. A name alone cannot identify the target monitor.
 

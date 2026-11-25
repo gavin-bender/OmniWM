@@ -150,13 +150,7 @@ enum WorkspaceBarMenuBuilder {
                 .renameWorkspace(target.id),
                 isEnabled: target.isConfigured
             ),
-            .submenu(
-                target.isConfigured
-                    ? String(localized: "Layout")
-                    : String(localized: "Layout (configured workspaces only)"),
-                layoutItems(for: target),
-                isEnabled: target.isConfigured
-            ),
+            .submenu(String(localized: "Layout"), layoutItems(for: target)),
             .submenu(
                 String(localized: "Move Workspace to Monitor"),
                 otherDisplays.map { .action($0.name, .moveWorkspaceToMonitor(target.id, $0.id)) },
@@ -277,7 +271,7 @@ enum WorkspaceBarMenuBuilder {
     }
 
     private static func layoutItems(for target: WorkspaceBarWorkspaceMenuTarget) -> [WorkspaceBarMenuItem] {
-        [(LayoutType.niri, ActiveLayoutKind.niri), (.dwindle, .dwindle)].map { layout, kind in
+        [(LayoutType.niri, ActiveLayoutKind.niri), (.dwindle, .dwindle), (.tabbed, .tabbed)].map { layout, kind in
             .action(
                 layout.localizedDisplayName,
                 .setLayout(target.id, layout),

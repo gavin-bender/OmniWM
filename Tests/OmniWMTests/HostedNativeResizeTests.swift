@@ -86,7 +86,7 @@ final class HostedNativeResizeTests: XCTestCase {
                     monitorFrame: frame, gaps: (horizontal: gap, vertical: gap),
                     orientation: controller.settings.monitors.effectiveOrientation(for: monitor)
                 )
-            case .dwindle:
+            case .dwindle, .tabbed:
                 let engine = try XCTUnwrap(controller.dwindleEngine)
                 return engine.calculateLayout(
                     for: workspace, screen: frame,

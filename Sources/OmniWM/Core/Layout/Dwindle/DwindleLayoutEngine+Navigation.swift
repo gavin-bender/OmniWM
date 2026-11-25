@@ -13,6 +13,9 @@ extension DwindleLayoutEngine {
         measurement: DwindleNeighborMeasurement = .gappedFrames,
         tieBreak: DwindleNeighborTieBreak = .treeOrder
     ) -> WindowToken? {
+        if let state = existingState(for: workspaceId), state.tabbedMembers != nil {
+            return tabbedNeighbor(from: handle, direction: direction, state: state)
+        }
         guard let state = existingState(for: workspaceId),
               let currentNode = state.leafByToken[handle],
               let currentTile = currentNode.tile,

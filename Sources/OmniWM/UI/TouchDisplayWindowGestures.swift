@@ -222,7 +222,7 @@ final class TouchDisplayWindowGestures: NSObject, NSWindowDelegate {
         switch action {
         case let .focusWindow(direction):
             switch controller.settings.workspaces.layoutType(for: workspace.name) {
-            case .dwindle:
+            case .dwindle, .tabbed:
                 if !controller.dwindleLayoutHandler.focusNeighbor(direction: direction, in: workspace.id) {
                     _ = controller.dwindleLayoutHandler.wrapGroupFocus(direction: direction, in: workspace.id)
                 }

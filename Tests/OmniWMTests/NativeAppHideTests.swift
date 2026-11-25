@@ -265,7 +265,7 @@ final class NativeAppHideTests: XCTestCase {
                     switch controller.workspaceManager.activeLayoutKind(for: workspace) {
                     case .niri:
                         _ = controller.niriEngine?.addWindow(token: token, to: workspace, afterSelection: nil)
-                    case .dwindle:
+                    case .dwindle, .tabbed:
                         _ = controller.dwindleEngine?.addWindow(token: token, to: workspace, activeWindowFrame: nil)
                     }
                 }
@@ -304,7 +304,7 @@ final class NativeAppHideTests: XCTestCase {
                     switch controller.workspaceManager.activeLayoutKind(for: activeWorkspace) {
                     case .niri:
                         _ = controller.niriEngine?.addWindow(token: token, to: activeWorkspace, afterSelection: nil)
-                    case .dwindle:
+                    case .dwindle, .tabbed:
                         _ = controller.dwindleEngine?.addWindow(
                             token: token,
                             to: activeWorkspace,

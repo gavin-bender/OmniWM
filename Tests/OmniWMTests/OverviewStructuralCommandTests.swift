@@ -1634,7 +1634,7 @@ final class OverviewStructuralCommandTests: XCTestCase {
             switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
             case .niri:
                 _ = controller.niriEngine?.addWindow(token: token, to: workspaceId, afterSelection: nil)
-            case .dwindle:
+            case .dwindle, .tabbed:
                 _ = controller.dwindleEngine?.addWindow(
                     token: token,
                     to: workspaceId,

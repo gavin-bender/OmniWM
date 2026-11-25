@@ -9,6 +9,7 @@ final class DwindleWorkspaceState {
     let root = DwindleNode(kind: .leaf(tile: nil))
     var leafByToken: [WindowToken: DwindleNode] = [:]
     var excludedTokens: Set<WindowToken> = []
+    var tabbedMembers: Set<WindowToken>?
     var tileCount = 0
     var selectedNodeId: DwindleNodeId?
     var preselection: Direction?

@@ -881,7 +881,7 @@ extension WorkspaceMoveFocusBehaviorTests {
             switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
             case .niri:
                 _ = controller.niriEngine?.addWindow(token: token, to: workspaceId, afterSelection: nil)
-            case .dwindle:
+            case .dwindle, .tabbed:
                 _ = controller.dwindleEngine?.addWindow(
                     token: token,
                     to: workspaceId,
@@ -926,7 +926,7 @@ extension WorkspaceMoveFocusBehaviorTests {
                 in: workspaceId,
                 onMonitor: monitor.id
             )
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(controller.dwindleEngine)
             controller.workspaceManager.withEngineMutationScope(in: workspaceId) {
                 _ = engine.activateWindow(handle.id, in: workspaceId)

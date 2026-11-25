@@ -120,6 +120,15 @@ final class SettingsTOMLCodecTests: XCTestCase {
         XCTAssertTrue(try SettingsTOMLCodec.decode(SettingsTOMLCodec.encode(export)).captureFreeWorkspaceSwipes)
     }
 
+    func testTabbedBarOptionsRoundTripIndependentlyOfOtherRails() throws {
+        var export = SettingsExport.defaults()
+        XCTAssertEqual(export.tabbedBar, TabbedBarOptions(position: .top, size: .medium, content: .iconsAndTitles))
+        export.tabbedBar = TabbedBarOptions(position: .left, size: .large, content: .titles)
+        let data = try SettingsTOMLCodec.encode(export)
+        XCTAssertEqual(try SettingsTOMLCodec.decode(data), export)
+        XCTAssertFalse(export.tabRailAppIcons)
+    }
+
     func testTabRailAppIconsDefaultsAndRoundTrips() throws {
         var export = SettingsExport.defaults()
         XCTAssertFalse(export.tabRailAppIcons)

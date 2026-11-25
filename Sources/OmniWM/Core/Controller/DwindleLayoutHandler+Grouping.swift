@@ -55,7 +55,9 @@ extension DwindleLayoutHandler {
             }
 
             let moveOutcome: WindowMoveOutcome
-            if sourceIsGrouped {
+            let tabbed = controller?.workspaceManager.activeLayoutKind(for: workspaceId) == .tabbed
+            let hasDestination = tabbed && engine.findGeometricNeighbor(from: token, direction: direction, in: workspaceId) != nil
+            if sourceIsGrouped && !hasDestination {
                 moveOutcome = engine
                     .ungroupWindow(token, direction: direction, in: workspaceId) ? .movedWithinWorkspace : .blocked
             } else {

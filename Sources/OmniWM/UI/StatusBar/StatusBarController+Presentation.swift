@@ -36,6 +36,7 @@ extension StatusBarController {
         switch layout {
         case .niri: "rectangle.split.3x1"
         case .dwindle: "rectangle.split.2x2"
+        case .tabbed: "macwindow.on.rectangle"
         }
     }
 
@@ -43,6 +44,7 @@ extension StatusBarController {
         switch layout {
         case .niri: LayoutType.niri.localizedDisplayName
         case .dwindle: LayoutType.dwindle.localizedDisplayName
+        case .tabbed: LayoutType.tabbed.localizedDisplayName
         }
     }
 
@@ -77,6 +79,7 @@ extension StatusBarController {
         switch layout {
         case .niri: niriLayoutGlyph
         case .dwindle: dwindleLayoutGlyph
+        case .tabbed: layoutGlyph(systemSymbolName: layoutSymbolName(.tabbed))
         }
     }
 
@@ -84,6 +87,7 @@ extension StatusBarController {
         switch layout {
         case .niri: brandedNiriLayoutImage
         case .dwindle: brandedDwindleLayoutImage
+        case .tabbed: statusButtonImage(icon: OmniWMBrandMark.statusItemImage(pointSize: statusIconPointSize), layout: .tabbed)
         }
     }
 

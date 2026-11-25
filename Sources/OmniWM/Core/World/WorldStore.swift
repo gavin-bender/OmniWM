@@ -416,7 +416,7 @@ extension WorldStore {
 
     func layoutTopology(for workspaceId: WorkspaceDescriptor.ID) -> LayoutTopology {
         switch activeLayoutResolver?(workspaceId) {
-        case .dwindle:
+        case .dwindle, .tabbed:
             return LayoutTopology(dwindleFullscreenTokens: dwindleEngine?.fullscreenTokens(in: workspaceId) ?? [])
         case .niri,
              nil:

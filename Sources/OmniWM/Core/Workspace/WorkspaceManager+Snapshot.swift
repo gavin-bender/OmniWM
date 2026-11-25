@@ -8,12 +8,12 @@ import QuartzCore
 extension WorkspaceManager {
     func activeLayoutKind(for workspaceId: WorkspaceDescriptor.ID) -> ActiveLayoutKind {
         guard let descriptor = workspaceCatalog.descriptor(for: workspaceId) else { return .niri }
-        return settings.workspaces.layoutType(for: descriptor.name) == .dwindle ? .dwindle : .niri
+        return ActiveLayoutKind(rawValue: settings.workspaces.layoutType(for: descriptor.name).rawValue) ?? .niri
     }
 
     func isInactiveTabMember(_ token: WindowToken, in workspaceId: WorkspaceDescriptor.ID) -> Bool {
         switch activeLayoutKind(for: workspaceId) {
-        case .dwindle:
+        case .dwindle, .tabbed:
             return dwindleEngine?.isInactiveGroupMember(token, in: workspaceId) == true
         case .niri:
             guard let engine = niriEngine,

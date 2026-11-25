@@ -67,7 +67,7 @@ struct WorldView {
 
     func isWindowFullscreenInLayout(_ entry: borrowing WindowState) -> Bool {
         switch controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) {
-        case .dwindle:
+        case .dwindle, .tabbed:
             return controller.dwindleEngine?.isWindowFullscreen(entry.token, in: entry.workspaceId) == true
         case .niri:
             return controller.niriEngine?.isWindowFullscreen(entry.token, in: entry.workspaceId) == true

@@ -229,7 +229,7 @@ extension AXEventHandler {
     ) -> CGRect? {
         let entry = observation.entry
         switch controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) {
-        case .dwindle:
+        case .dwindle, .tabbed:
             guard let engine = controller.dwindleEngine else { return nil }
             _ = controller.dwindleLayoutHandler.activateWindow(
                 entry.token,

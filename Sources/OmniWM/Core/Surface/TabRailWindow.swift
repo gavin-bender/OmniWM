@@ -20,6 +20,11 @@ class TabRailWindow: NSPanel {
     private var registeredSurfaceWindowNumber: Int?
     private var accessibilityDisplayObserver: NSObjectProtocol?
 
+    var onTabAction: ((TabRailInfo, WindowToken, TabBarAction) -> Void)?
+    func insertion(atScreen point: CGPoint) -> (before: WindowToken?, marker: CGRect)? {
+        railView.insertion(at: CGPoint(x: point.x - appliedFrame.minX, y: point.y - appliedFrame.minY))
+    }
+
     var onSelect: ((TabRailInfo, Int, WindowToken?) -> Void)?
     var ringOrderedAbove: (@MainActor (UInt32) -> UInt32?)?
 
@@ -53,6 +58,10 @@ class TabRailWindow: NSPanel {
         isReleasedWhenClosed = false
         omniwm_window_manager_end_coordinator_capture()
 
+        railView.onTabAction = { [weak self] token, action in
+            guard let self, let currentInfo else { return }
+            self.onTabAction?(currentInfo, token, action)
+        }
         railView.onSelect = { [weak self] visualIndex in
             guard let self, let currentInfo else { return }
             let token = currentInfo.tabs.first(where: { $0.visualIndex == visualIndex })?.token
@@ -75,7 +84,11 @@ class TabRailWindow: NSPanel {
         }
     }
 
+    @discardableResult
+    func cancelDrag() -> Bool { railView.cancelDrag() }
+
     override func close() {
+        cancelDrag()
         dismissHover()
         if let accessibilityDisplayObserver {
             NotificationCenter.default.removeObserver(accessibilityDisplayObserver)
@@ -123,6 +136,12 @@ class TabRailWindow: NSPanel {
         }
         self.style = style
         currentInfo = info
+        if let options = style.options {
+            var content = info.tileFrame
+            if options.position == .top { content.size.height -= options.thickness }
+            else { content.origin.x += options.thickness; content.size.width -= options.thickness }
+            railView.groupContentFrame = content
+        }
         let clampedActiveVisualIndex = min(max(0, info.activeVisualIndex), max(0, info.tabCount - 1))
         guard frame.width > 1, frame.height > 1 else {
             railView.update(tabs: info.normalizedTabs, activeVisualIndex: clampedActiveVisualIndex, style: style)

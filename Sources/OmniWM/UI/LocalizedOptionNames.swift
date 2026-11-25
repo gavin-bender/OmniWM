@@ -28,6 +28,7 @@ extension LayoutType {
     var localizedDisplayName: String {
         switch self {
         case .defaultLayout: String(localized: "Default")
+        case .tabbed: String(localized: "Tabbed")
         case .niri: String(localized: "Niri (Scrolling)")
         case .dwindle: String(localized: "Dwindle (BSP)")
         }

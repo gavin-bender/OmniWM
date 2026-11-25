@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
+import Carbon
 import CoreGraphics
 import Foundation
 
@@ -20,6 +21,20 @@ extension HotkeyCenter {
     }
 
     func handleWindowSwitcherEvent(type: CGEventType, event: CGEvent) -> Bool {
+        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        if type == .keyDown, keyCode == kVK_Escape, cancelTabDrag?() == true {
+            suppressedHotkeyKeyCodes.insert(UInt32(keyCode))
+            return true
+        }
+        if type == .keyDown, keyCode == kVK_Tab, isRunning, !commandHotkeysSuspended,
+           keyboardModeInput.kind == .normal, !windowSwitcherInput.holdsKeyboard,
+           event.flags.intersection([.maskCommand, .maskControl, .maskAlternate]) == .maskAlternate {
+            if suppressedHotkeyKeyCodes.contains(UInt32(keyCode)) { return true }
+            if cycleFocusedTabGroup?(event.flags.contains(.maskShift)) == true {
+                suppressedHotkeyKeyCodes.insert(UInt32(keyCode))
+                return true
+            }
+        }
         let decision = windowSwitcherInput.handle(
             type: type,
             keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)),

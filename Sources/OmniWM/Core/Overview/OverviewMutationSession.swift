@@ -155,7 +155,7 @@ final class OverviewMutationSession {
             in: mutation.destinationWorkspaceId,
             onMonitor: monitor.id
         )
-        if wmController.workspaceManager.activeLayoutKind(for: mutation.destinationWorkspaceId) == .dwindle,
+        if wmController.workspaceManager.activeLayoutKind(for: mutation.destinationWorkspaceId).usesGroupedTiles,
            let engine = wmController.dwindleEngine,
            let node = engine.findNode(for: mutation.selectedHandle.id, in: mutation.destinationWorkspaceId)
         {

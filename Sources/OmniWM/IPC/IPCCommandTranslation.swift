@@ -210,6 +210,8 @@ extension LayoutType {
             self = .defaultLayout
         case .niri:
             self = .niri
+        case .tabbed:
+            self = .tabbed
         case .dwindle:
             self = .dwindle
         }

@@ -94,7 +94,7 @@ final class HostedWindowTabRailPresentationTests: XCTestCase {
                 engine.updateTabbedColumnVisibility(column: column)
             }
             return try XCTUnwrap(fixture.controller.niriLayoutHandler.desiredTabRailInfos().first)
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(fixture.controller.dwindleEngine)
             world.withEngineMutationScope {
                 for entry in entries {

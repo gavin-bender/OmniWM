@@ -39,6 +39,7 @@ final class SurfaceReconciler {
         controller: WMController,
         borderApplier: BorderSurfaceApplier = BorderSurfaceApplier(),
         applyTabRails: @escaping TabRailApply = { controller, infos, forceOrdering in
+            controller.hotkeys.tabGroupsVisible = infos.contains { $0.styleOverride?.options != nil }
             controller.tabRailManager.updateRails(
                 infos, forceOrdering: forceOrdering, style: controller.tabRailStyle
             )

@@ -76,7 +76,7 @@ extension WorkspaceNavigationHandler {
         case .niri:
             guard let node = controller.niriEngine?.findNode(for: token, in: workspaceId) else { return }
             commitWorkspaceSelection(nodeId: node.id, focusedToken: token, in: workspaceId)
-        case .dwindle:
+        case .dwindle, .tabbed:
             guard let engine = controller.dwindleEngine,
                   engine.findNode(for: token, in: workspaceId) != nil
             else { return }

@@ -46,7 +46,7 @@ extension WindowActionHandler {
 
         let targetWorkspaceId = anchorWorkspaceId
         switch layoutType(for: targetWorkspaceId) {
-        case .dwindle:
+        case .dwindle, .tabbed:
             return summonWindowRightInDwindle(
                 token: token,
                 sourceWorkspaceId: targetEntry.workspaceId,
@@ -106,7 +106,7 @@ extension WindowActionHandler {
             return false
         }
 
-        if sourceLayoutType == .dwindle {
+        if sourceLayoutType.usesGroupedTiles {
             commitSummonedWindowFocus(
                 token,
                 in: targetWorkspaceId,

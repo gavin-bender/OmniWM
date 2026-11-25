@@ -102,6 +102,6 @@ final class OverviewWindowFacts {
         guard let wmController else { return false }
         guard let name = wmController.workspaceManager.descriptor(for: workspaceId)?.name else { return false }
         let layoutType = wmController.settings.workspaces.layoutType(for: name)
-        return layoutType != .dwindle
+        return !layoutType.usesGroupedTiles
     }
 }

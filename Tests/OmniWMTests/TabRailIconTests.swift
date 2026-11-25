@@ -8,6 +8,69 @@ import XCTest
 
 @MainActor
 final class TabRailIconTests: XCTestCase {
+    func testTabbedBarSwitchesEdgeSizeAndContentsOnAnExistingGroup() throws {
+        let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
+        defer { manager.removeAll() }
+        let origin = try XCTUnwrap(NSScreen.screens.first).visibleFrame.origin
+        var info = makeInfo(count: 4, height: 420, origin: origin)
+        for position in [TabbedBarOptions.Position.top, .left] {
+            for size in [TabbedBarOptions.Size.small, .medium, .large] {
+                for content in [TabbedBarOptions.Content.iconsAndTitles, .icons, .titles] {
+                    let options = TabbedBarOptions(position: position, size: size, content: content)
+                    info.styleOverride = .windowTabs(options)
+                    manager.updateRails([info])
+                    let (window, view, icons) = try views(manager, info)
+                    if position == .top {
+                        XCTAssertEqual(window.frame.maxY, info.tileFrame.maxY)
+                        XCTAssertEqual(window.frame.height, options.thickness)
+                    } else {
+                        XCTAssertEqual(window.frame.minX, info.tileFrame.minX)
+                        XCTAssertEqual(window.frame.width, options.thickness)
+                    }
+                    let row = icons.rows[1]
+                    let title = try XCTUnwrap(row.subviews.compactMap { $0 as? NSTextField }.first)
+                    XCTAssertEqual(title.stringValue, "Window 1")
+                    XCTAssertEqual(title.isHidden, content == .icons)
+                    XCTAssertEqual(row.imageView.isHidden, content == .titles)
+                    let rect = icons.railLayout(in: view).items[1].hitRect
+                    XCTAssertEqual(view.item(at: CGPoint(x: rect.midX, y: rect.midY))?.visualIndex, 1)
+                }
+            }
+        }
+    }
+
+    func testDragAcrossBarThenOutsideRetainsOriginalToken() throws {
+        let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
+        defer { manager.removeAll() }
+        var info = makeInfo(count: 3)
+        info.styleOverride = .windowTabs(.init())
+        manager.updateRails([info])
+        let (window, view, icons) = try views(manager, info)
+        window.displayIfNeeded()
+        if let path = ProcessInfo.processInfo.environment["OMNIWM_TAB_PREVIEW_PATH"],
+           let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            try bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        }
+        let items = icons.railLayout(in: view).items
+        let start = CGPoint(x: items[0].hitRect.midX, y: items[0].hitRect.midY)
+        let end = CGPoint(x: items[2].hitRect.maxX - 5, y: start.y)
+        var releases: [Bool] = []
+        manager.onTabAction = { _, token, action in
+            XCTAssertEqual(token, info.tabs[0].token)
+            if case let .drag(_, released) = action { releases.append(released) }
+        }
+        view.mouseDown(with: try event(.leftMouseDown, at: start, in: window))
+        view.mouseDragged(with: try event(.leftMouseDragged, at: end, in: window))
+        XCTAssertNotEqual(icons.rows[1].layer?.transform.m41, 0)
+        let slot = try XCTUnwrap(window.insertion(atScreen: window.convertToScreen(CGRect(origin: end, size: .zero)).origin))
+        XCTAssertNil(slot.before)
+        view.mouseUp(with: try event(.leftMouseUp, at: CGPoint(x: end.x, y: -80), in: window))
+        XCTAssertEqual(releases, [false, true])
+        XCTAssertEqual(icons.rows[1].layer?.transform.m41, 0)
+        XCTAssertEqual(view.menu(for: try event(.rightMouseDown, at: start, in: window))?.items.count, 4)
+    }
+
     func testIconClickHoverAndAccessibilityAgreeAcrossCountsAndSelections() throws {
         let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
         defer { manager.removeAll() }

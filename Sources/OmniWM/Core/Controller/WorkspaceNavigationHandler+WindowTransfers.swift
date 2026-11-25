@@ -234,7 +234,7 @@ extension WorkspaceNavigationHandler {
         switch controller.workspaceManager.activeLayoutKind(for: workspaceId) {
         case .niri:
             return controller.niriEngine?.findNode(for: handle, in: workspaceId) != nil
-        case .dwindle:
+        case .dwindle, .tabbed:
             return controller.dwindleEngine?.findNode(for: handle.id, in: workspaceId) != nil
         }
     }

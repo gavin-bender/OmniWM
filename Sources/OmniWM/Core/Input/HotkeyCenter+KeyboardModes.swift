@@ -130,7 +130,7 @@ extension HotkeyCenter {
     }
 
     var keyboardTapRequiredOutsideModes: Bool {
-        configuration.systemHyperTrigger.isEnabled || !sideSpecificDispatch.isEmpty || windowSwitcherEnabled
+        configuration.systemHyperTrigger.isEnabled || !sideSpecificDispatch.isEmpty || windowSwitcherEnabled || tabGroupsVisible
     }
 
     private var keyboardModeCaptureUnavailable: Bool {

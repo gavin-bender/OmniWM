@@ -181,7 +181,7 @@ extension AXEventHandler {
         }
         let layoutType = controller.workspaceManager.descriptor(for: entry.workspaceId)
             .map { controller.settings.workspaces.layoutType(for: $0.name) } ?? .defaultLayout
-        guard layoutType != .dwindle,
+        guard !layoutType.usesGroupedTiles,
               let monitor = controller.workspaceManager.monitor(for: entry.workspaceId),
               controller.workspaceManager.activeWorkspace(on: monitor.id)?.id == entry.workspaceId
         else {

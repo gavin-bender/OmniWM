@@ -10,6 +10,15 @@ import IOKit.hidsystem
 final class HotkeyCenter {
     var onCommand: ((HotkeyInvocation) -> Void)?
     var isMouseButtonCaptured: ((Int64) -> Bool)?
+    var tabGroupsVisible = false {
+        didSet {
+            guard oldValue != tabGroupsVisible, isRunning else { return }
+            if tabGroupsVisible { _ = setupHyperTriggerTapIfNeeded() }
+            updateEventTapEnablement()
+        }
+    }
+    var cancelTabDrag: (() -> Bool)?
+    var cycleFocusedTabGroup: ((Bool) -> Bool)?
     var onWindowSwitcherAction: ((WindowSwitcherAction, UInt64) -> Void)?
     var onKeyboardModeChange: ((KeyboardModeKind) -> Void)?
     var isKeyboardModeArmingBlocked: (() -> Bool)?

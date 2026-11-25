@@ -24,6 +24,19 @@ extension MouseEventHandler {
             return false
         }
 
+        if controller.workspaceManager.activeLayoutKind(for: wsId) == .tabbed {
+            if button == .left, modifiers.isDisjoint(with: Self.relevantModifierFlags),
+               let token = tabbedWindow(at: location, in: wsId),
+               let entry = controller.workspaceManager.entry(for: token),
+               let frame = fastNativeWindowFrame(for: entry),
+               location.y >= frame.maxY - 32
+            {
+                state.tabbedTitleDrag = (token, location, frame)
+                controller.axEventHandler.noteMouseFocusIntent(token: token)
+            }
+            return false
+        }
+
         if button == .left, modifiers.isDisjoint(with: Self.relevantModifierFlags) {
             recordPointerFocusIntent(
                 at: location,
@@ -35,7 +48,7 @@ extension MouseEventHandler {
 
         let layoutType = controller.workspaceManager.descriptor(for: wsId)
             .map { controller.settings.workspaces.layoutType(for: $0.name) }
-        if layoutType == .dwindle {
+        if layoutType?.usesGroupedTiles == true {
             return handleDwindleMouseDown(at: location, modifiers: modifiers, button: button, wsId: wsId)
         }
 
@@ -198,5 +211,32 @@ extension MouseEventHandler {
 
     func isCapturedInteraction(_ button: MouseButton) -> Bool {
         state.capturedInteractionButton == button
+    }
+}
+
+extension MouseEventHandler {
+    static func tabWindowStack(at point: CGPoint) -> [(id: Int, frame: CGRect)] {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        return (list as? [[String: Any]] ?? []).compactMap { item in
+            guard item[kCGWindowLayer as String] as? Int == 0, let id = item[kCGWindowNumber as String] as? Int,
+                  let bounds = item[kCGWindowBounds as String] as? NSDictionary,
+                  let rect = CGRect(dictionaryRepresentation: bounds) else { return nil }
+            let frame = ScreenCoordinateSpace.toAppKit(rect: rect)
+            return frame.contains(point) ? (id, frame) : nil
+        }
+    }
+
+    func tabWindowBorderId() -> Int? {
+        guard let controller, let focus = controller.workspaceManager.borderFocusToken,
+              let id = UInt32(exactly: focus.windowId) else { return nil }
+        return controller.surfaceReconciler.ringWindowId(orderedAbove: id).map(Int.init)
+    }
+
+    func tabbedWindow(at point: CGPoint, in workspaceId: WorkspaceDescriptor.ID) -> WindowToken? {
+        let border = tabWindowBorderId()
+        guard let controller, let window = tabWindowStackAtPoint(point).first(where: { $0.id != border }),
+              let entry = controller.workspaceManager.entry(forWindowId: window.id), entry.workspaceId == workspaceId,
+              entry.hiddenState == nil, entry.mode == .tiling, entry.layoutReason == .standard else { return nil }
+        return entry.token
     }
 }

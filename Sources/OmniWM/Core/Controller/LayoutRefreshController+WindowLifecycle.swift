@@ -201,7 +201,7 @@ extension LayoutRefreshController {
         var seeds: [WorkspaceDescriptor.ID: NiriWindowRemovalSeed] = [:]
         for payload in payloads {
             switch payload.layoutType {
-            case .dwindle:
+            case .dwindle, .tabbed:
                 continue
             case .niri,
                  .defaultLayout:

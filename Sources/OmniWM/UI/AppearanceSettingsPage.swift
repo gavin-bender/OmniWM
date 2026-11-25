@@ -32,6 +32,30 @@ struct AppearanceSettingsPage: View {
             set: { controller.setAnimationsEnabled($0) }
         )
         return Form {
+            Section("Tabbed layout") {
+                Picker("Tab bar position", selection: $settings.tabbedBar.position) {
+                    Text("Top").tag(TabbedBarOptions.Position.top)
+                    Text("Left").tag(TabbedBarOptions.Position.left)
+                }
+                .id("Tab bar position")
+                Picker("Tab bar size", selection: $settings.tabbedBar.size) {
+                    Text("Small").tag(TabbedBarOptions.Size.small)
+                    Text("Medium").tag(TabbedBarOptions.Size.medium)
+                    Text("Large").tag(TabbedBarOptions.Size.large)
+                }
+                .id("Tab bar size")
+                Picker("Tab contents", selection: $settings.tabbedBar.content) {
+                    Text("App icons and window titles").tag(TabbedBarOptions.Content.iconsAndTitles)
+                    Text("App icons").tag(TabbedBarOptions.Content.icons)
+                    Text("Window titles").tag(TabbedBarOptions.Content.titles)
+                }
+                .id("Tab contents")
+            }
+            .onChange(of: settings.tabbedBar) {
+                controller.workspaceManager.invalidateAllLayouts()
+                controller.layoutRefreshController.requestRelayout(reason: .layoutConfigChanged)
+                controller.surfaceReconciler.noteWorldChanged()
+            }
             Section("Appearance") {
                 Toggle("Show app icons in tab rails", isOn: Binding(
                     get: { settings.tabRailAppIcons },

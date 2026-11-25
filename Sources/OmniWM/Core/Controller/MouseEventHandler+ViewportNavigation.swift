@@ -75,7 +75,7 @@ extension MouseEventHandler {
         case .niri,
              .defaultLayout:
             return ScrollContext(engine: engine, wsId: workspace.id, monitor: monitor)
-        case .dwindle:
+        case .dwindle, .tabbed:
             return nil
         }
     }

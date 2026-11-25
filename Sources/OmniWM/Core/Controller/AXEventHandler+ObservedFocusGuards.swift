@@ -10,7 +10,7 @@ extension AXEventHandler {
         switch controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) {
         case .niri:
             return controller.niriEngine?.findNode(for: entry.token, in: entry.workspaceId) != nil
-        case .dwindle:
+        case .dwindle, .tabbed:
             return controller.dwindleEngine?.containsWindow(entry.token, in: entry.workspaceId) == true
         }
     }

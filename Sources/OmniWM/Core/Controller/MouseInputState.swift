@@ -127,6 +127,7 @@ struct MouseInputState {
     var gestureStartX: CGFloat = 0.0
     var gestureStartY: CGFloat = 0.0
     var gestureLastAverageX: CGFloat = 0.0
+    var tabbedTitleDrag: (token: WindowToken, start: CGPoint, frame: CGRect)?
     var gestureLastAverageY: CGFloat = 0.0
     var gestureLastTimestamp: TimeInterval = 0
     var lockedGestureContext: LockedGestureContext?

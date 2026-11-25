@@ -124,7 +124,7 @@ extension WMController {
                 if let node = niriEngine?.findNode(for: token, in: workspaceId) {
                     return node.renderedFrame ?? node.frame
                 }
-            case .dwindle:
+            case .dwindle, .tabbed:
                 if let engine = dwindleEngine {
                     return engine.contentFrame(for: token, in: workspaceId)
                         ?? engine.findNode(for: token, in: workspaceId)?.cachedFrame

@@ -69,7 +69,7 @@ extension WindowActionHandler {
         }
 
         switch targetLayoutKind {
-        case .dwindle:
+        case .dwindle, .tabbed:
             if !prepareDwindleNavigationTarget(navigationToken, workspaceId: workspaceId) {
                 _ = controller.workspaceManager.applySessionPatch(
                     .init(
@@ -201,7 +201,7 @@ extension WindowActionHandler {
         workspaceId: WorkspaceDescriptor.ID
     ) -> Bool {
         guard let controller,
-              controller.workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
+              controller.workspaceManager.activeLayoutKind(for: workspaceId).usesGroupedTiles,
               let entry = controller.workspaceManager.entry(for: token),
               entry.workspaceId == workspaceId,
               entry.mode == .tiling,

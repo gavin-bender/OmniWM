@@ -115,7 +115,7 @@ final class HostedChildNavigationTests: XCTestCase {
         switch manager.activeLayoutKind(for: fixture.base.workspace) {
         case .niri:
             break
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(fixture.base.controller.dwindleEngine)
             manager.withEngineMutationScope(in: fixture.base.workspace) {
                 XCTAssertTrue(engine.groupWindow(fixture.parent.token, into: other.token, in: fixture.base.workspace))
@@ -136,7 +136,7 @@ final class HostedChildNavigationTests: XCTestCase {
             let engine = try XCTUnwrap(controller.niriEngine)
             let node = try XCTUnwrap(engine.findNode(for: other.token, in: fixture.base.workspace))
             XCTAssertEqual(manager.niriViewportState(for: fixture.base.workspace).selectedNodeId, node.id)
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(controller.dwindleEngine)
             XCTAssertEqual(
                 engine.tileSnapshot(for: fixture.parent.token, in: fixture.base.workspace)?.activeToken,
@@ -152,7 +152,7 @@ final class HostedChildNavigationTests: XCTestCase {
             let engine = try XCTUnwrap(fixture.base.controller.niriEngine)
             let node = try XCTUnwrap(engine.findNode(for: fixture.parent.token, in: fixture.base.workspace))
             XCTAssertEqual(manager.niriViewportState(for: fixture.base.workspace).selectedNodeId, node.id)
-        case .dwindle:
+        case .dwindle, .tabbed:
             let engine = try XCTUnwrap(fixture.base.controller.dwindleEngine)
             XCTAssertEqual(
                 engine.tileSnapshot(for: fixture.parent.token, in: fixture.base.workspace)?.activeToken,

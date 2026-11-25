@@ -99,7 +99,7 @@ final class NuCompletionTests: XCTestCase {
         })
         try assertCompletions(cases + [(
             "omniwmctl command \(layout.commandWords.joined(separator: " ")) ",
-            ["default", "niri", "dwindle"]
+            ["default", "niri", "dwindle", "tabbed"]
         )])
     }
 

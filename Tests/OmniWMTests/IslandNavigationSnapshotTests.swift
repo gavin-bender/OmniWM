@@ -288,7 +288,7 @@ final class IslandNavigationSnapshotTests: XCTestCase {
                 switch manager.activeLayoutKind(for: workspace) {
                 case .niri:
                     _ = fixture.controller.niriEngine?.addWindow(token: token, to: workspace, afterSelection: nil)
-                case .dwindle:
+                case .dwindle, .tabbed:
                     _ = fixture.controller.dwindleEngine?.addWindow(token: token, to: workspace, activeWindowFrame: nil)
                 }
             }

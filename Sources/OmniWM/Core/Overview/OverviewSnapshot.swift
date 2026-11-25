@@ -86,7 +86,7 @@ final class OverviewSnapshot {
         let workspaceIds = Set(workspaces.map(\.id))
         dwindleGroupsByWorkspace = dwindleGroupsByWorkspace.filter {
             workspaceIds.contains($0.key) && !affectedWorkspaceIds.contains($0.key)
-                && workspaceManager.activeLayoutKind(for: $0.key) == .dwindle
+                && workspaceManager.activeLayoutKind(for: $0.key).usesGroupedTiles
         }
     }
 
@@ -121,7 +121,7 @@ final class OverviewSnapshot {
                 } else {
                     niriSnapshotsByWorkspace.removeValue(forKey: workspaceId)
                 }
-            case .dwindle:
+            case .dwindle, .tabbed:
                 if let projection = dwindleOverviewProjection(for: workspaceId) {
                     dwindleProjections[workspaceId] = projection
                     engineFrames.merge(projection.frames) { _, new in new }
@@ -252,7 +252,7 @@ extension OverviewSnapshot {
         for workspaceId: WorkspaceDescriptor.ID
     ) -> DwindleOverviewWorkspaceProjection? {
         guard let wmController,
-              wmController.workspaceManager.activeLayoutKind(for: workspaceId) == .dwindle,
+              wmController.workspaceManager.activeLayoutKind(for: workspaceId).usesGroupedTiles,
               let engine = wmController.dwindleEngine
         else {
             return nil

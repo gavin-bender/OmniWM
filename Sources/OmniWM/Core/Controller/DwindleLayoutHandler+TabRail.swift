@@ -12,13 +12,15 @@ extension DwindleLayoutHandler {
         var infos: [TabRailInfo] = []
         for monitor in controller.workspaceManager.monitors {
             guard let workspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id),
-                  controller.workspaceManager.activeLayoutKind(for: workspace.id) == .dwindle
+                  controller.workspaceManager.activeLayoutKind(for: workspace.id).usesGroupedTiles
             else {
                 continue
             }
 
             let presentationTime = controller.animationClock.now()
             let scale = controller.layoutRefreshController.buildMonitorSnapshot(for: monitor).scale
+            let tabbed = controller.workspaceManager.activeLayoutKind(for: workspace.id) == .tabbed
+            let railBounds = tabbed ? controller.insetWorkingFrame(for: monitor).intersection(monitor.visibleFrame) : monitor.visibleFrame
             for snapshot in engine.groupedTileSnapshots(in: workspace.id) {
                 let presentedFrame = presentedTileFrame(
                     geometry: .init(
@@ -33,7 +35,7 @@ extension DwindleLayoutHandler {
                     scale: scale
                 )
                 let frame = presentedFrame ?? snapshot.tileFrame ?? .zero
-                let visibleFrame = presentedFrame?.intersection(monitor.visibleFrame) ?? .null
+                let visibleFrame = presentedFrame?.intersection(railBounds) ?? .null
 
                 let tabs = tabInfos(for: snapshot, controller: controller)
 
@@ -47,7 +49,9 @@ extension DwindleLayoutHandler {
                         tabCount: tabs.count,
                         activeVisualIndex: snapshot.activeIndex,
                         activeWindowId: controller.workspaceManager.entry(for: snapshot.activeToken)?.windowId,
-                        tabs: tabs
+                        tabs: tabs,
+                        styleOverride: controller.workspaceManager.activeLayoutKind(for: workspace.id) == .tabbed
+                            ? .windowTabs(controller.settings.tabbedBar) : nil
                     )
                 )
             }
@@ -92,6 +96,7 @@ extension DwindleLayoutHandler {
         targetTime: TimeInterval
     ) -> [TabRailGeometryCommand] {
         var commands: [TabRailGeometryCommand] = []
+        let railBounds = engine.existingState(for: workspaceId)?.tabbedMembers != nil ? monitor.tabbedWorkingFrame : monitor.visibleFrame
         engine.forEachGroupedTileGeometry(in: workspaceId) { geometry in
             let key = TabRailKey(workspaceId: workspaceId, owner: .dwindleTile(geometry.id))
             guard let frame = presentedTileFrame(
@@ -114,7 +119,7 @@ extension DwindleLayoutHandler {
                 TabRailGeometryCommand(
                     key: key,
                     tileFrame: frame,
-                    visibleTileFrame: frame.intersection(monitor.visibleFrame)
+                    visibleTileFrame: frame.intersection(railBounds)
                 )
             )
         }

@@ -54,7 +54,7 @@ extension ActionCatalog {
                 command: .workspace(.toggleLayout),
                 category: .layout,
                 binding: KeyBinding(keyCode: UInt32(kVK_ANSI_L), modifiers: UInt32(optionKey | shiftKey)),
-                keywords: ["layout", "niri", "dwindle"]
+                keywords: ["layout", "niri", "dwindle", "tabbed"]
             ),
             IPCPresentationCommand.overview.actionSpec(),
             IPCPresentationCommand.systemStats.actionSpec()

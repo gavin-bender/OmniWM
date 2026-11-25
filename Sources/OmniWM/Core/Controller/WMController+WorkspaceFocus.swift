@@ -50,7 +50,7 @@ extension WMController {
                     return
                 }
             }
-        case .dwindle:
+        case .dwindle, .tabbed:
             if let token = dwindleEngine?.selectedNode(in: workspaceId)?.windowToken,
                !isManagedWindowSuppressedByMacOS(token)
             {
@@ -95,7 +95,7 @@ extension WMController {
                 )
                 return false
             }
-        case .dwindle:
+        case .dwindle, .tabbed:
             if let engine = dwindleEngine,
                engine.findNode(for: token, in: workspaceId) != nil
             {

@@ -60,7 +60,7 @@ final class NativeResizeAdoptionTests: NiriInteractionTestCase {
                     gaps: (horizontal: gap, vertical: gap),
                     orientation: controller.settings.monitors.effectiveOrientation(for: monitor)
                 )
-            case .dwindle:
+            case .dwindle, .tabbed:
                 let engine = try XCTUnwrap(controller.dwindleEngine)
                 return engine.calculateLayout(
                     for: workspaceId,
@@ -1587,7 +1587,7 @@ final class NativeResizeAdoptionTests: NiriInteractionTestCase {
                             state: &state
                         )
                     }
-                case .dwindle:
+                case .dwindle, .tabbed:
                     let engine = try XCTUnwrap(fixture.controller.dwindleEngine)
                     fixture.manager.withEngineMutationScope(in: fixture.workspaceId) {
                         engine.setSelectedNode(

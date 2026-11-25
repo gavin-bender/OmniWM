@@ -52,6 +52,12 @@ enum TabRailPlacement {
         guard tabCount > 0,
               TabRailManager.isRenderable(visibleTileFrame: visibleTileFrame)
         else { return .zero }
+        if let options = style.options, options.position == .top {
+            let height = min(options.thickness, visibleTileFrame.height)
+            let frame = CGRect(x: visibleTileFrame.minX, y: visibleTileFrame.maxY - height,
+                               width: visibleTileFrame.width, height: height)
+            return displayFrame.map { frame.intersection($0) } ?? frame
+        }
         let width = style.hitWidth
         let height = style.fittedHeight(tabCount: tabCount, availableHeight: visibleTileFrame.height)
         guard height > 1 else { return .zero }

@@ -24,6 +24,8 @@ extension DwindleLayoutHandler {
             engine: engine,
             workspaceId: snapshot.workspaceId
         )
+        let isTabbed = controller?.workspaceManager.activeLayoutKind(for: snapshot.workspaceId) == .tabbed
+        let previousSelection = engine.projectedActiveToken(in: snapshot.workspaceId)
         let removedTokens = engine.syncWindows(
             windowTokens,
             in: snapshot.workspaceId,
@@ -33,13 +35,24 @@ extension DwindleLayoutHandler {
             bootstrapFullscreenScreen: snapshot.monitor.fullscreenLayoutFrame
         )
 
+        if isTabbed {
+            engine.synchronizeTabbedGroups(tokens: windowTokens, preferred: snapshot.preferredFocusToken,
+                                          previousSelection: previousSelection, in: snapshot.workspaceId) { token in
+                guard let controller, let entry = controller.workspaceManager.entry(for: token),
+                      entry.hiddenState == nil,
+                      let frame = controller.mouseEventHandler.fastNativeWindowFrame(for: entry),
+                      frame.intersection(snapshot.monitor.workingFrame).width > 40 else { return nil }
+                return frame
+            }
+        }
+
         for window in snapshot.windows {
             engine.updateWindowConstraints(for: window.token, constraints: window.constraints)
         }
 
         let newFrames = engine.calculateLayout(
             for: snapshot.workspaceId,
-            screen: snapshot.monitor.workingFrame,
+            screen: isTabbed ? snapshot.monitor.tabbedWorkingFrame : snapshot.monitor.workingFrame,
             borderSafeFillScreen: snapshot.monitor.borderSafeFillFrame,
             fullscreenScreen: snapshot.monitor.fullscreenLayoutFrame
         )

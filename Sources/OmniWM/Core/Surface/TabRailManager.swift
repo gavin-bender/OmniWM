@@ -7,6 +7,17 @@ import AppKit
 final class TabRailManager {
     typealias SelectionHandler = (TabRailInfo, Int, WindowToken?) -> Void
 
+    var onTabAction: ((TabRailInfo, WindowToken, TabBarAction) -> Void)?
+    func dropRail(windowId: Int, at point: CGPoint, in workspace: WorkspaceDescriptor.ID)
+        -> (target: WindowToken, before: WindowToken?, marker: CGRect)? {
+        guard let window = railWindows.values.first(where: { $0.windowNumber == windowId && $0.isOrderedIn }),
+              let info = railInfos.values.first(where: { railWindows[$0.key] === window }),
+              info.workspaceId == workspace, info.styleOverride?.options != nil,
+              let target = info.tabs.first(where: { $0.isActive })?.token,
+              let slot = window.insertion(atScreen: point) else { return nil }
+        return (target, slot.before, slot.marker)
+    }
+
     var onSelect: SelectionHandler?
     var ringOrderedAbove: (@MainActor (UInt32) -> UInt32?)?
 
@@ -71,11 +82,16 @@ final class TabRailManager {
                 activeWindowId: info.activeWindowId,
                 tabs: info.tabs,
                 orderingWindowId: command.orderingWindowId,
-                displayFrame: command.displayFrame
+                displayFrame: command.displayFrame,
+                styleOverride: info.styleOverride
             )
             railInfos[command.key] = presentedInfo
             updateRail(presentedInfo, forceOrdering: false)
         }
+    }
+
+    func cancelDrag() -> Bool {
+        railWindows.values.contains { $0.cancelDrag() }
     }
 
     func existingWindow(for key: TabRailKey) -> NSWindow? {
@@ -88,6 +104,7 @@ final class TabRailManager {
             let window = TabRailWindow(
                 owner: info.owner, workspaceId: info.workspaceId, motionPolicy: motionPolicy, appInfoCache: appInfoCache
             )
+            window.onTabAction = { [weak self] info, token, action in self?.onTabAction?(info, token, action) }
             window.onSelect = { [weak self] info, visualIndex, token in
                 self?.onSelect?(info, visualIndex, token)
             }
@@ -95,7 +112,7 @@ final class TabRailManager {
             railWindows[key] = window
             return window
         }()
-        window.update(info: info, forceOrdering: forceOrdering, style: style)
+        window.update(info: info, forceOrdering: forceOrdering, style: info.styleOverride ?? style)
     }
 
     func removeAll() {

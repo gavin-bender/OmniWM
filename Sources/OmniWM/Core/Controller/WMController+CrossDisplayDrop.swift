@@ -57,7 +57,7 @@ extension WMController {
         case nil:
             return
         }
-        if plan.sourceLayout == .dwindle, plan.targetLayout == .niri {
+        if plan.sourceLayout.usesGroupedTiles, plan.targetLayout == .niri {
             releaseDwindleConstraints(for: plan.unit)
         }
     }
@@ -71,7 +71,7 @@ extension WMController {
         switch plan.sourceLayout {
         case .niri:
             guard let engine = niriEngine, let node = engine.findNode(for: token, in: source) else { return nil }
-            if plan.targetLayout == .dwindle {
+            if plan.targetLayout.usesGroupedTiles {
                 workspaceManager.captureDetachedNiriPlacement(for: token, in: source)
             }
             let sizing = engine.detachWindowForTransfer(
@@ -82,7 +82,7 @@ extension WMController {
             return plan.targetLayout == .niri
                 ? .niri(NiriTransferredColumn(windows: [node], activeIndex: 0, sizing: sizing))
                 : .dwindle(DwindleTransferredTile(token: token))
-        case .dwindle:
+        case .dwindle, .tabbed:
             guard let tile = dwindleEngine?.detachForTransfer(
                 token: token,
                 wholeTile: plan.unit.isGroup,
@@ -139,8 +139,8 @@ extension WMController {
             if plan.targetLayout == .niri { states[target] = targetState }
         }
 
-        switch (plan.sourceLayout, plan.targetLayout) {
-        case (.niri, .niri):
+        switch (plan.sourceLayout.usesGroupedTiles, plan.targetLayout.usesGroupedTiles) {
+        case (false, false):
             guard let engine = niriEngine,
                   let node = engine.findNode(for: plan.unit.activeToken, in: source),
                   let partnerNode = engine.findNode(for: partner.activeToken, in: target)
@@ -155,21 +155,21 @@ extension WMController {
             partnerNode.constraints = plan.constraints[partnerNode.token] ?? .unconstrained
             prepareCrossDisplayNiriViewport(for: partnerNode, in: source, state: &sourceState)
             prepareCrossDisplayNiriViewport(for: node, in: target, state: &targetState)
-        case (.niri, .dwindle):
+        case (false, true):
             swapAcrossLayouts(
                 niri: (plan.unit.activeToken, source),
                 dwindle: (partner, target),
                 plan: plan,
                 niriState: &sourceState
             )
-        case (.dwindle, .niri):
+        case (true, false):
             swapAcrossLayouts(
                 niri: (partner.activeToken, target),
                 dwindle: (plan.unit, source),
                 plan: plan,
                 niriState: &targetState
             )
-        case (.dwindle, .dwindle):
+        case (true, true):
             swapDwindleUnits(plan.unit, in: source, with: partner, in: target)
         }
     }
