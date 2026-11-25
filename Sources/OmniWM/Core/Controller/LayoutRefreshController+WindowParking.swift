@@ -15,6 +15,7 @@ extension LayoutRefreshController {
               entry.layoutReason == .standard,
               let verifiedFrame = controller.axManager.verifiedParkFrame(for: entry.windowId),
               !observedFrame.approximatelyEqual(to: verifiedFrame, tolerance: FrameTolerance.frameWrite),
+              !workspaceSwipe.isPresentingIncomingWindow(entry.token),
               let monitor = controller.workspaceManager.monitor(for: entry.workspaceId),
               controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)?.id != entry.workspaceId
         else { return }

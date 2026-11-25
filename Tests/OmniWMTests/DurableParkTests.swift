@@ -2037,6 +2037,37 @@ final class DurableParkTests: XCTestCase {
         XCTAssertNil(controller.layoutRefreshController.layoutState.pendingRefresh)
     }
 
+    func testInactiveParkRepairYieldsToIncomingSwipeUntilItIsCancelled() async throws {
+        let fixture = try Self.parkDriftFixture()
+        let controller = fixture.controller
+        let manager = controller.workspaceManager
+        let swipe = controller.layoutRefreshController.workspaceSwipe
+        let monitor = fixture.monitor
+        let source = try XCTUnwrap(manager.activeWorkspace(on: monitor.id))
+        let handle = try XCTUnwrap(manager.handle(for: fixture.token))
+        let incoming = WorkspaceSwipePresentation.Workspace(
+            id: fixture.workspaceId, items: [.init(handle: handle, frame: fixture.visibleFrame)]
+        )
+        let flight = WorkspaceSwipePresentation.Flight(
+            preparation: .init(monitor: monitor, frame: monitor.visibleFrame,
+                               source: .init(id: source.id, items: []), previous: nil, next: incoming),
+            destination: incoming, axis: .vertical, cumulative: 20, isNext: true, timestamp: 1,
+            recognitionMovement: nil, captureFree: true
+        )
+        let member = LiveWorkspaceSlide.Member(token: fixture.token, window: fixture.target.expectedWindow,
+                                              layout: fixture.visibleFrame, original: fixture.parkFrame,
+                                              parkOrigin: fixture.parkFrame.origin, minimumHeight: 1, incoming: true)
+        flight.liveSlide = LiveWorkspaceSlide(members: [member], viewport: monitor.visibleFrame)
+        swipe.install(flight, after: nil)
+        await Self.sendFrameEvent(fixture, observedFrame: fixture.visibleFrame)
+        XCTAssertEqual(controller.axManager.verifiedParkFrame(for: fixture.token.windowId), fixture.parkFrame)
+
+        swipe.cancel(flight, reason: "test")
+        await Self.sendFrameEvent(fixture, observedFrame: fixture.visibleFrame)
+        XCTAssertNil(controller.axManager.verifiedParkFrame(for: fixture.token.windowId))
+        XCTAssertTrue(controller.axManager.pendingParkWindowIds.contains(fixture.token.windowId))
+    }
+
     func testInactiveNativeSpaceDriftWaitsForMovableOrAlreadyHiddenSettlement() async throws {
         for alreadyHidden in [false, true] {
             let fixture = try Self.parkDriftFixture()

@@ -529,6 +529,14 @@ extension WorkspaceSwipePresentation {
         flights.values.contains { $0.committing && $0.liveSlide?.ownsTranslation(for: id) == true }
     }
 
+    // Incoming windows leave their parking strip before the active workspace changes.
+    // WindowServer reports this intentional move through the normal park-repair path.
+    func isPresentingIncomingWindow(_ token: WindowToken) -> Bool {
+        flights.values.contains { flight in
+            !flight.committing && flight.liveSlide?.members.contains { $0.incoming && $0.token == token } == true
+        }
+    }
+
     private func keepFocusOffHiddenWorkspace(_ workspaceId: WorkspaceDescriptor.ID) {
         guard let controller, let monitorId = latestGestureMonitorId,
               let monitor = controller.workspaceManager.monitor(byId: monitorId),
