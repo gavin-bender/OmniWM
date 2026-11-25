@@ -210,6 +210,25 @@ final class MultitouchPalmFilterTests: XCTestCase {
         XCTAssertEqual(fingerFrame.timestamp, fingerTimestamp)
     }
 
+    func testThreeScreenContactsRouteToTouchedDisplayWithUnclassifiedFingerLabels() throws {
+        var filters = MultitouchPalmFilters()
+        let registration = MultitouchGestureSource.RegistrationToken(generation: 5, slot: 1, isTouchScreen: true)
+        let token = MultitouchGestureSource.RegistrationToken(bitPattern: UInt(bitPattern: registration.refcon))
+        XCTAssertEqual(token, registration)
+        let contacts = [
+            Contact(pathId: 1, fingerId: 7, x: 0.25, y: 0.25),
+            Contact(pathId: 2, fingerId: 8, x: 0.50, y: 0.50),
+            Contact(pathId: 3, fingerId: 9, x: 0.75, y: 0.75),
+            Contact(pathId: 4, fingerId: 10, majorAxis: Self.oversizedMajorAxis)
+        ]
+        let frame = Self.withRawContacts(contacts) { fingers, count in
+            filters.buildRawFrame(fingers: fingers, count: count, timestamp: 1, token: token)
+        }
+        XCTAssertEqual(frame.touches.count, 3)
+        let location = frame.screenLocation(in: CGRect(x: -1000, y: 200, width: 1000, height: 800))
+        XCTAssertEqual(location, CGPoint(x: -500, y: 600))
+    }
+
     func testFingerPositionsSurviveFiltering() throws {
         var filter = MultitouchPalmFilter()
         let finger = Contact(pathId: 1, fingerId: 2, x: 0.25, y: 0.75)

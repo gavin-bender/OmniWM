@@ -4,6 +4,15 @@
 import AppKit
 import Foundation
 
+extension WorkspaceSwipeAxis {
+    func workspaceMovement(x: CGFloat, y: CGFloat, isTouchScreen: Bool) -> CGFloat {
+        switch self {
+        case .horizontal: x
+        case .vertical: isTouchScreen ? -y : y
+        }
+    }
+}
+
 extension MouseEventHandler {
     struct GestureFrameMetrics {
         var cumulativeX: CGFloat
@@ -85,7 +94,14 @@ extension MouseEventHandler {
             let since = state.gestureFingerCountMismatchSince ?? snapshot.timestamp
             state.gestureFingerCountMismatchSince = since
             let held = snapshot.timestamp - since
-            if activeTouchCount > 0, held < (state.activeGestureMode?.fingerCountGrace ?? 0) {
+            // A single missing fingertip can be a transient contact dropout mid-swipe.
+            let grace: TimeInterval
+            if case .workspaceSwitch = state.activeGestureMode, activeTouchCount == requiredFingers - 1 {
+                grace = 0.065
+            } else {
+                grace = state.activeGestureMode?.fingerCountGrace ?? 0
+            }
+            if activeTouchCount > 0, held < grace {
                 return
             }
             MouseTrace.record("gesture: \(requiredFingers) -> \(activeTouchCount) fingers, ending")
@@ -93,7 +109,7 @@ extension MouseEventHandler {
                 reason: "finger-count", required: requiredFingers, fingers: activeTouchCount, held: held
             ))
             if activeTouchCount < requiredFingers {
-                finalizeCommittedGestureAfterTouchRelease(timestamp: snapshot.timestamp)
+                finalizeCommittedGestureAfterTouchRelease(timestamp: since)
                 return
             }
         } else if state.gesturePhase == .armed, activeTouchCount > requiredFingers,
@@ -265,7 +281,7 @@ extension MouseEventHandler {
             return
         }
 
-        let metrics = GestureFrameMetrics(
+        var metrics = GestureFrameMetrics(
             cumulativeX: (average.x - state.gestureStartX) * GestureEventSnapshot.normalizedPositionToGestureUnits,
             cumulativeY: (average.y - state.gestureStartY) * GestureEventSnapshot.normalizedPositionToGestureUnits,
             rawDeltaX: (average.x - state.gestureLastAverageX) * GestureEventSnapshot.normalizedPositionToGestureUnits,
@@ -273,11 +289,12 @@ extension MouseEventHandler {
             previousTimestamp: state.gestureLastTimestamp
         )
 
+        let isTouchScreen = lockedContext.contactSession?.isTouchScreen == true
         if let axis = lockedContext.workspaceAxis,
            state.gesturePhase == .armed || state.activeGestureMode == .workspaceSwitch(axis: axis)
         {
             state.workspaceSwipeTracker.push(
-                delta: Double(axis == .horizontal ? metrics.rawDeltaX : metrics.rawDeltaY),
+                delta: Double(axis.workspaceMovement(x: metrics.rawDeltaX, y: metrics.rawDeltaY, isTouchScreen: isTouchScreen)),
                 timestamp: timestamp
             )
         }
@@ -293,6 +310,11 @@ extension MouseEventHandler {
             guard commitGestureMode(metrics: metrics, lockedContext: lockedContext, timestamp: timestamp) else {
                 if state.gesturePhase == .armed { rememberGestureSample(average, at: timestamp) }
                 return
+            }
+            if lockedContext.contactSession?.isTouchScreen == true, state.activeGestureMode == .columnScroll {
+                // Include the distance traveled while the recognizer was deciding which gesture owns the drag.
+                metrics.rawDeltaX = metrics.cumulativeX
+                metrics.rawDeltaY = metrics.cumulativeY
             }
         }
 

@@ -89,7 +89,8 @@ struct MultitouchPalmFilters: Sendable {
             fingers: fingers,
             count: count,
             timestamp: timestamp,
-            palmFilter: &filters[token.slot]
+            palmFilter: &filters[token.slot],
+            isTouchScreen: token.isTouchScreen
         )
     }
 }

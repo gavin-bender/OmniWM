@@ -52,6 +52,7 @@ struct SettingsExport: Equatable {
     var animationsEnabled: Bool
     var animationSpeed: Double
     var slideWorkspaceSwitches = false
+    var captureFreeWorkspaceSwipes = false
     var pausePalettePasteDuringSecureInput = true
     var language: String?
 

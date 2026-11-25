@@ -201,9 +201,11 @@ final class FakeMultitouchBackend {
         refcon: UnsafeMutableRawPointer? = nil
     ) {
         guard let registration = callbackByRegistryId[registryId] else { return }
-        let stride = 96
-        let fingers = UnsafeMutableRawPointer.allocate(byteCount: max(touches.count, 1) * stride, alignment: 8)
+        let stride = multitouchTouchStride
+        let byteCount = max(touches.count, 1) * stride
+        let fingers = UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: 8)
         defer { fingers.deallocate() }
+        fingers.initializeMemory(as: UInt8.self, repeating: 0, count: byteCount)
         for (index, touch) in touches.enumerated() {
             let base = index * stride
             fingers.storeBytes(of: Int32(4), toByteOffset: base + 20, as: Int32.self)

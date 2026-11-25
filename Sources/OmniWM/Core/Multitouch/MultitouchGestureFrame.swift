@@ -22,6 +22,7 @@ struct MultitouchContactSession: Equatable, Sendable {
     let slot: Int
     let session: UInt64
     let senderId: UInt64?
+    var isTouchScreen = false
 }
 
 struct MultitouchContactSessions: Sendable {
@@ -79,6 +80,20 @@ extension MultitouchGestureSource {
     struct RawFrame: Sendable {
         let touches: RawTouchBuffer
         let timestamp: Double
+
+        func screenLocation(in frame: CGRect) -> CGPoint? {
+            guard !touches.isEmpty else { return nil }
+            var center = CGPoint.zero
+            for touch in touches {
+                guard touch.x.isFinite, touch.y.isFinite else { return nil }
+                center.x += CGFloat(touch.x)
+                center.y += CGFloat(touch.y)
+            }
+            return CGPoint(
+                x: frame.minX + center.x / CGFloat(touches.count) * frame.width,
+                y: frame.minY + center.y / CGFloat(touches.count) * frame.height
+            )
+        }
 
         init(touches: [RawTouch], timestamp: Double) {
             self.touches = RawTouchBuffer(touches)
@@ -153,7 +168,8 @@ extension MultitouchGestureSource {
         fingers: UnsafeMutableRawPointer?,
         count: Int32,
         timestamp: Double,
-        palmFilter: inout MultitouchPalmFilter
+        palmFilter: inout MultitouchPalmFilter,
+        isTouchScreen: Bool = false
     ) -> RawFrame {
         defer { palmFilter.finishFrame() }
         guard let fingers, count > 0 else { return RawFrame(touches: [], timestamp: timestamp) }
@@ -163,7 +179,9 @@ extension MultitouchGestureSource {
             let state = fingers.load(fromByteOffset: base + multitouchStateByteOffset, as: Int32.self)
             let isPalm = palmFilter.isPalm(
                 pathId: fingers.load(fromByteOffset: base + multitouchPathIdByteOffset, as: Int32.self),
-                fingerId: fingers.load(fromByteOffset: base + multitouchFingerIdByteOffset, as: Int32.self),
+                // The named-finger classification is a trackpad heuristic. Use contact size on a direct surface.
+                fingerId: isTouchScreen ? multitouchUnclassifiedFingerId :
+                    fingers.load(fromByteOffset: base + multitouchFingerIdByteOffset, as: Int32.self),
                 majorAxis: fingers.load(fromByteOffset: base + multitouchMajorAxisByteOffset, as: Float.self)
             )
             guard state == multitouchTouchingState, !isPalm else { continue }

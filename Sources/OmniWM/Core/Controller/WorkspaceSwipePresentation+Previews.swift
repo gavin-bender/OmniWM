@@ -24,6 +24,14 @@ extension WorkspaceSwipePresentation {
         }
     }
 
+    func resetRenderer() {
+        cancelAll(reason: "renderer-changed")
+        for preview in allPreviews { preview.release() }
+        previews.removeAll()
+        unclaimedPreview = nil
+        warmPreviews()
+    }
+
     func syncAvailability() {
         guard let controller else { return }
         let swipes = controller.settings.gestures.workspaceSwipeEnabled
@@ -53,6 +61,16 @@ extension WorkspaceSwipePresentation {
         flight.progress = flight.motion.progress(at: timestamp)
         flight.carried = flight.carry?(timestamp) ?? .zero
         if flight.carried == .zero { flight.carry = nil }
+        if let slide = flight.liveSlide {
+            if flight.phase == .settling {
+                flight.progress = flight.motion.isComplete(at: timestamp)
+                    ? (flight.motion.target ?? flight.progress) : min(1, max(0, flight.progress))
+            }
+            if !slide.update(source: flight.offset(destination: false), destination: flight.offset(destination: true)) {
+                liveRendererInterrupted(flight, reason: "live-slide-update-failed")
+            }
+            return
+        }
         previews[flight.preparation.monitor.id]?.update(
             sourceOffset: flight.offset(destination: false),
             destinationOffset: flight.offset(destination: true)
@@ -62,7 +80,8 @@ extension WorkspaceSwipePresentation {
     func trace(_ action: String, progress: Double = 0) {
         guard TrackpadScrollTrace.shared.isActive else { return }
         TrackpadScrollTrace.record(.workspacePresentation(
-            renderer: "preview",
+            renderer: flight?.liveSlide?.followsDisplayLink == true ? "dock" :
+                (controller?.settings.captureFreeWorkspaceSwipes == true ? "accessibility" : "preview"),
             action: action,
             progress: progress,
             velocity: flight?.motion.velocity(at: mediaTimeProvider()),

@@ -5,6 +5,7 @@ import AppKit
 import CoreHID
 import Foundation
 import IOKit
+import OmniWMSystemGestures
 import os
 
 @MainActor
@@ -30,6 +31,7 @@ final class MultitouchGestureSource {
     private let devices: MultitouchDeviceRegistration
     private var activeGeneration: UInt = 0
     private var previousActiveCount = 0
+    private var lastScreenTouchLocation: CGPoint?
     private(set) var revalidationTask: Task<Void, Never>?
     private var episodeActive = false
     private var episodeReasons: Set<RevalidationReason> = []
@@ -407,6 +409,15 @@ extension MultitouchGestureSource {
         set { sharedRoute.withLock { $0.source = newValue } }
     }
 
+    nonisolated static let screenReportCallback: OmniWMKiwiCallback = { bits, points, count, timestamp in
+        guard let source = MultitouchGestureSource.shared else { return }
+        var touches = RawTouchBuffer()
+        for point in UnsafeBufferPointer(start: points, count: Int(count)) {
+            touches.append(RawTouch(x: point.x, y: point.y))
+        }
+        source.enqueueRawFrame(RawFrame(touches: touches, timestamp: timestamp), token: RegistrationToken(bitPattern: bits))
+    }
+
     private static let contactCallback: MultitouchBinding.ContactCallback = { _, fingers, count, timestamp, _, refcon in
         let token = RegistrationToken(bitPattern: refcon.map(UInt.init(bitPattern:)) ?? 0)
         let frame = MultitouchPalmFilters.capture(fingers: fingers, count: count, timestamp: timestamp, token: token)
@@ -451,12 +462,24 @@ extension MultitouchGestureSource {
                 generation: delivery.generation,
                 slot: delivery.slot,
                 session: delivery.contactSession,
-                senderId: devices.senderId(at: delivery.slot)
+                senderId: devices.senderId(at: delivery.slot),
+                isTouchScreen: devices.isTouchScreen(at: delivery.slot)
             )
+            var gestureLocation = cursorLocation
+            if contactSession.isTouchScreen, #available(macOS 27.0, *),
+               let screen = TouchDisplayWindowGestures.builtInTouchScreen()
+            {
+                // A direct swipe belongs to the screen under the fingers even when the mouse is on another monitor.
+                if let point = delivery.frame.screenLocation(in: screen.frame) {
+                    lastScreenTouchLocation = point
+                }
+                gestureLocation = lastScreenTouchLocation ?? CGPoint(x: screen.frame.midX, y: screen.frame.midY)
+                if delivery.kind.isTerminal { lastScreenTouchLocation = nil }
+            }
             handleRawFrame(
                 delivery.frame,
                 generation: delivery.generation,
-                location: cursorLocation,
+                location: gestureLocation,
                 terminalPhase: delivery.kind == .cancelled ? .cancelled : .ended,
                 contactSession: contactSession
             )
@@ -493,6 +516,7 @@ extension MultitouchGestureSource {
 
     private func invalidateActiveGeneration() {
         activeGeneration = 0
+        lastScreenTouchLocation = nil
         rawFrameMailbox.invalidate()
     }
 }

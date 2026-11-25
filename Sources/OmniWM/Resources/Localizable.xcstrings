@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Drag to move live windows. Quick or repeated swipes switch on release. Vertical drags use the compatible yabai-sb Dock service when available. Keyboard workspace switches are instant." : {
+
+    },
+    "Capture-Free Workspace Swipes" : {
+
+    },
     "This removes the saved launcher entry and clears its keyboard shortcut. Your apps and script files stay on disk." : {
 
     },

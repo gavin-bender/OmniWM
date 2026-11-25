@@ -84,6 +84,7 @@ extension WorkspaceSwipePresentation {
     }
 
     func windowFrameChanged(_ windowId: UInt32) {
+        if retiredSlideWindows.keys.contains(where: { $0.windowId == Int(windowId) }) { scheduleSlideAudit() }
         for flight in flights.values where flight.handoff?.windowIds.contains(windowId) == true {
             readHandoffGeometry(flight)
         }

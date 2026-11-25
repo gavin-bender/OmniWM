@@ -30,6 +30,7 @@ final class SettingsStore {
     @ObservationIgnored private(set) var layoutConfigurationRevision: UInt64 = 0
 
     var onIPCEnabledChanged: (@MainActor (Bool) -> Void)?
+    var onWorkspaceSwipeRendererChanged: (@MainActor () -> Void)?
     var onSlideWorkspaceSwitchesChanged: (@MainActor () -> Void)?
     var onExternalSettingsReloaded: (@MainActor () -> Void)?
     var onConfigNoticeChanged: (@MainActor () -> Void)?
@@ -158,6 +159,14 @@ final class SettingsStore {
         didSet {
             guard oldValue != slideWorkspaceSwitches else { return }
             onSlideWorkspaceSwitchesChanged?()
+            scheduleSave()
+        }
+    }
+
+    var captureFreeWorkspaceSwipes = SettingsStore.defaultExport.captureFreeWorkspaceSwipes {
+        didSet {
+            guard oldValue != captureFreeWorkspaceSwipes else { return }
+            onWorkspaceSwipeRendererChanged?()
             scheduleSave()
         }
     }
@@ -465,6 +474,7 @@ extension SettingsStore {
         animationsEnabled = export.animationsEnabled
         animationSpeed = export.animationSpeed
         slideWorkspaceSwitches = export.slideWorkspaceSwitches
+        captureFreeWorkspaceSwipes = export.captureFreeWorkspaceSwipes
         pausePalettePasteDuringSecureInput = export.pausePalettePasteDuringSecureInput
         language = export.language
         clipboard.apply(export.clipboard)

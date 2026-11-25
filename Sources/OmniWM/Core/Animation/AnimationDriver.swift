@@ -99,6 +99,7 @@ final class AnimationDriver {
     func beginGesture(
         in workspaceId: WorkspaceDescriptor.ID,
         isTrackpad: Bool,
+        usesPointDeltas: Bool = false,
         timestamp: TimeInterval = CACurrentMediaTime()
     ) -> GestureSessionID? {
         let livenessTimestamp = gestureLivenessNow()
@@ -110,6 +111,7 @@ final class AnimationDriver {
         nextGestureSessionID &+= 1
         let gesture = ViewportGesture(
             isTrackpad: isTrackpad,
+            usesPointDeltas: usesPointDeltas,
             sessionID: sessionID,
             livenessTimestamp: livenessTimestamp
         )
@@ -313,16 +315,19 @@ extension AnimationDriver {
 
         let tracker = SwipeTracker()
         let isTrackpad: Bool
+        let usesPointDeltas: Bool
         let sessionID: GestureSessionID
         private(set) var normFactor: Double = 1.0
         private(set) var lastUpdateTime: TimeInterval
 
         init(
             isTrackpad: Bool,
+            usesPointDeltas: Bool = false,
             sessionID: GestureSessionID,
             livenessTimestamp: TimeInterval
         ) {
             self.isTrackpad = isTrackpad
+            self.usesPointDeltas = usesPointDeltas
             self.sessionID = sessionID
             lastUpdateTime = livenessTimestamp
         }
@@ -356,7 +361,7 @@ extension AnimationDriver {
             else { return }
             guard tracker.push(delta: delta, timestamp: timestamp) else { return }
             lastUpdateTime = livenessTimestamp
-            if isTrackpad {
+            if isTrackpad, !usesPointDeltas {
                 let nextNormFactor = viewportWidth / AnimationDriver.gestureWorkingAreaMovement
                 normFactor = nextNormFactor.isFinite ? nextNormFactor : 1
             }

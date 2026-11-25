@@ -31,6 +31,7 @@ final class ServiceLifecycleManager {
         nativeNavigationGesture(.system(OmniWMNativeGestureTrackpadAppExpose), "trackpad-app-expose-restore")
     ]
     private lazy var touchDisplayNavigationGestures = [
+        nativeNavigationGesture(.touchSpacesEnabled(), "touch-space-enabled-restore", enabledValues: [-1, 1]),
         nativeNavigationGesture(.system(OmniWMNativeGestureTouchSpaces), "touch-space-swipe-restore", enabledValues: [3, 4]),
         nativeNavigationGesture(.system(OmniWMNativeGestureTouchMissionControl), "touch-mission-control-restore"),
         nativeNavigationGesture(.system(OmniWMNativeGestureTouchAppExpose), "touch-app-expose-restore")
@@ -344,6 +345,7 @@ final class ServiceLifecycleManager {
         {
             controller.cancelManagedFocusRequestAndRestoreSource(request)
         }
+        controller.layoutRefreshController.workspaceSwipe.cancelAll(reason: "service-stop")
         controller.hasStartedServices = false
         touchDisplayGestureCaptureActive = false
         reconcileNativeNavigationGestures()

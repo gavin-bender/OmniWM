@@ -330,6 +330,7 @@ extension NiriLayoutEngine {
         context: NiriInteractionContext,
         currentOffset: Double,
         projectedOffset: Double,
+        touchscreenDisplacement: Double? = nil,
         snapToColumn: Bool = true,
         centerMode: CenterFocusedColumn = .never,
         alwaysCenterSingleColumn: Bool = false,
@@ -369,6 +370,7 @@ extension NiriLayoutEngine {
                     edgeOverscroll: effectiveSettings(in: context.workspaceId).edgeOverscroll
                 ),
                 motion: context.motion,
+                touchscreenDisplacement: touchscreenDisplacement,
                 snapToColumn: snapToColumn,
                 centerMode: centerMode,
                 alwaysCenterSingleColumn: alwaysCenterSingleColumn

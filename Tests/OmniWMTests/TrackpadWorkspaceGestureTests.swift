@@ -993,6 +993,7 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         at timestamp: TimeInterval,
         location: CGPoint = CGPoint(x: 800, y: 450),
         senderId: UInt64? = 0x637,
+        isTouchScreen: Bool = false,
         slot: Int = 0
     ) {
         let handler = fixture.controller.mouseEventHandler
@@ -1003,7 +1004,8 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
             handler.updateContactSessions(contacts)
         }
         let contact = MultitouchContactSession(
-            generation: contacts.generation, slot: slot, session: contacts.sessions[slot], senderId: senderId
+            generation: contacts.generation, slot: slot, session: contacts.sessions[slot], senderId: senderId,
+            isTouchScreen: isTouchScreen
         )
         let snapshot = MouseEventHandler.GestureEventSnapshot(
             location: location,
@@ -1043,6 +1045,19 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         time += 0.01
         sendFrame(fixture, phase: endPhase, fingers: 0, x: 0, y: 0, at: time, location: location)
         return time
+    }
+
+    func testVerticalSwipeContinuesAfterOneFingerBrieflyDropsOut() throws {
+        let fixture = try makeFixture()
+        let handler = fixture.controller.mouseEventHandler
+        sendFrame(fixture, phase: .began, fingers: 3, x: 0.5, y: 0.2, at: 100)
+        sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.24, at: 100.01)
+        sendFrame(fixture, phase: .changed, fingers: 2, x: 0.5, y: 0.18, at: 100.02)
+        XCTAssertEqual(handler.state.gesturePhase, .committed)
+        sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.32, at: 100.05)
+        sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.67, at: 100.08)
+        sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: 100.09)
+        XCTAssertEqual(activeWorkspace(fixture), fixture.ws2)
     }
 
     func testVerticalSwipeSwitchesToNextWorkspaceExactlyOnce() throws {
@@ -1393,6 +1408,90 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         time += 0.01
         sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: time)
         XCTAssertEqual(activeWorkspace(fixture), fixture.ws1)
+    }
+
+    func testCaptureFreeSwipesLeaveAndReturnToWorkspaceOneThroughLayoutFeedback() throws {
+        for touchscreen in [false, true] {
+            let fixture = try makeFixture()
+            let controller = fixture.controller
+            controller.motionPolicy.animationsEnabled = true
+            controller.settings.captureFreeWorkspaceSwipes = true
+            let swipe = controller.layoutRefreshController.workspaceSwipe
+            for (index, direction) in [1.0, -1.0].enumerated() {
+                let start = 100 + Double(index)
+                let sign = touchscreen ? -direction : direction
+                sendFrame(fixture, phase: .began, fingers: 3, x: 0.5, y: 0.5, at: start, isTouchScreen: touchscreen)
+                for (step, dy) in [0.022, 0.07, 0.15, 0.26].enumerated() {
+                    sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.5 + sign * dy,
+                              at: start + 0.015 * Double(step + 1), isTouchScreen: touchscreen)
+                    swipe.handleInvalidation(workspaceId: activeWorkspace(fixture), domains: .layoutCommit)
+                }
+                let owner = try XCTUnwrap(swipe.flight)
+                sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: start + 0.07, isTouchScreen: touchscreen)
+                XCTAssertEqual(owner.motion.target, 1)
+                swipe.tick(displayId: fixture.monitor.displayId, timestamp: CACurrentMediaTime() + 1)
+                swipe.didSubmitPlacement()
+                XCTAssertEqual(activeWorkspace(fixture), index == 0 ? fixture.ws2 : fixture.ws1)
+            }
+        }
+    }
+
+    func testVerticalTouchscreenSwipesSwitchWorkspacesInBothDirections() throws {
+        let fixture = try makeFixture()
+        let manager = fixture.controller.workspaceManager
+        XCTAssertTrue(manager.setActiveWorkspace(fixture.ws2, on: fixture.monitor.id))
+        for (index, endY) in [0.82, 0.18].enumerated() {
+            let start = 100.0 + Double(index)
+            sendFrame(fixture, phase: .began, fingers: 3, x: 0.5, y: 0.5, at: start, isTouchScreen: true)
+            sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: endY, at: start + 0.02, isTouchScreen: true)
+            sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: start + 0.03, isTouchScreen: true)
+            XCTAssertEqual(activeWorkspace(fixture), index == 0 ? fixture.ws1 : fixture.ws2)
+        }
+    }
+
+    func testTouchscreenSelectsLeftColumnAndCanDragBackRight() throws {
+        var focused: [UInt32] = []
+        let fixture = try makeFixture(scrollGestureEnabled: true, windowFocusOperations: WindowFocusOperations(
+            activateApp: { _ in }, focusSpecificWindow: { _, id, _ in focused.append(id) }, raiseWindow: { _ in }
+        ))
+        try addColumnGestureWindows(to: fixture)
+        let manager = fixture.controller.workspaceManager
+        manager.withNiriViewportState(for: fixture.ws1) { $0.activeColumnIndex = 1 }
+        for (index, endX) in [0.90, 0.10].enumerated() {
+            let start = 100.0 + Double(index)
+            sendFrame(fixture, phase: .began, fingers: 3, x: 0.5, y: 0.5, at: start, isTouchScreen: true)
+            sendFrame(fixture, phase: .changed, fingers: 3, x: endX, y: 0.5, at: start + 0.04, isTouchScreen: true)
+            sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: start + 0.05, isTouchScreen: true)
+            XCTAssertEqual(manager.niriViewportState(for: fixture.ws1).activeColumnIndex, index)
+            XCTAssertFalse(manager.animationDriver.hasMotion(in: fixture.ws1))
+        }
+        XCTAssertEqual(focused, [7101, 7102])
+    }
+
+    func testTouchscreenColumnDragTracksDisplayPointsAndStopsOnLift() throws {
+        for style in TrackpadScrollStyle.allCases {
+            let fixture = try makeFixture(scrollGestureEnabled: true)
+            try addColumnGestureWindows(to: fixture)
+            let gestures = fixture.controller.settings.gestures
+            gestures.trackpadScrollStyle = style
+            gestures.scrollSensitivity = style == .snap ? 0.1 : 100
+            let manager = fixture.controller.workspaceManager
+            let driver = manager.animationDriver
+            let start = manager.niriViewportState(for: fixture.ws1).viewOffset
+
+            sendFrame(fixture, phase: .began, fingers: 3, x: 0.6, y: 0.5, at: 100, isTouchScreen: true)
+            for (index, x) in [0.599, 0.50, 0.55].enumerated() {
+                sendFrame(fixture, phase: .changed, fingers: 3, x: x, y: 0.5,
+                          at: 100.01 + Double(index) * 0.01, isTouchScreen: true)
+                if index > 0 {
+                    let offset = try XCTUnwrap(driver.liveViewOffset(in: fixture.ws1, semanticOffset: start))
+                    XCTAssertEqual(offset - start, (0.6 - x) * fixture.monitor.frame.width, accuracy: 0.001)
+                }
+            }
+            sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: 100.04, isTouchScreen: true)
+            XCTAssertFalse(driver.hasMotion(in: fixture.ws1))
+            XCTAssertEqual(manager.niriViewportState(for: fixture.ws1).viewOffset - start, 80, accuracy: 0.001)
+        }
     }
 
     func testSharedCountHorizontalSwipeAppliesAndFinalizesNiriViewport() throws {
@@ -2194,6 +2293,8 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         }
         time += 0.01
         sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.24, at: time)
+        time += 0.08
+        sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.24, at: time)
         return time
     }
 
@@ -2230,9 +2331,11 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         try assertTracedScroll(fixture, decision: .ownedSession)
         sendFrame(fixture, phase: .changed, fingers: 3, x: 0.5, y: 0.24, at: 100.01)
         sendFrame(fixture, phase: .changed, fingers: 2, x: 0.5, y: 0.24, at: 100.02)
+        try assertTracedScroll(fixture, phase: CGScrollPhase.changed.rawValue, decision: .activeGesture)
+        sendFrame(fixture, phase: .changed, fingers: 2, x: 0.5, y: 0.24, at: 100.09)
         try assertTracedScroll(fixture, phase: CGScrollPhase.changed.rawValue, decision: .liftLatch)
 
-        sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: 100.03)
+        sendFrame(fixture, phase: .ended, fingers: 0, x: 0, y: 0, at: 100.10)
         let released = try assertTracedScroll(fixture, decision: .ownedSession)
         XCTAssertTrue(released.contains("retained=1:0:1:1591 retainedCurrent=1"))
         try assertTracedScroll(fixture, phase: CGScrollPhase.ended.rawValue, decision: .terminalTail)
@@ -2255,7 +2358,7 @@ final class TrackpadWorkspaceGestureTests: XCTestCase {
         XCTAssertTrue(freshContact.contains("retained=none retainedCurrent=none"))
         let trace = recorder.dump()
         let retained = try XCTUnwrap(trace.range(of: "ownership action=retain contact=1:0:1:1591"))
-        let releasedGesture = try XCTUnwrap(trace.range(of: "gesture timestamp=100.03"))
+        let releasedGesture = try XCTUnwrap(trace.range(of: "gesture timestamp=100.1 "))
         let retired = try XCTUnwrap(trace.range(
             of: "ownership action=retire contact=1:0:1:1591 generation=1 currentSession=2"
         ))

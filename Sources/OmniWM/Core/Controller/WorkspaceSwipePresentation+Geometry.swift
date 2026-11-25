@@ -5,7 +5,7 @@ import AppKit
 
 extension WorkspaceSwipePresentation {
     func warmPreviews() {
-        guard preparation == nil,
+        guard controller?.settings.captureFreeWorkspaceSwipes != true, preparation == nil,
               let controller, controller.hasStartedServices,
               controller.motionPolicy.animationsEnabled,
               controller.settings.gestures.workspaceSwipeEnabled || controller.settings.slideWorkspaceSwitchesUntracked,
@@ -26,6 +26,12 @@ extension WorkspaceSwipePresentation {
         for flight in Array(flights.values) {
             if flight.committing {
                 if !participantsAreCurrent(flight) { cancel(flight, reason: "commit-superseded") }
+            } else if flight.liveSlide != nil {
+                // A live drag moves windows and can itself trigger layout notifications.
+                // Only retire it when the workspace or participating windows change.
+                if !participantsAreCurrent(flight) {
+                    liveRendererInterrupted(flight, reason: "live-participants-changed")
+                }
             } else if flight.chained {
                 if !participantsAreCurrent(flight) { cancel(flight, reason: "world-invalidated") }
             } else if !domains.isDisjoint(with: .layoutCommit),

@@ -167,18 +167,21 @@ struct LayoutVisibilityApplication {
 
     private mutating func restoreHiddenEntries() {
         if !restoreEntries.isEmpty {
-            var frameBackedLayoutTransientTokens: Set<WindowToken> = []
-            frameBackedLayoutTransientTokens.reserveCapacity(restoreEntries.count)
+            var plannedRestoreTokens: Set<WindowToken> = []
+            plannedRestoreTokens.reserveCapacity(restoreEntries.count)
             let restorePlans: [LayoutRefreshController.WindowPositionPlan] = restoreEntries
                 .compactMap { entry, hiddenState in
                     guard !blockedRevealTokens.contains(entry.token),
                           pendingRevealTransactionIdsByToken[entry.token] == nil
                     else { return nil }
-                    if let plannedFrame = LayoutDiffExecutor.frameBackedLayoutTransientRestoreFrame(
+                    if let plannedFrame = LayoutDiffExecutor.plannedRestoreFrame(
                         hiddenState: hiddenState,
+                        mode: entry.mode,
                         frameChange: frameChangeByToken[entry.token]
                     ) {
-                        frameBackedLayoutTransientTokens.insert(entry.token)
+                        // A tiled column can straddle a display edge. Restoring its
+                        // saved on-screen position first would show a second horizontal position.
+                        plannedRestoreTokens.insert(entry.token)
                         return LayoutRefreshController.WindowPositionPlan(
                             entry: entry,
                             frame: plannedFrame
@@ -192,7 +195,7 @@ struct LayoutVisibilityApplication {
                 }
             deferredVisibleAXTokens = refreshController.applyPositionPlans(
                 restorePlans,
-                deferringVisibleAXFor: frameBackedLayoutTransientTokens
+                deferringVisibleAXFor: plannedRestoreTokens
             )
 
             for (entry, _) in restoreEntries
@@ -335,7 +338,7 @@ extension LayoutVisibilityApplication {
             pid: entry.pid,
             window: axRef,
             frame: change.frame,
-            components: change.components
+            components: deferredVisibleAXTokens.contains(change.token) ? change.components.union(.position) : change.components
         )
         if change.allowsTerminalRecovery {
             terminalRecoveryFrameUpdates.append(frameUpdate)

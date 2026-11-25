@@ -297,6 +297,115 @@ final class WorkspaceSwipePresentationTests: XCTestCase {
         XCTAssertEqual(controller.workspaceManager.activeWorkspace(on: monitor.id)?.id, destination)
     }
 
+    func testRapidLiveSwipesPreserveOrderAndReverseAfterPlacement() throws {
+        var now = 1.0
+        let (controller, swipe, monitor, source) = try fixture(mediaTimeProvider: { now })
+        controller.settings.captureFreeWorkspaceSwipes = true
+        let manager = controller.workspaceManager
+        let second = try XCTUnwrap(manager.workspaceId(for: "2", createIfMissing: false))
+        let third = try XCTUnwrap(manager.workspaceId(for: "3", createIfMissing: true))
+        manager.assignWorkspaceToMonitor(third, monitorId: monitor.id)
+
+        func flick(_ units: Double) {
+            _ = swipe.prepare(monitorId: monitor.id, timestamp: now)
+            now += 0.01
+            XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: units / 10, timestamp: now, directTouch: true))
+            now += 0.02
+            XCTAssertTrue(swipe.update(cumulative: units, timestamp: now))
+            now += 0.01
+            XCTAssertTrue(swipe.release(timestamp: now, allowFlick: true))
+            swipe.tick(displayId: monitor.displayId, timestamp: now + 1)
+            swipe.didSubmitPlacement()
+        }
+
+        let forward: Double = TrackpadGestureIntent.isNextWorkspace(
+            axis: .vertical, displacement: 1, naturalDirection: controller.settings.gestures.invertDirection
+        ) == true ? 250 : -250
+        XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, source)
+        for _ in 0..<64 {
+            for (movement, expected) in [(forward, second), (forward, third), (-forward, second), (-forward, source)] {
+                flick(movement)
+                XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, expected)
+                XCTAssertNil(swipe.flights[monitor.id])
+            }
+        }
+        XCTAssertFalse(swipe.hasPresentation)
+        XCTAssertTrue(swipe.previews.isEmpty)
+    }
+
+    func testSecondLiveRendererCannotReplaceTheOwnerOfWindowCleanup() throws {
+        let (controller, swipe, monitor, _) = try fixture()
+        controller.settings.captureFreeWorkspaceSwipes = true
+        _ = swipe.prepare(monitorId: monitor.id, timestamp: 1)
+        XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: 20, timestamp: 1.01, directTouch: true))
+        XCTAssertTrue(swipe.update(cumulative: 42, timestamp: 1.15))
+        let owner = try XCTUnwrap(swipe.flight)
+        let duplicate = WorkspaceSwipePresentation.Flight(
+            preparation: owner.preparation, destination: owner.destination, axis: .vertical,
+            cumulative: 20, isNext: true, timestamp: 1.02, recognitionMovement: nil, directTouch: true
+        )
+        XCTAssertFalse(swipe.beginLiveSlide(duplicate))
+        XCTAssertTrue(swipe.flight === owner)
+        swipe.cancelAll(reason: "test")
+        XCTAssertNil(swipe.flights[monitor.id])
+    }
+
+    func testLiveInputSurvivesLayoutFeedbackAndInterruptedRendererOnBothDevices() throws {
+        for directTouch in [false, true] {
+            let (controller, swipe, monitor, source) = try fixture()
+            controller.settings.captureFreeWorkspaceSwipes = true
+            _ = swipe.prepare(monitorId: monitor.id, timestamp: 10)
+            XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: 30, timestamp: 10.01,
+                                      recognitionMovement: .init(delta: 6, timestamp: 10), directTouch: directTouch))
+            let owner = try XCTUnwrap(swipe.flight)
+            XCTAssertEqual(owner.progress, 0.1, accuracy: 0.00001)
+            XCTAssertEqual(owner.motion.velocity(at: 10.01), 2, accuracy: 0.00001)
+            swipe.handleInvalidation(workspaceId: source, domains: .layoutCommit)
+            XCTAssertTrue(swipe.flight === owner)
+            swipe.liveRendererInterrupted(owner, reason: "test-interruption")
+            XCTAssertTrue(swipe.update(cumulative: 200, timestamp: 10.16))
+            XCTAssertNil(swipe.flights[monitor.id])
+            XCTAssertTrue(swipe.release(timestamp: 10.45, allowFlick: true))
+            XCTAssertEqual(controller.workspaceManager.activeWorkspace(on: monitor.id)?.id, owner.destination.id)
+            XCTAssertFalse(swipe.release(timestamp: 10.46, allowFlick: true))
+        }
+    }
+
+    func testRepeatedContactCanResumeLiveTrackingDuringSameDrag() throws {
+        let (controller, swipe, monitor, _) = try fixture()
+        controller.settings.captureFreeWorkspaceSwipes = true
+        _ = swipe.prepare(monitorId: monitor.id, timestamp: 1)
+        XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: 155, timestamp: 1.02))
+        XCTAssertTrue(swipe.release(timestamp: 1.25, allowFlick: true))
+        swipe.tick(displayId: monitor.displayId, timestamp: 4)
+        swipe.didSubmitPlacement()
+        _ = swipe.prepare(monitorId: monitor.id, timestamp: 1.30)
+        XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: -15, timestamp: 1.32))
+        XCTAssertNil(swipe.flight)
+        XCTAssertTrue(swipe.update(cumulative: -120, timestamp: 1.52))
+        XCTAssertEqual(try XCTUnwrap(swipe.flight).progress, 0.4, accuracy: 0.00001)
+    }
+
+    func testLiveDragFollowedByFastReversalAndCancelledFlick() throws {
+        var now = 1.0
+        let (controller, swipe, monitor, source) = try fixture(mediaTimeProvider: { now })
+        controller.settings.captureFreeWorkspaceSwipes = true
+        _ = swipe.prepare(monitorId: monitor.id, timestamp: 1)
+        XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: 20, timestamp: 1.01, directTouch: true))
+        XCTAssertTrue(swipe.update(cumulative: 210, timestamp: 1.16))
+        XCTAssertNotNil(swipe.flight?.liveSlide)
+        now = 1.17
+        XCTAssertTrue(swipe.release(timestamp: now, allowFlick: true))
+        for (contact, flick) in [(1.18, true), (1.24, false)] {
+            _ = swipe.prepare(monitorId: monitor.id, timestamp: contact)
+            XCTAssertTrue(swipe.begin(axis: .vertical, cumulative: -20, timestamp: contact + 0.01, directTouch: true))
+            XCTAssertTrue(swipe.update(cumulative: -240, timestamp: contact + 0.03))
+            XCTAssertTrue(swipe.release(timestamp: contact + 0.04, allowFlick: flick))
+            XCTAssertEqual(controller.workspaceManager.activeWorkspace(on: monitor.id)?.id, source)
+        }
+        XCTAssertFalse(swipe.hasPresentation)
+    }
+
     func testSwipeDuringCommittingSettleChainsFromTheDestination() throws {
         var mediaTime = 1.06
         let (controller, swipe, monitor, _) = try fixture(mediaTimeProvider: { mediaTime })
@@ -460,6 +569,69 @@ final class WorkspaceSwipePresentationTests: XCTestCase {
         XCTAssertFalse(swipe.hasPresentation)
         XCTAssertTrue(swipe.previewSurface(controller, for: monitor.id) === preview)
         XCTAssertEqual(controller.workspaceManager.activeWorkspace(on: monitor.id)?.id, next.id)
+    }
+
+    func testLiveTouchscreenVisualDirectionIsIndependentOfDestinationOrder() throws {
+        let (controller, swipe, monitor, _) = try fixture()
+        defer { withExtendedLifetime(controller) {} }
+        let preparation = try XCTUnwrap(swipe.makePreparation(monitorId: monitor.id))
+        let next = try XCTUnwrap(preparation.next)
+        for isNext in [false, true] {
+            let flight = WorkspaceSwipePresentation.Flight(
+                preparation: preparation, destination: next, axis: .vertical, cumulative: 12,
+                isNext: isNext, timestamp: 1, recognitionMovement: nil, directTouch: true
+            )
+            flight.progress = 0.25
+            XCTAssertGreaterThan(flight.offset(destination: false).dy, 0)
+        }
+    }
+
+    func testCaptureFreeMinimumHeightWindowWaitsUntilItFitsAtTopEdge() {
+        let viewport = CGRect(x: 0, y: 0, width: 800, height: 600)
+        let window = CGRect(x: 12, y: 0, width: 360, height: 600)
+        let park = CGPoint(x: 801, y: 0)
+        for offset in [0, 100, 240, 241, 350, 600, 350, 241, 240, 150, 0] {
+            let frame = LiveWorkspaceSlide.displayedFrame(
+                layout: window, offset: .init(dx: 0, dy: CGFloat(offset)), viewport: viewport,
+                parkOrigin: park, minimumHeight: 360
+            )
+            XCTAssertEqual(frame.origin == park, offset > 240)
+            XCTAssertGreaterThanOrEqual(frame.height, 360)
+        }
+    }
+
+    func testLiveWindowsShareNoPixelsAsTheyCrossTheTopEdgeInEitherDirection() {
+        let viewport = CGRect(x: 0, y: 0, width: 900, height: 700)
+        let window = CGRect(x: 12, y: 10, width: 420, height: 680)
+        let park = CGPoint(x: 901, y: 0)
+        for sign in [-1.0, 1.0] {
+            for step in 0 ... 20 {
+                let progress = Double(step) / 20
+                let source = LiveWorkspaceSlide.displayedFrame(
+                    layout: window, offset: .init(dx: 0, dy: sign * progress * 770), viewport: viewport, parkOrigin: park
+                )
+                let destination = LiveWorkspaceSlide.displayedFrame(
+                    layout: window, offset: .init(dx: 0, dy: sign * (progress - 1) * 770), viewport: viewport, parkOrigin: park
+                )
+                XCTAssertTrue(source.intersection(destination).intersection(viewport).isEmpty)
+                if step == 0 { XCTAssertEqual(source, window) }
+                if step == 20 { XCTAssertEqual(destination, window) }
+            }
+        }
+    }
+
+    func testCaptureFreeModePreparesGestureWithoutCreatingPreviewSurfaces() throws {
+        let (controller, swipe, monitor, source) = try fixture()
+        controller.settings.captureFreeWorkspaceSwipes = true
+        let next = try XCTUnwrap(controller.workspaceManager.nextWorkspaceInOrder(
+            on: monitor.id, from: source, wrapAround: true
+        ))
+        swipe.warmPreviews()
+        _ = swipe.prepare(monitorId: monitor.id, timestamp: 1)
+        XCTAssertNotNil(swipe.preparation)
+        XCTAssertTrue(swipe.previews.isEmpty)
+        XCTAssertFalse(swipe.animateSwitch(to: next.id, on: monitor.id, isNext: true))
+        XCTAssertTrue(swipe.previews.isEmpty)
     }
 
     func testWarmingWaitsForSwipesOrSlides() throws {

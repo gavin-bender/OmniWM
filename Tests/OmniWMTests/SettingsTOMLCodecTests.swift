@@ -113,6 +113,13 @@ final class SettingsTOMLCodecTests: XCTestCase {
         XCTAssertNil(result.migration)
     }
 
+    func testCaptureFreeWorkspaceSwipesIsOptInAndRoundTrips() throws {
+        var export = SettingsExport.defaults()
+        XCTAssertFalse(export.captureFreeWorkspaceSwipes)
+        export.captureFreeWorkspaceSwipes = true
+        XCTAssertTrue(try SettingsTOMLCodec.decode(SettingsTOMLCodec.encode(export)).captureFreeWorkspaceSwipes)
+    }
+
     func testTabRailAppIconsDefaultsAndRoundTrips() throws {
         var export = SettingsExport.defaults()
         XCTAssertFalse(export.tabRailAppIcons)

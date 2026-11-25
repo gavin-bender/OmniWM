@@ -24,8 +24,13 @@ final class WorkspaceSwipeMotion {
     private var spring: SpringAnimation?
     private(set) var target: Double?
 
-    init(cumulativeUnits: Double, timestamp: TimeInterval, recognitionMovement: SwipeEvent? = nil) {
+    init(cumulativeUnits: Double, timestamp: TimeInterval, recognitionMovement: SwipeEvent? = nil,
+         includeRecognitionDistance: Bool = false) {
         originUnits = cumulativeUnits.isFinite ? cumulativeUnits : 0
+        if includeRecognitionDistance {
+            baselineProgress = originUnits / Self.travelUnits
+            trackedProgress = Self.rubberBand(baselineProgress)
+        }
         lastTimestamp = timestamp.isFinite ? timestamp : 0
         tracker.seed(recognitionMovement.map {
             SwipeEvent(delta: $0.delta / Self.travelUnits, timestamp: $0.timestamp)

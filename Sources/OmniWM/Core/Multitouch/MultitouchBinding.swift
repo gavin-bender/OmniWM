@@ -3,6 +3,7 @@
 
 import Foundation
 import IOKit
+import OmniWMSystemGestures
 
 final class MultitouchBinding {
     typealias DeviceRef = OpaquePointer
@@ -19,6 +20,7 @@ final class MultitouchBinding {
         let ref: DeviceRef
         let registryId: UInt64
         let senderId: UInt64?
+        var isTouchScreen = false
     }
 
     enum EnumerationOutcome: Equatable, Sendable {
@@ -49,6 +51,7 @@ final class MultitouchBinding {
     ) -> Int32
     private typealias UnregisterFunc = @convention(c) (DeviceRef, ContactCallback) -> Int32
 
+    private var kiwiMonitors: [DeviceRef: OpaquePointer] = [:]
     private let createListFunc: CreateListFunc
     private let startFunc: DeviceModeFunc
     private let stopFunc: DeviceFunc
@@ -152,7 +155,15 @@ final class MultitouchBinding {
             guard registryIds.insert(registryId).inserted else {
                 return Enumeration(list: array, devices: [], outcome: .duplicateRegistryId)
             }
-            devices.append(Device(ref: ref, registryId: registryId, senderId: Self.senderId(for: service)))
+            let usagePairs = IORegistryEntryCreateCFProperty(
+                service, kIOHIDDeviceUsagePairsKey as CFString, kCFAllocatorDefault, 0
+            )?.takeRetainedValue() as? [[String: Int]]
+            let isTouchScreen = usagePairs?.contains {
+                $0[kIOHIDDeviceUsagePageKey] == kHIDPage_Digitizer && $0[kIOHIDDeviceUsageKey] == kHIDUsage_Dig_TouchScreen
+            } == true
+            devices.append(Device(
+                ref: ref, registryId: registryId, senderId: Self.senderId(for: service), isTouchScreen: isTouchScreen
+            ))
         }
         return Enumeration(list: array, devices: devices, outcome: .success(devices.count))
     }
@@ -181,15 +192,15 @@ final class MultitouchBinding {
     }
 
     func start(_ device: DeviceRef) -> Int32 {
-        startFunc(device, 0)
+        kiwiMonitors[device] != nil ? KERN_SUCCESS : startFunc(device, 0)
     }
 
     func stop(_ device: DeviceRef) -> Int32 {
-        stopFunc(device)
+        kiwiMonitors[device] != nil ? KERN_SUCCESS : stopFunc(device)
     }
 
     func isRunning(_ device: DeviceRef) -> Bool {
-        isRunningFunc(device)
+        kiwiMonitors[device] != nil || isRunningFunc(device)
     }
 
     func register(
@@ -197,11 +208,24 @@ final class MultitouchBinding {
         callback: ContactCallback,
         refcon: UnsafeMutableRawPointer
     ) -> Bool {
-        registerWithRefconFunc(device, callback, refcon) != 0
+        let token = UInt(bitPattern: refcon)
+        if MultitouchGestureSource.RegistrationToken(bitPattern: token).isTouchScreen,
+           IORegistryEntryCreateCFProperty(getServiceFunc(device), kIOHIDProductKey as CFString, nil, 0)?
+               .takeRetainedValue() as? String == "Kiwi",
+           let monitor = omniwm_open_kiwi_monitor(token, MultitouchGestureSource.screenReportCallback)
+        {
+            kiwiMonitors[device] = monitor
+            return true
+        }
+        return registerWithRefconFunc(device, callback, refcon) != 0
     }
 
     func unregister(_ device: DeviceRef, callback: ContactCallback) -> Bool {
-        unregisterFunc(device, callback) != 0
+        if let monitor = kiwiMonitors.removeValue(forKey: device) {
+            omniwm_close_kiwi_monitor(monitor)
+            return true
+        }
+        return unregisterFunc(device, callback) != 0
     }
 
     private static func logUnavailable(_ reason: String) {

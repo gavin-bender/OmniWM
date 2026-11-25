@@ -10,6 +10,33 @@ final class NativeNavigationGestureLease {
         var read: () -> Int32?
         var write: (Int32) -> Bool
 
+        // macOS stores the Spaces enable switch separately from its optional minimum finger count.
+        // Preserve an absent key so releasing the lease restores the system default.
+        static func touchSpacesEnabled(domain: String = "com.apple.SystemGestures") -> Self {
+            let domain = domain as CFString
+            let key = "spaceSwap" as CFString
+            return Self(
+                read: {
+                    guard let value = CFPreferencesCopyValue(
+                        key, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost
+                    ) else { return -1 }
+                    guard let number = value as? NSNumber, [0, 1].contains(number.intValue) else { return nil }
+                    return number.int32Value
+                },
+                write: { value in
+                    let setting: CFBoolean?
+                    switch value {
+                    case -1: setting = nil
+                    case 0: setting = kCFBooleanFalse
+                    case 1: setting = kCFBooleanTrue
+                    default: return false
+                    }
+                    CFPreferencesSetValue(key, setting, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+                    return CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+                }
+            )
+        }
+
         static func system(_ gesture: OmniWMNativeGesturePreference) -> Self {
             Self(
                 read: {

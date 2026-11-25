@@ -54,6 +54,9 @@ extension WMController {
         settings.gestures.onWorkspaceSwipeEnabledChange = { [weak self] in
             self?.layoutRefreshController.workspaceSwipe.syncAvailability()
         }
+        settings.onWorkspaceSwipeRendererChanged = { [weak self] in
+            self?.layoutRefreshController.workspaceSwipe.resetRenderer()
+        }
         settings.onSlideWorkspaceSwitchesChanged = { [weak self] in
             self?.layoutRefreshController.workspaceSwipe.syncAvailability()
         }

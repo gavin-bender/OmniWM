@@ -7,6 +7,27 @@ import XCTest
 
 @MainActor
 final class NativeNavigationGestureLeaseTests: XCTestCase {
+    func testTouchSpacesPausesTheEnableSwitchAndRestoresExplicitOrDefaultValue() throws {
+        let domain = "com.barut.OmniWM.tests." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let journal = directory.appendingPathComponent("restore")
+        let preference = NativeNavigationGestureLease.Preference.touchSpacesEnabled(domain: domain)
+        defaults.set(3, forKey: "spaceSwapMinimumPointCount")
+        for original: Int32 in [-1, 1, 0] {
+            XCTAssertTrue(preference.write(original))
+            let lease = NativeNavigationGestureLease(restoreURL: journal, enabledValues: [-1, 1], preference: preference)
+            lease.reconcile(shouldPause: true)
+            XCTAssertEqual(preference.read(), 0)
+            XCTAssertEqual(defaults.integer(forKey: "spaceSwapMinimumPointCount"), 3)
+            XCTAssertEqual(FileManager.default.fileExists(atPath: journal.path), original != 0)
+            lease.reconcile(shouldPause: false)
+            XCTAssertEqual(preference.read(), original)
+        }
+    }
+
     func testNavigationPreferencesRestoreIndependently() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -27,6 +27,10 @@ extension AXEventHandler {
 
     func handleFrameChanged(windowId: UInt32) {
         guard let controller, !controller.isOwnedWindow(windowNumber: Int(windowId)) else { return }
+        if controller.layoutRefreshController.workspaceSwipe.movingLiveWindow(windowId) {
+            cancelFrameObservation(windowId: windowId)
+            return
+        }
         controller.layoutRefreshController.workspaceSwipe.windowFrameChanged(windowId)
         let tracked = controller.workspaceManager.withEntry(forWindowId: Int(windowId)) {
             (mode: $0.mode, hiddenState: $0.hiddenState, workspaceId: $0.workspaceId)

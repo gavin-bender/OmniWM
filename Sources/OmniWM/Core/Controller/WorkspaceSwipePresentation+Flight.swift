@@ -26,6 +26,7 @@ extension WorkspaceSwipePresentation {
         let preparation: Preparation
         let destination: Workspace
         let axis: WorkspaceSwipeAxis
+        let isNext: Bool
         let inputSign: Double
         let visualSign: CGFloat
         let motion: WorkspaceSwipeMotion
@@ -35,6 +36,8 @@ extension WorkspaceSwipePresentation {
             phase == .committing || phase == .waitingForPlacement
         }
 
+        var liveSlide: LiveWorkspaceSlide?
+        var landingTask: Task<Void, Never>?
         var settlement: AXFrameSettlement?
         var handoff: Handoff?
         var carry: ((TimeInterval) -> CGVector?)?
@@ -52,18 +55,24 @@ extension WorkspaceSwipePresentation {
             cumulative: Double,
             isNext: Bool,
             timestamp: TimeInterval,
-            recognitionMovement: SwipeEvent?
+            recognitionMovement: SwipeEvent?,
+            directTouch: Bool = false, captureFree: Bool = false
         ) {
             self.preparation = preparation
             self.destination = destination
             self.axis = axis
+            self.isNext = isNext
             inputSign = cumulative < 0 ? -1 : 1
-            visualSign = isNext ? 1 : -1
+            if directTouch {
+                visualSign = axis == .vertical ? inputSign : -inputSign
+            } else {
+                visualSign = isNext ? 1 : -1
+            }
             motion = WorkspaceSwipeMotion(
                 cumulativeUnits: abs(cumulative), timestamp: timestamp,
                 recognitionMovement: recognitionMovement.map {
                     SwipeEvent(delta: $0.delta * (cumulative < 0 ? -1 : 1), timestamp: $0.timestamp)
-                }
+                }, includeRecognitionDistance: directTouch || captureFree
             )
         }
 

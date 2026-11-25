@@ -10,6 +10,12 @@ final class WorkspaceSwipePresentation {
     var preparation: Preparation?
     private(set) var flights: [Monitor.ID: Flight] = [:]
     private weak var gestureFlight: Flight?
+    var pendingSlideResets: [WindowToken: AXWindowRef] = [:]
+    var retiredSlideWindows: [WindowToken: AXWindowRef] = [:]
+    var slideAuditTask: Task<Void, Never>?
+    private var captureFreeContact: (flight: Flight, animateAfter: TimeInterval)?
+    private static let repeatedSwipeInterval: TimeInterval = 0.25
+    private var lastLiveRelease: [Monitor.ID: TimeInterval] = [:]
     private var chainMonitorId: Monitor.ID?
     private var latestSerial = 0
     private var latestGestureMonitorId: Monitor.ID?
@@ -45,7 +51,7 @@ final class WorkspaceSwipePresentation {
     }
 
     var hasPresentation: Bool {
-        !flights.isEmpty
+        !flights.isEmpty || captureFreeContact != nil
     }
 
     func hasDisplayWork(_ displayId: CGDirectDisplayID) -> Bool {
@@ -55,11 +61,12 @@ final class WorkspaceSwipePresentation {
     private func hasDisplayWork(_ flight: Flight, _ displayId: CGDirectDisplayID) -> Bool {
         flight.preparation.monitor.displayId == displayId
             && (!flight.committing || flight.isKeyboard && !flight.motionFinished)
-            && (flight.motion.target != nil || flight.carry != nil)
+            && (flight.motion.target != nil || flight.carry != nil || flight.liveSlide?.followsDisplayLink == true)
     }
 
     func prepare(monitorId: Monitor.ID, timestamp: TimeInterval) -> Bool {
         gestureFlight = nil
+        captureFreeContact = nil
         guard let controller, controller.motionPolicy.animationsEnabled else { return false }
         let mediaTime = mediaTimeProvider()
         let existing = flights[monitorId]
@@ -87,6 +94,7 @@ final class WorkspaceSwipePresentation {
             return false
         }
         self.preparation = preparation
+        if controller.settings.captureFreeWorkspaceSwipes { return false }
         let surface = previewSurface(controller, for: monitorId)
         surface.captureSource(monitor: preparation.monitor, workingFrame: preparation.frame)
         surface.warm(
@@ -100,7 +108,7 @@ final class WorkspaceSwipePresentation {
     @discardableResult
     func begin(
         axis: WorkspaceSwipeAxis, cumulative: Double, timestamp: TimeInterval,
-        recognitionMovement: SwipeEvent? = nil
+        recognitionMovement: SwipeEvent? = nil, directTouch: Bool = false
     ) -> Bool {
         guard let controller, controller.motionPolicy.animationsEnabled else { return false }
         let (preparation, predecessor) = beginPreparation()
@@ -114,6 +122,18 @@ final class WorkspaceSwipePresentation {
         else {
             guard let predecessor else { return false }
             return refuseOrFallBack(from: predecessor, axis: axis, cumulative: cumulative)
+        }
+        if controller.settings.captureFreeWorkspaceSwipes {
+            let flight = Flight(preparation: preparation, destination: destination, axis: axis, cumulative: cumulative,
+                                isNext: isNext, timestamp: timestamp, recognitionMovement: recognitionMovement,
+                                directTouch: directTouch, captureFree: true)
+            let monitorId = preparation.monitor.id
+            // Start an isolated drag immediately. For overlapping swipes, wait for the
+            // preceding placement to finish, then join the gesture at its current position.
+            let animateAfter = lastLiveRelease[monitorId].map { $0 + Self.repeatedSwipeInterval } ?? timestamp
+            captureFreeContact = (flight, animateAfter)
+            _ = update(cumulative: cumulative, timestamp: timestamp)
+            return true
         }
         let preview = previewSurface(controller, for: preparation.monitor.id)
         if let predecessor,
@@ -154,18 +174,52 @@ final class WorkspaceSwipePresentation {
 
     @discardableResult
     func update(cumulative: Double, timestamp: TimeInterval) -> Bool {
+        if let contact = captureFreeContact {
+            let tracked = contact.flight
+            tracked.motion.update(cumulativeUnits: cumulative * tracked.inputSign, timestamp: timestamp)
+            if timestamp >= contact.animateAfter, flights[tracked.preparation.monitor.id] == nil,
+               participantsAreCurrent(tracked) {
+                // A rejected window set should not run AX discovery on every input frame.
+                captureFreeContact = (tracked, .infinity)
+                if beginLiveSlide(tracked) { captureFreeContact = nil }
+            }
+            return true
+        }
         guard let flight, !flight.committing, flight.motion.target == nil else { return false }
         guard participantsAreCurrent(flight), controller?.motionPolicy.animationsEnabled == true else {
-            cancel(flight, reason: "invalidated")
+            if flight.liveSlide != nil, controller?.motionPolicy.animationsEnabled == true {
+                flight.motion.update(cumulativeUnits: cumulative * flight.inputSign, timestamp: timestamp)
+                liveRendererInterrupted(flight, reason: "live-participants-changed")
+            } else {
+                cancel(flight, reason: "invalidated")
+            }
             return true
         }
         flight.motion.update(cumulativeUnits: cumulative * flight.inputSign, timestamp: timestamp)
-        present(flight, at: mediaTimeProvider())
+        if flight.liveSlide?.followsDisplayLink != true { present(flight, at: mediaTimeProvider()) }
         return true
     }
 
     @discardableResult
     func release(timestamp: TimeInterval, allowFlick: Bool) -> Bool {
+        if let contact = captureFreeContact {
+            captureFreeContact = nil
+            let monitor = contact.flight.preparation.monitor.id
+            lastLiveRelease[monitor] = timestamp
+            guard contact.flight.motion.release(timestamp: timestamp, allowFlick: allowFlick,
+                                                animationTime: mediaTimeProvider()),
+                  contact.flight.motion.target == 1 else { return true }
+            // Finish any older live ownership before ordinary workspace navigation.
+            if let previous = flights[monitor] {
+                if !previous.committing, previous.motion.target == 1 { commit(previous) }
+                if isCurrent(previous) { cancel(previous, reason: "rapid-switch") }
+            }
+            if controller?.workspaceManager.activeWorkspaceOrFirst(on: monitor)?.id == contact.flight.preparation.source.id {
+                controller?.workspaceNavigationHandler.switchWorkspaceBySwipe(isNext: contact.flight.isNext, monitorId: monitor)
+            }
+            scheduleSlideAudit()
+            return true
+        }
         guard let flight, !flight.committing else { return false }
         guard flight.motion.release(
             timestamp: timestamp, allowFlick: allowFlick, animationTime: mediaTimeProvider(),
@@ -174,13 +228,31 @@ final class WorkspaceSwipePresentation {
             cancel(flight, reason: "invalid-release")
             return true
         }
+        if flight.liveSlide != nil { lastLiveRelease[flight.preparation.monitor.id] = timestamp }
         flight.phase = .settling
         if !activateDisplayLink(for: flight) {
-            cancel(flight, reason: "display-link-unavailable")
+            if flight.liveSlide != nil { liveRendererInterrupted(flight, reason: "display-link-unavailable") }
+            else { cancel(flight, reason: "display-link-unavailable") }
             return true
         }
         prefetchChainTargets(after: flight)
         return true
+    }
+
+    /// Release window ownership independently of the user's decision to switch.
+    func liveRendererInterrupted(_ flight: Flight, reason: String) {
+        guard isCurrent(flight), let slide = flight.liveSlide, !flight.committing else { return }
+        if flight.motion.target == 1 {
+            // An AX renderer can fail halfway through a write. Restore its windows
+            // before ordinary layout performs the committed switch.
+            finishLiveSlide(slide)
+            flight.liveSlide = nil
+            commit(flight)
+        } else {
+            let keepContact = self.flight === flight && flight.motion.target == nil
+            cancel(flight, reason: reason)
+            if keepContact { captureFreeContact = (flight, .infinity) }
+        }
     }
 
     func activateDisplayLink(for flight: Flight) -> Bool {
@@ -221,11 +293,23 @@ final class WorkspaceSwipePresentation {
     func tick(displayId: CGDirectDisplayID, timestamp: TimeInterval) {
         for flight in flights.values where hasDisplayWork(flight, displayId) {
             guard participantsAreCurrent(flight), controller?.motionPolicy.animationsEnabled == true else {
-                cancel(flight, reason: "invalidated")
+                if flight.liveSlide != nil, controller?.motionPolicy.animationsEnabled == true {
+                    liveRendererInterrupted(flight, reason: "live-participants-changed")
+                } else {
+                    cancel(flight, reason: "invalidated")
+                }
+                continue
+            }
+            // Hand the last few points to the real window placement. The toggle-based
+            // compositor would otherwise expose old frames while chasing a subpixel spring.
+            if flight.liveSlide?.followsDisplayLink == true, flight.phase == .settling,
+               let target = flight.motion.target,
+               abs(target - flight.motion.progress(at: timestamp)) * flight.stride <= 3 {
+                if target == 1 { commit(flight) } else { cancel(flight, reason: "cancelled") }
                 continue
             }
             present(flight, at: timestamp)
-            if flight.motion.isComplete(at: timestamp) {
+            if isCurrent(flight), flight.motion.target != nil, flight.motion.isComplete(at: timestamp) {
                 if flight.committing {
                     finishKeyboardMotion(flight)
                 } else if flight.motion.target == 1 {
@@ -295,6 +379,10 @@ extension WorkspaceSwipePresentation {
     }
 
     func cancel(reason: String) {
+        if captureFreeContact != nil {
+            captureFreeContact = nil
+            return
+        }
         guard let flight else {
             stopPreparing()
             return
@@ -303,16 +391,23 @@ extension WorkspaceSwipePresentation {
     }
 
     func cancelAll(reason: String) {
+        captureFreeContact = nil
+        lastLiveRelease.removeAll()
         focusOwed = false
         for flight in Array(flights.values) {
             cancel(flight, reason: reason, settlingFocus: false)
         }
         stopPreparing()
+        auditRetiredSlides()
     }
 
     func cancel(_ flight: Flight, reason: String, keepingPreview: Bool = false, settlingFocus: Bool = true) {
         let monitorId = flight.preparation.monitor.id
         guard flights[monitorId] === flight else { return }
+        flight.landingTask?.cancel()
+        flight.landingTask = nil
+        if let slide = flight.liveSlide { finishLiveSlide(slide) }
+        flight.liveSlide = nil
         flights[monitorId] = nil
         flight.handoff?.cancel()
         flight.settlement?.onChange = nil
@@ -362,6 +457,16 @@ extension WorkspaceSwipePresentation {
             cancel(flight, reason: "superseded")
             return
         }
+        // An interrupted spring has no final image to preserve. During a normal
+        // landing keep each window at its last visible position until it is placed.
+        if let slide = flight.liveSlide, slide.followsDisplayLink, abs(1 - flight.progress) > 0.025 {
+            let released = finishLiveSlide(slide)
+            flight.liveSlide = nil
+            guard released else {
+                cancel(flight, reason: "transform-release-failed")
+                return
+            }
+        }
         let takesFocus = flight.serial == latestSerial || latestGestureMonitorId == monitor.id
         flight.phase = .committing
         previews[monitor.id]?.freezeSource()
@@ -371,12 +476,24 @@ extension WorkspaceSwipePresentation {
         settlement.onChange = { [weak self] in self?.checkSettlement() }
         controller.axManager.workspaceFrameSettlements.append(settlement)
         controller.workspaceNavigationHandler.saveNiriViewportState(for: flight.preparation.source.id)
+        if let slide = flight.liveSlide, let landing = slide.beginLanding() {
+            flight.landingTask = Task { [weak self, weak flight] in
+                await landing.value
+                guard !Task.isCancelled, let self, let flight, isCurrent(flight), flight.liveSlide === slide else { return }
+                finishLiveSlide(slide)
+                flight.liveSlide = nil
+            }
+        }
         guard controller.workspaceManager.setActiveWorkspace(
             flight.destination.id, on: monitor.id, updateInteractionMonitor: takesFocus
         ) else {
             flight.phase = .settling
             cancel(flight, reason: "commit-failed")
             return
+        }
+        if let slide = flight.liveSlide, !slide.followsDisplayLink {
+            slide.adoptPlacedWindows(in: controller, destination: flight.destination)
+            flight.liveSlide = nil
         }
         trace(takesFocus ? "committed" : "committed-background", progress: flight.progress)
         let placementSubmitted: LayoutRefreshController.PostLayoutAction = { [weak self, weak flight] in
@@ -403,6 +520,10 @@ extension WorkspaceSwipePresentation {
         }
         flight.phase = .waitingForPlacement
         refreshController.stopDisplayLinkIfIdle(for: monitor.displayId)
+    }
+
+    func isLandingWindow(_ id: Int) -> Bool {
+        flights.values.contains { $0.committing && $0.liveSlide?.ownsTranslation(for: id) == true }
     }
 
     private func keepFocusOffHiddenWorkspace(_ workspaceId: WorkspaceDescriptor.ID) {

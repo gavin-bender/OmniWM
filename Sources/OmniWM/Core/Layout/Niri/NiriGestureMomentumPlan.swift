@@ -45,7 +45,10 @@ struct NiriGestureMomentumPlan {
         self.sizeKeyPath = sizeKeyPath
     }
 
-    func landing(columns: [NiriContainer], activeIndex: Int, currentOffset: Double) -> Landing {
+    func landing(
+        columns: [NiriContainer], activeIndex: Int, currentOffset: Double,
+        touchscreenDisplacement: Double? = nil
+    ) -> Landing {
         let previousActiveColumn = activeIndex.clamped(to: 0 ... columns.count - 1)
         let previousActivePosition = positions[previousActiveColumn]
         let rawViewStart = previousActivePosition + currentOffset
@@ -60,7 +63,23 @@ struct NiriGestureMomentumPlan {
             viewEnd: viewEnd
         )
         let normalizedActiveColumn: Int
-        if currentContainerSpan > 0, currentColumnOverlap + 0.001 >= currentContainerSpan / 2.0 {
+        if let touchscreenDisplacement {
+            // Follow the content crossing the original focus point, even when both columns still fit.
+            let focusPoint = previousActivePosition + currentContainerSpan / 2 + touchscreenDisplacement
+            var nearest = previousActiveColumn
+            var bestDistance = Double.infinity
+            for (index, column) in columns.enumerated() {
+                let start = positions[index]
+                let end = start + Double(column[keyPath: sizeKeyPath])
+                guard end > viewStart, start < viewEnd, end > start else { continue }
+                let distance = max(start - focusPoint, focusPoint - end, 0)
+                if distance < bestDistance {
+                    bestDistance = distance
+                    nearest = index
+                }
+            }
+            normalizedActiveColumn = nearest
+        } else if currentContainerSpan > 0, currentColumnOverlap + 0.001 >= currentContainerSpan / 2.0 {
             normalizedActiveColumn = previousActiveColumn
         } else {
             normalizedActiveColumn = bestVisibleColumn(

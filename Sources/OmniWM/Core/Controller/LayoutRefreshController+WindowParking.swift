@@ -117,8 +117,14 @@ extension LayoutRefreshController {
             plans.map { (pid: $0.entry.pid, windowId: $0.entry.windowId) },
             reason: "revealed"
         )
+        // A preliminary move would add the parking distance to the presentation
+        // transform. For landing windows let the app's physical AX placement lead.
+        let earlyMoves = plans.filter { !workspaceSwipe.isLandingWindow($0.entry.windowId) }
+        for plan in plans where workspaceSwipe.isLandingWindow(plan.entry.windowId) {
+            requiresVisibleAXTokens.insert(plan.entry.token)
+        }
         controller.axManager.applyPositionsViaSkyLight(
-            plans.map { SkyLightPositionTarget(token: $0.entry.token, frame: $0.frame) },
+            earlyMoves.map { SkyLightPositionTarget(token: $0.entry.token, frame: $0.frame) },
             allowInactive: true
         )
         let visibleFrames = plans.compactMap { plan -> AXFrameApplicationTarget? in
@@ -174,9 +180,10 @@ extension LayoutRefreshController {
         }
 
         let waitsForFrameWrites = awaitedWindowIds.contains(where: controller.axManager.isAwaitingFrameWrite)
-        if !movablePlans.isEmpty, !waitsForFrameWrites {
+        let earlyMoves = movablePlans.filter { !workspaceSwipe.isLandingWindow($0.entry.windowId) }
+        if !earlyMoves.isEmpty, !waitsForFrameWrites {
             controller.axManager.applyPositionsViaSkyLight(
-                movablePlans.map { SkyLightPositionTarget(token: $0.entry.token, frame: $0.frame) },
+                earlyMoves.map { SkyLightPositionTarget(token: $0.entry.token, frame: $0.frame) },
                 allowInactive: true, tracingPark: true
             )
         }

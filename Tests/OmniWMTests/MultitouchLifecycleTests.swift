@@ -19,7 +19,7 @@ final class MultitouchLifecycleTests: XCTestCase {
         XCTAssertNil(criterion.primaryUsage)
         XCTAssertEqual(
             criterion.deviceUsages,
-            [.digitizers(.touchPad), .digitizers(.multiplePointDigitizer)]
+            [.digitizers(.touchPad), .digitizers(.touchScreen), .digitizers(.multiplePointDigitizer)]
         )
         XCTAssertNil(criterion.vendorID)
         XCTAssertNil(criterion.productID)

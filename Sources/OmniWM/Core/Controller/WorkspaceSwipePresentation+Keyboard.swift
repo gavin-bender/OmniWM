@@ -14,7 +14,7 @@ extension WorkspaceSwipePresentation {
         on monitorId: Monitor.ID,
         isNext explicitIsNext: Bool?
     ) -> Bool {
-        guard let controller, canAnimateSwitch(to: targetId, on: monitorId),
+        guard controller?.settings.captureFreeWorkspaceSwipes != true, let controller, canAnimateSwitch(to: targetId, on: monitorId),
               let monitor = controller.workspaceManager.monitor(byId: monitorId)
         else { return false }
         let preview = previewSurface(controller, for: monitorId)

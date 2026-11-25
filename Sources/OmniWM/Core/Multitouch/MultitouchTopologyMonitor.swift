@@ -37,6 +37,7 @@ final class MultitouchTopologyMonitor {
     static let topologyCriteria = [
         HIDDeviceManager.DeviceMatchingCriteria(deviceUsages: [
             .digitizers(.touchPad),
+            .digitizers(.touchScreen),
             .digitizers(.multiplePointDigitizer)
         ])
     ]

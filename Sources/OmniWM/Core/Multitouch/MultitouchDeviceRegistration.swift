@@ -66,6 +66,10 @@ final class MultitouchDeviceRegistration {
         slotsBySender[senderId] != nil
     }
 
+    func isTouchScreen(at slot: Int) -> Bool {
+        registrations.indices.contains(slot) && registrations[slot].device.isTouchScreen
+    }
+
     func senderId(at slot: Int) -> UInt64? {
         guard registrations.indices.contains(slot),
               let senderId = registrations[slot].device.senderId,
@@ -117,7 +121,7 @@ final class MultitouchDeviceRegistration {
         var candidates: [Registration] = []
         candidates.reserveCapacity(enumeration.devices.count)
         for (slot, device) in enumeration.devices.enumerated() {
-            let refcon = RegistrationToken(generation: generation, slot: slot).refcon
+            let refcon = RegistrationToken(generation: generation, slot: slot, isTouchScreen: device.isTouchScreen).refcon
             let registered = refcon.map { operations.register(device.ref, callback, $0) } ?? false
             lastRegister = registered ? .success : .rejected
             guard registered else {

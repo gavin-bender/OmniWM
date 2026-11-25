@@ -15,19 +15,23 @@ extension MultitouchGestureSource {
 
         let generation: UInt
         let slot: Int
+        let isTouchScreen: Bool
 
-        init(generation: UInt, slot: Int) {
+        init(generation: UInt, slot: Int, isTouchScreen: Bool = false) {
             self.generation = generation
             self.slot = slot
+            self.isTouchScreen = isTouchScreen
         }
 
         init(bitPattern: UInt) {
-            generation = bitPattern >> Self.slotBits
+            generation = bitPattern >> (Self.slotBits + 1)
+            isTouchScreen = bitPattern & UInt(Self.slotCapacity) != 0
             slot = Int(bitPattern & UInt(Self.slotCapacity - 1))
         }
 
         var refcon: UnsafeMutableRawPointer? {
-            UnsafeMutableRawPointer(bitPattern: generation << Self.slotBits | UInt(slot))
+            let surfaceBit = isTouchScreen ? UInt(Self.slotCapacity) : 0
+            return UnsafeMutableRawPointer(bitPattern: generation << (Self.slotBits + 1) | surfaceBit | UInt(slot))
         }
     }
 

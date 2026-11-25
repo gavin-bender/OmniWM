@@ -11,6 +11,7 @@ extension ViewportState {
         columns: [NiriContainer],
         geometry: NiriViewportGeometry,
         motion: MotionSnapshot,
+        touchscreenDisplacement: Double? = nil,
         snapToColumn: Bool = true,
         centerMode: CenterFocusedColumn = .never,
         alwaysCenterSingleColumn: Bool = false
@@ -30,6 +31,7 @@ extension ViewportState {
         guard snapToColumn else {
             endGestureWithMomentum(
                 projectedOffset: projectedOffset,
+                touchscreenDisplacement: touchscreenDisplacement,
                 columns: columns,
                 geometry: geometry,
                 totalContentSpan: totalContentSpan,
@@ -291,6 +293,7 @@ extension ViewportState {
 
     private mutating func endGestureWithMomentum(
         projectedOffset: Double,
+        touchscreenDisplacement: Double?,
         columns: [NiriContainer],
         geometry: NiriViewportGeometry,
         totalContentSpan: Double,
@@ -316,7 +319,8 @@ extension ViewportState {
         )?.landing(
             columns: columns,
             activeIndex: activeColumnIndex,
-            currentOffset: projectedOffset
+            currentOffset: projectedOffset,
+            touchscreenDisplacement: touchscreenDisplacement
         ) else {
             jumpOffset(to: CGFloat(projectedOffset))
             activatePrevColumnOnRemoval = nil

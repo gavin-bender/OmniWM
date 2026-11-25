@@ -16,12 +16,16 @@ final class LayoutDiffExecutor {
         self.refreshController = refreshController
     }
 
-    static func frameBackedLayoutTransientRestoreFrame(
+    static func plannedRestoreFrame(
         hiddenState: HiddenState,
+        mode: TrackedWindowMode,
         frameChange: CGRect?
     ) -> CGRect? {
-        guard hiddenState.offscreenSide != nil else { return nil }
-        return frameChange
+        switch hiddenState.reason {
+        case .layoutTransient: return frameChange
+        case .workspaceInactive: return mode == .tiling ? frameChange : nil
+        case .scratchpad: return nil
+        }
     }
 
     func execute(_ plan: WorkspaceLayoutPlan, controller: WMController) {

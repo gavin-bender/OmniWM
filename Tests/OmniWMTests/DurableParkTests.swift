@@ -896,6 +896,27 @@ final class DurableParkTests: XCTestCase {
     }
 
     func testLayoutTransientShowUsesCurrentLayoutFrameInsteadOfHistoricalRestore() throws {
+        try assertSingleRestoreWrite(reason: .layoutTransient(.right), plannedX: 2559, historicalX: 1304)
+    }
+
+    func testWorkspaceShowPlacesPartiallyVisibleTilesDirectlyOnEitherEdge() throws {
+        try assertSingleRestoreWrite(reason: .workspaceInactive, plannedX: -600, historicalX: 0)
+        try assertSingleRestoreWrite(reason: .workspaceInactive, plannedX: 2000, historicalX: 1304)
+    }
+
+    func testPlannedRestoreKeepsFloatingScratchpadAndMissingLayoutFallbacks() {
+        let frame = CGRect(x: -876, y: 16, width: 1768, height: 1096)
+        for reason in [HiddenReason.workspaceInactive, .scratchpad] {
+            let hidden = HiddenState(proportionalPosition: .zero, referenceMonitorId: nil, reason: reason)
+            XCTAssertNil(LayoutDiffExecutor.plannedRestoreFrame(hiddenState: hidden, mode: .floating, frameChange: frame))
+            XCTAssertNil(LayoutDiffExecutor.plannedRestoreFrame(hiddenState: hidden, mode: .tiling, frameChange: nil))
+            if reason == .scratchpad {
+                XCTAssertNil(LayoutDiffExecutor.plannedRestoreFrame(hiddenState: hidden, mode: .tiling, frameChange: frame))
+            }
+        }
+    }
+
+    private func assertSingleRestoreWrite(reason: HiddenReason, plannedX: CGFloat, historicalX: CGFloat) throws {
         let controller = Self.controller()
         let monitor = Self.monitor()
         controller.workspaceManager.applyMonitorConfigurationChange([monitor])
@@ -911,8 +932,8 @@ final class DurableParkTests: XCTestCase {
             windowId: windowId,
             to: workspaceId
         )
-        let historicalFrame = CGRect(x: 1304, y: 16, width: 1256, height: 1378)
-        let plannedFrame = CGRect(x: 2559, y: 16, width: 1256, height: 1378)
+        let historicalFrame = CGRect(x: historicalX, y: 16, width: 1256, height: 1378)
+        let plannedFrame = CGRect(x: plannedX, y: 16, width: 1256, height: 1378)
         let proportionalPosition = controller.layoutRefreshController.proportionalPosition(
             topLeft: historicalFrame.topLeftCorner,
             in: monitor.frame
@@ -920,34 +941,8 @@ final class DurableParkTests: XCTestCase {
         let hiddenState = HiddenState(
             proportionalPosition: proportionalPosition,
             referenceMonitorId: monitor.id,
-            reason: .layoutTransient(.right)
+            reason: reason
         )
-        XCTAssertEqual(
-            LayoutDiffExecutor.frameBackedLayoutTransientRestoreFrame(
-                hiddenState: hiddenState,
-                frameChange: plannedFrame
-            ),
-            plannedFrame
-        )
-        XCTAssertNotEqual(
-            LayoutDiffExecutor.frameBackedLayoutTransientRestoreFrame(
-                hiddenState: hiddenState,
-                frameChange: plannedFrame
-            ),
-            historicalFrame
-        )
-        for reason in [HiddenReason.workspaceInactive, .scratchpad] {
-            XCTAssertNil(
-                LayoutDiffExecutor.frameBackedLayoutTransientRestoreFrame(
-                    hiddenState: HiddenState(
-                        proportionalPosition: proportionalPosition,
-                        referenceMonitorId: monitor.id,
-                        reason: reason
-                    ),
-                    frameChange: plannedFrame
-                )
-            )
-        }
         controller.workspaceManager.setHiddenState(hiddenState, for: token)
         controller.layoutRefreshController.fastFrameProvider = { queriedToken, _ in
             queriedToken == token ? plannedFrame : nil

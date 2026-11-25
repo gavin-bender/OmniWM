@@ -47,13 +47,17 @@ extension MouseEventHandler {
         state.activeGestureMode = mode
         state.gesturePhase = .committed
         if case let .workspaceSwitch(axis) = mode {
+            let isTouchScreen = lockedContext.contactSession?.isTouchScreen == true
+            let gain = controller.workspaceManager.monitor(byId: lockedContext.monitorId).map {
+                liveWorkspaceGain(for: axis, monitor: $0, directTouch: isTouchScreen)
+            } ?? 1
             if controller.layoutRefreshController.workspaceSwipe.begin(
-                axis: axis, cumulative: axis == .horizontal ? metrics.cumulativeX : metrics.cumulativeY,
+                axis: axis, cumulative: gain * axis.workspaceMovement(x: metrics.cumulativeX, y: metrics.cumulativeY, isTouchScreen: isTouchScreen),
                 timestamp: timestamp,
                 recognitionMovement: SwipeEvent(
-                    delta: Double(axis == .horizontal ? metrics.rawDeltaX : metrics.rawDeltaY),
+                    delta: Double(gain * axis.workspaceMovement(x: metrics.rawDeltaX, y: metrics.rawDeltaY, isTouchScreen: isTouchScreen)),
                     timestamp: metrics.previousTimestamp
-                )
+                ), directTouch: isTouchScreen && controller.settings.captureFreeWorkspaceSwipes
             ) { state.workspaceSwipeFired = true }
         } else {
             controller.layoutRefreshController.workspaceSwipe.otherGestureRecognized(on: lockedContext.monitorId)
@@ -100,9 +104,14 @@ extension MouseEventHandler {
             let primaryDelta = lockedContext.columnScrollAxis == .horizontal
                 ? metrics.rawDeltaX
                 : metrics.rawDeltaY
-            var deltaUnits = primaryDelta * CGFloat(controller.settings.gestures.scrollSensitivity)
-            if controller.settings.gestures.invertDirection {
-                deltaUnits = -deltaUnits
+            let isTouchScreen = lockedContext.contactSession?.isTouchScreen == true
+            let deltaUnits: CGFloat
+            if isTouchScreen {
+                let screenSpan = orientation == .horizontal ? monitor.frame.width : monitor.frame.height
+                deltaUnits = -primaryDelta / GestureEventSnapshot.normalizedPositionToGestureUnits * screenSpan
+            } else {
+                let direction: CGFloat = controller.settings.gestures.invertDirection ? -1 : 1
+                deltaUnits = direction * primaryDelta * CGFloat(controller.settings.gestures.scrollSensitivity)
             }
             applyTrackpadViewportScrollDelta(
                 deltaUnits,
@@ -110,12 +119,14 @@ extension MouseEventHandler {
                 wsId: lockedContext.workspaceId,
                 monitor: monitor,
                 orientation: orientation,
+                usesPointDeltas: isTouchScreen,
                 timestamp: timestamp
             )
         case let .workspaceSwitch(axis):
             dispatchWorkspaceSwipeFrame(
                 axis: axis,
                 metrics: metrics,
+                isTouchScreen: lockedContext.contactSession?.isTouchScreen == true,
                 monitorId: lockedContext.monitorId,
                 timestamp: timestamp
             )
@@ -136,22 +147,26 @@ extension MouseEventHandler {
         }
     }
 
+    private func liveWorkspaceGain(for axis: WorkspaceSwipeAxis, monitor: Monitor, directTouch: Bool) -> CGFloat {
+        guard controller?.settings.captureFreeWorkspaceSwipes == true, directTouch else { return 1 }
+        let dimension = axis == .horizontal ? monitor.frame.width : monitor.frame.height
+        let travel = (axis == .horizontal ? monitor.visibleFrame.width : monitor.visibleFrame.height) * 1.1
+        return dimension * WorkspaceSwipeMotion.travelUnits / (GestureEventSnapshot.normalizedPositionToGestureUnits * max(1, travel))
+    }
+
     private func dispatchWorkspaceSwipeFrame(
         axis: WorkspaceSwipeAxis,
         metrics: GestureFrameMetrics,
+        isTouchScreen: Bool,
         monitorId: Monitor.ID,
         timestamp: TimeInterval
     ) {
         guard let controller else { return }
-        if controller.layoutRefreshController.workspaceSwipe.update(
-            cumulative: axis == .horizontal ? metrics.cumulativeX : metrics.cumulativeY,
-            timestamp: timestamp
-        ) { return }
-        handleWorkspaceSwipeFrame(
-            axis: axis,
-            cumulative: axis == .horizontal ? metrics.cumulativeX : metrics.cumulativeY,
-            monitorId: monitorId
-        )
+        let cumulative = axis.workspaceMovement(x: metrics.cumulativeX, y: metrics.cumulativeY, isTouchScreen: isTouchScreen)
+        let monitor = controller.workspaceManager.monitor(byId: monitorId)
+        let gain = monitor.map { liveWorkspaceGain(for: axis, monitor: $0, directTouch: isTouchScreen) } ?? 1
+        if controller.layoutRefreshController.workspaceSwipe.update(cumulative: cumulative * gain, timestamp: timestamp) { return }
+        handleWorkspaceSwipeFrame(axis: axis, cumulative: cumulative, monitorId: monitorId)
     }
 
     private func handleOverviewSwipe(
@@ -258,22 +273,19 @@ extension MouseEventHandler {
         {
             return
         }
+        let cumulative = axis.workspaceMovement(
+            x: state.gestureLastAverageX - state.gestureStartX,
+            y: state.gestureLastAverageY - state.gestureStartY,
+            isTouchScreen: state.lockedGestureContext?.contactSession?.isTouchScreen == true
+        ) * GestureEventSnapshot.normalizedPositionToGestureUnits
         defer {
             TrackpadScrollTrace.record(.workspaceFallback(
-                cumulative: Double((axis == .horizontal
-                        ? state.gestureLastAverageX - state.gestureStartX
-                        : state.gestureLastAverageY - state.gestureStartY)
-                    * GestureEventSnapshot.normalizedPositionToGestureUnits),
-                velocity: state.workspaceSwipeTracker.velocity(), allowFlick: allowFlick,
-                fired: state.workspaceSwipeFired
+                cumulative: Double(cumulative), velocity: state.workspaceSwipeTracker.velocity(),
+                allowFlick: allowFlick, fired: state.workspaceSwipeFired
             ))
         }
         guard allowFlick, !state.workspaceSwipeFired else { return }
         state.workspaceSwipeTracker.push(delta: 0, timestamp: timestamp)
-        let cumulative = (axis == .horizontal
-            ? state.gestureLastAverageX - state.gestureStartX
-            : state.gestureLastAverageY - state.gestureStartY)
-            * GestureEventSnapshot.normalizedPositionToGestureUnits
         guard let displacement = TrackpadGestureIntent.releaseFlickDisplacement(
                   cumulativeAxisUnits: cumulative,
                   velocity: state.workspaceSwipeTracker.velocity()
@@ -319,20 +331,22 @@ extension MouseEventHandler {
         let baseOffset = Double(controller.workspaceManager.niriViewportState(for: wsId).viewOffset)
         let settings = engine.effectiveSettings(in: wsId)
 
+        let isTouchScreen = lockedContext.contactSession?.isTouchScreen == true
         var selectedWindow: NiriWindow?
         controller.workspaceManager.withNiriViewportState(for: wsId) { endState in
             selectedWindow = engine.endProjectedGesture(
                 state: &endState,
                 context: NiriInteractionContext(
                     workspaceId: wsId,
-                    motion: controller.motionPolicy.snapshot(),
+                    motion: isTouchScreen ? .disabled : controller.motionPolicy.snapshot(),
                     workingFrame: geometry.workingFrame,
                     gaps: geometry.innerGap,
                     orientation: orientation
                 ),
                 currentOffset: baseOffset + sample.relativeOffset,
-                projectedOffset: baseOffset + sample.relativeProjectedOffset,
-                snapToColumn: controller.settings.gestures.trackpadScrollStyle == .snap,
+                projectedOffset: baseOffset + (isTouchScreen ? sample.relativeOffset : sample.relativeProjectedOffset),
+                touchscreenDisplacement: isTouchScreen ? sample.relativeOffset : nil,
+                snapToColumn: !isTouchScreen && controller.settings.gestures.trackpadScrollStyle == .snap,
                 centerMode: settings.centerFocusedColumn,
                 alwaysCenterSingleColumn: settings.alwaysCenterSingleColumn,
                 viewFrame: monitor.frame,

@@ -5,6 +5,8 @@
 #define OMNIWM_SYSTEM_GESTURES_H
 
 #include <stdbool.h>
+#include "OmniWMKiwiTouch.h"
+#include "OmniWMDockSlide.h"
 
 typedef enum OmniWMNativeGesturePreference {
     OmniWMNativeGestureTouchSpaces = 0,
