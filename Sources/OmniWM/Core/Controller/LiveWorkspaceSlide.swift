@@ -195,16 +195,18 @@ extension WorkspaceSwipePresentation {
         flight.liveSlide = LiveWorkspaceSlide(
             members: members, viewport: flight.preparation.frame, dockDisplay: flight.axis == .vertical ? monitor.frame : nil
         )
-        if flight.isKeyboard {
-            flight.motion.animateToDestination(startTime: mediaTimeProvider(), motion: controller.motionPolicy.snapshot())
-            flight.phase = .settling
-        }
         install(flight, after: nil, tracksGesture: tracksGesture)
-        if (flight.liveSlide?.followsDisplayLink == true || flight.motion.target != nil), !activateDisplayLink(for: flight) {
+        if (flight.isKeyboard || flight.liveSlide?.followsDisplayLink == true || flight.motion.target != nil),
+           !activateDisplayLink(for: flight) {
             cancel(flight, reason: "display-link-unavailable")
             return false
         }
         present(flight, at: mediaTimeProvider())
+        if flight.isKeyboard, isCurrent(flight) {
+            focusIncomingWindow(for: flight)
+            flight.motion.animateToDestination(startTime: mediaTimeProvider(), motion: controller.motionPolicy.snapshot())
+            flight.phase = .settling
+        }
         return isCurrent(flight)
     }
 

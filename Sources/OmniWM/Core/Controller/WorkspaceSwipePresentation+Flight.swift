@@ -38,6 +38,7 @@ extension WorkspaceSwipePresentation {
         }
 
         var liveSlide: LiveWorkspaceSlide?
+        var earlyFocus: (source: WindowToken, target: WindowToken, intent: IntentID?)?
         var landingTask: Task<Void, Never>?
         var settlement: AXFrameSettlement?
         var handoff: Handoff?

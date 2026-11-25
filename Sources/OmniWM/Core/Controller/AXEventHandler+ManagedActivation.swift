@@ -38,6 +38,11 @@ extension AXEventHandler {
         callbackGeneration: UInt64? = nil
     ) {
         guard let controller else { return }
+        // The slide owns the workspace change. Activating this workspace from
+        // the native notification would park its windows during the animation.
+        if !isWorkspaceActive, !appFullscreen, controller.layoutRefreshController.workspaceSwipe.isEarlyFocusTarget(entry.token) {
+            return
+        }
         let request = ManagedActivationRequest(
             source: source,
             confirmRequest: confirmRequest,

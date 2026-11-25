@@ -11,11 +11,13 @@ extension WMController {
         origin: ManagedFocusOrigin = .keyboardOrProgrammatic,
         raisesWindow: Bool = true,
         defersRetryRaise: Bool = false,
-        requiresWorkerRaise: Bool = false
+        requiresWorkerRaise: Bool = false,
+        acceptingNativeFocus: Bool = false
     ) -> ManagedFocusRequest? {
         let token = workspaceManager.entry(for: token)?.target.hostedMetadata == nil
             ? token : shellAppWindowManager.activeSheet(for: token) ?? token
         guard let entry = focusableEntry(for: token, origin: origin) else { return nil }
+        let alreadyFronted = acceptingNativeFocus && intentLedger.activeManagedRequest == nil && nativeWindowHasFocus(token)
         let handoff = prepareFocusHandoff(for: token)
         let requiresWorkerRaise = requiresWorkerRaise && !raisesWindow
         let request = publishManagedFocusRequest(
@@ -23,7 +25,7 @@ extension WMController {
             requiresWorkerRaise: requiresWorkerRaise
         )
 
-        let applied = applyManagedFocusRequest(
+        let applied = alreadyFronted || applyManagedFocusRequest(
             request,
             entry: entry,
             validatesPointer: false,

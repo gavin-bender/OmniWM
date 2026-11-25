@@ -48,6 +48,11 @@ extension WMController {
         }
     }
 
+    func nativeWindowHasFocus(_ token: WindowToken) -> Bool {
+        axEventHandler.frontmostApplicationPIDProvider() == token.pid
+            && axEventHandler.focusedWindowToken(for: token.pid, timeout: 0.025) == token
+    }
+
     func canFocusWindow(
         pid: pid_t,
         windowId: Int

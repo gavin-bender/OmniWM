@@ -187,8 +187,8 @@ extension AXEventHandler {
         return WindowToken(pid: pid, windowId: axRef.windowId)
     }
 
-    func focusedWindowToken(for pid: pid_t) -> WindowToken? {
-        guard let axRef = resolveFocusedAXWindowRef(pid: pid) else { return nil }
+    func focusedWindowToken(for pid: pid_t, timeout: Float? = nil) -> WindowToken? {
+        guard let axRef = resolveFocusedAXWindowRef(pid: pid, timeout: timeout) else { return nil }
         return canonicalObservedWindowToken(pid: pid, axRef: axRef)
     }
 
@@ -305,8 +305,9 @@ extension AXEventHandler {
         return true
     }
 
-    private func resolveFocusedWindowValue(pid: pid_t) -> CFTypeRef? {
+    private func resolveFocusedWindowValue(pid: pid_t, timeout: Float?) -> CFTypeRef? {
         let appElement = AXUIElementCreateApplication(pid)
+        if let timeout { AXUIElementSetMessagingTimeout(appElement, timeout) }
         var focusedWindow: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             appElement,
@@ -317,8 +318,8 @@ extension AXEventHandler {
         return focusedWindow
     }
 
-    private func resolveFocusedAXWindowRef(pid: pid_t) -> AXWindowRef? {
-        guard let windowElement = resolveFocusedWindowValue(pid: pid),
+    private func resolveFocusedAXWindowRef(pid: pid_t, timeout: Float?) -> AXWindowRef? {
+        guard let windowElement = resolveFocusedWindowValue(pid: pid, timeout: timeout),
               CFGetTypeID(windowElement) == AXUIElementGetTypeID()
         else {
             return nil

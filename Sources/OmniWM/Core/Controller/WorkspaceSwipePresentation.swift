@@ -236,6 +236,7 @@ final class WorkspaceSwipePresentation {
             else { cancel(flight, reason: "display-link-unavailable") }
             return true
         }
+        if flight.motion.target == 1 { focusIncomingWindow(for: flight) }
         prefetchChainTargets(after: flight)
         return true
     }
@@ -413,6 +414,7 @@ extension WorkspaceSwipePresentation {
         }
         flight.liveSlide = nil
         flights[monitorId] = nil
+        restoreFocusIfSlideAborted(flight)
         flight.handoff?.cancel()
         flight.settlement?.onChange = nil
         controller?.axManager.workspaceFrameSettlements.removeAll { $0 === flight.settlement }
@@ -512,6 +514,7 @@ extension WorkspaceSwipePresentation {
             focusOwed = false
             controller.workspaceNavigationHandler.commitWorkspaceTransitionFocusHandoff(
                 targetWorkspaceId: flight.destination.id, monitor: monitor, startScrollAnimation: false,
+                previouslyFronted: flight.earlyFocus?.target,
                 placementSubmitted: placementSubmitted, placementInvalidated: placementInvalidated
             )
         } else {
@@ -528,6 +531,40 @@ extension WorkspaceSwipePresentation {
 
     func isLandingWindow(_ id: Int) -> Bool {
         flights.values.contains { $0.committing && $0.liveSlide?.ownsTranslation(for: id) == true }
+    }
+
+    func focusIncomingWindow(for flight: Flight) {
+        guard let controller, isCurrent(flight), flight.serial == latestSerial,
+              flight.liveSlide?.followsDisplayLink == true, flight.earlyFocus == nil,
+              controller.intentLedger.activeManagedRequest == nil,
+              controller.workspaceManager.systemModalFocusToken == nil,
+              let source = controller.workspaceManager.nativeManagedFocusToken,
+              controller.workspaceManager.workspace(for: source) == flight.preparation.source.id,
+              let target = controller.workspaceManager.resolveWorkspaceFocusToken(in: flight.destination.id),
+              let item = flight.destination.items.first(where: { $0.token == target }),
+              let entry = controller.workspaceManager.entry(for: item.handle),
+              controller.nativeWindowHasFocus(source)
+        else { return }
+        flight.earlyFocus = (source, target, controller.intentLedger.newestFocusIntentId())
+        if !controller.performWindowFronting(entry) { flight.earlyFocus = nil }
+    }
+
+    func isEarlyFocusTarget(_ token: WindowToken) -> Bool {
+        flights.values.contains { flight in
+            guard !flight.committing, let early = flight.earlyFocus, early.target == token else { return false }
+            return controller?.intentLedger.newestFocusIntentId() == early.intent
+        }
+    }
+
+    private func restoreFocusIfSlideAborted(_ flight: Flight) {
+        guard let early = flight.earlyFocus, let controller, flight.serial == latestSerial,
+              controller.workspaceManager.activeWorkspace(on: flight.preparation.monitor.id)?.id == flight.preparation.source.id,
+              controller.workspaceManager.workspace(for: early.source) == flight.preparation.source.id,
+              controller.isManagedWindowDisplayable(early.source),
+              controller.intentLedger.newestFocusIntentId() == early.intent,
+              controller.nativeWindowHasFocus(early.target)
+        else { return }
+        controller.focusWindow(early.source)
     }
 
     // Incoming windows leave their parking strip before the active workspace changes.

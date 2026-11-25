@@ -473,6 +473,30 @@ final class WorkspaceSwipePresentationTests: XCTestCase {
         XCTAssertFalse(swipe.hasPresentation)
     }
 
+    func testEarlyNativeFocusObservationDoesNotSwitchWorkspacesUnderTheSlide() throws {
+        let (controller, swipe, monitor, source) = try fixture()
+        let manager = controller.workspaceManager
+        let preparation = try XCTUnwrap(swipe.makePreparation(monitorId: monitor.id))
+        let destination = try XCTUnwrap(preparation.next)
+        let flight = WorkspaceSwipePresentation.Flight(
+            preparation: preparation, destination: destination, axis: .vertical, cumulative: 0,
+            isNext: true, timestamp: 1, recognitionMovement: nil, captureFree: true
+        )
+        let pid: pid_t = 764_943
+        let target = manager.addWindow(AXWindowRef(element: AXUIElementCreateApplication(pid), windowId: 764_944),
+                                       pid: pid, windowId: 764_944, to: destination.id)
+        let entry = try XCTUnwrap(manager.entry(for: target))
+        swipe.install(flight, after: nil, tracksGesture: false)
+        flight.earlyFocus = (WindowToken(pid: pid, windowId: 764_942), target, controller.intentLedger.newestFocusIntentId())
+        controller.axEventHandler.handleManagedAppActivation(entry: entry, isWorkspaceActive: false, appFullscreen: false)
+        XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, source)
+        XCTAssertTrue(swipe.isEarlyFocusTarget(target))
+        swipe.cancel(flight, reason: "test")
+        XCTAssertFalse(swipe.isEarlyFocusTarget(target))
+        controller.axEventHandler.handleManagedAppActivation(entry: entry, isWorkspaceActive: false, appFullscreen: false)
+        XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, destination.id)
+    }
+
     func testKeyboardSwitchCommitsAtOnceAndSlidesUntilBothFinish() throws {
         var mediaTime = 0.0
         let (controller, swipe, monitor, source) = try fixture(mediaTimeProvider: { mediaTime })
