@@ -27,6 +27,7 @@ extension WorkspaceSwipePresentation {
         let destination: Workspace
         let axis: WorkspaceSwipeAxis
         let isNext: Bool
+        let captureFree: Bool
         let inputSign: Double
         let visualSign: CGFloat
         let motion: WorkspaceSwipeMotion
@@ -45,6 +46,8 @@ extension WorkspaceSwipePresentation {
         var chained = false
         var serial = 0
         var isKeyboard = false
+        var queuedShortcut: (target: WorkspaceDescriptor.ID, previous: WorkspaceDescriptor.ID, isNext: Bool?)?
+        var animatesAfterCommit: Bool { isKeyboard && !captureFree }
         var motionFinished = false
         var deferredFinishReason: String?
 
@@ -62,6 +65,7 @@ extension WorkspaceSwipePresentation {
             self.destination = destination
             self.axis = axis
             self.isNext = isNext
+            self.captureFree = captureFree
             inputSign = cumulative < 0 ? -1 : 1
             if directTouch {
                 visualSign = axis == .vertical ? inputSign : -inputSign

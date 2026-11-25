@@ -195,6 +195,10 @@ extension WorkspaceSwipePresentation {
         flight.liveSlide = LiveWorkspaceSlide(
             members: members, viewport: flight.preparation.frame, dockDisplay: flight.axis == .vertical ? monitor.frame : nil
         )
+        if flight.isKeyboard {
+            flight.motion.animateToDestination(startTime: mediaTimeProvider(), motion: controller.motionPolicy.snapshot())
+            flight.phase = .settling
+        }
         install(flight, after: nil, tracksGesture: tracksGesture)
         if (flight.liveSlide?.followsDisplayLink == true || flight.motion.target != nil), !activateDisplayLink(for: flight) {
             cancel(flight, reason: "display-link-unavailable")

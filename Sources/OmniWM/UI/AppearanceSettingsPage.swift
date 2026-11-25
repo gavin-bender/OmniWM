@@ -75,13 +75,13 @@ struct AppearanceSettingsPage: View {
 
                 Toggle("Capture-Free Workspace Swipes", isOn: $settings.captureFreeWorkspaceSwipes)
                     .id("Capture-Free Workspace Swipes")
-                SettingsCaption(localized: "Drag to move live windows. Quick or repeated swipes switch on release. With a compatible yabai-sb Dock service, vertical swipes and horizontal column drags use the compositor. Keyboard workspace switches are instant.")
+                SettingsCaption(localized: "Drag to move live windows. Quick or repeated swipes switch on release. With a compatible yabai-sb Dock service, vertical swipes and horizontal column drags use the compositor.")
 
                 Toggle("Slide Workspace Switches", isOn: $settings.slideWorkspaceSwitches)
                     .id("Slide Workspace Switches")
-                    .disabled(!controller.motionPolicy.animationsEnabled || settings.captureFreeWorkspaceSwipes)
+                    .disabled(!controller.motionPolicy.animationsEnabled)
                 SettingsCaption(
-                    localized: "Workspace switches from shortcuts, the command palette and omniwmctl slide like a trackpad swipe. Needs Screen Recording."
+                    localized: "Animate workspace shortcuts using the same transition as a swipe. Enable Capture-Free Workspace Swipes to move live windows without Screen Recording."
                 )
 
                 SettingsSliderRow(

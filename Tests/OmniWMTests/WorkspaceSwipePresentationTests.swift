@@ -657,7 +657,51 @@ final class WorkspaceSwipePresentationTests: XCTestCase {
         _ = swipe.prepare(monitorId: monitor.id, timestamp: 1)
         XCTAssertNotNil(swipe.preparation)
         XCTAssertTrue(swipe.previews.isEmpty)
-        XCTAssertFalse(swipe.animateSwitch(to: next.id, on: monitor.id, isNext: true))
+        XCTAssertTrue(swipe.animateSwitch(to: next.id, on: monitor.id, isNext: true))
+        XCTAssertNotNil(swipe.flights[monitor.id]?.liveSlide)
+        XCTAssertTrue(swipe.previews.isEmpty)
+        swipe.cancelAll(reason: "test-complete")
+    }
+
+    func testCaptureFreeShortcutsSlideAndQueueTheLatestDestinationUntilPlacement() throws {
+        var now = 1.0
+        let (controller, swipe, monitor, first) = try fixture(mediaTimeProvider: { now })
+        controller.settings.captureFreeWorkspaceSwipes = true
+        controller.settings.slideWorkspaceSwitches = true
+        let manager = controller.workspaceManager
+        let next = try XCTUnwrap(manager.workspaceId(named: "2"))
+        let third = try XCTUnwrap(manager.workspaceId(for: "3", createIfMissing: true))
+        manager.assignWorkspaceToMonitor(third, monitorId: monitor.id)
+        let navigation = controller.workspaceNavigationHandler
+        let duration = slideDuration(controller)
+
+        navigation.switchWorkspace(index: 1)
+        let outbound = try XCTUnwrap(swipe.flights[monitor.id])
+        XCTAssertTrue(outbound.isKeyboard)
+        XCTAssertNil(swipe.flight)
+        now += duration / 2
+        swipe.tick(displayId: monitor.displayId, timestamp: now)
+        XCTAssertGreaterThan(outbound.progress, 0)
+        XCTAssertLessThan(outbound.progress, 1)
+        XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, first)
+
+        navigation.switchWorkspaceRelative(isNext: true)
+        XCTAssertEqual(swipe.pendingSwitchTarget(on: monitor.id), third)
+        navigation.switchWorkspace(index: 0)
+        XCTAssertEqual(swipe.pendingSwitchTarget(on: monitor.id), first)
+        XCTAssertTrue(swipe.flights[monitor.id] === outbound)
+        now += duration
+        swipe.tick(displayId: monitor.displayId, timestamp: now)
+        XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, next)
+        swipe.didSubmitPlacement(outbound)
+        let returning = try XCTUnwrap(swipe.flights[monitor.id])
+        XCTAssertEqual(returning.preparation.source.id, next)
+        XCTAssertEqual(returning.destination.id, first)
+        now += duration * 2
+        swipe.tick(displayId: monitor.displayId, timestamp: now)
+        swipe.didSubmitPlacement(returning)
+        XCTAssertEqual(manager.activeWorkspace(on: monitor.id)?.id, first)
+        XCTAssertFalse(swipe.hasPresentation)
         XCTAssertTrue(swipe.previews.isEmpty)
     }
 

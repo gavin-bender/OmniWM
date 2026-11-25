@@ -119,10 +119,19 @@ extension WorkspaceSwipePresentation {
         guard isCurrent(flight) else { return }
         let failed = flight.settlement?.failed == true
         let reason = failed ? "placement-failed" : confirmed ? "completed" : "handoff-unconfirmed"
-        if flight.isKeyboard, !flight.motionFinished {
+        if flight.animatesAfterCommit, !flight.motionFinished {
             flight.deferredFinishReason = reason
             return
         }
         cancel(flight, reason: reason)
+        if let queued = flight.queuedShortcut, queued.target != flight.destination.id, let controller,
+           controller.workspaceManager.activeWorkspace(on: flight.preparation.monitor.id)?.id == flight.destination.id,
+           let target = controller.workspaceManager.descriptor(for: queued.target),
+           controller.workspaceManager.monitor(for: target.id)?.id == flight.preparation.monitor.id {
+            controller.workspaceNavigationHandler.activateWorkspaceInOrder(
+                target, from: flight.destination.id, on: flight.preparation.monitor.id, isNext: queued.isNext,
+                animated: controller.settings.slideWorkspaceSwitchesUntracked
+            )
+        }
     }
 }

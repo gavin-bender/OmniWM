@@ -8,9 +8,8 @@ import OmniWMIPC
 extension WorkspaceNavigationHandler {
     func switchWorkspace(index: Int, autoBackAndForth: Bool = false) {
         guard let rawWorkspaceID = WorkspaceIDPolicy.rawID(from: max(0, index) + 1) else { return }
-        if autoBackAndForth, let current = controller?.activeWorkspace(), current.name == rawWorkspaceID,
-           canSkipSwitch(toVisibleWorkspace: current.id)
-        {
+        if autoBackAndForth, let controller, let target = controller.workspaceManager.workspaceId(named: rawWorkspaceID),
+           isSelectedForShortcut(target, current: controller.activeWorkspace()?.id, on: interactionMonitorId(for: controller)) {
             workspaceBackAndForth()
             return
         }
@@ -24,6 +23,16 @@ extension WorkspaceNavigationHandler {
         return nativeFocusWorkspaceId == nil || nativeFocusWorkspaceId == workspaceId
     }
 
+    private func isSelectedForShortcut(
+        _ target: WorkspaceDescriptor.ID, current: WorkspaceDescriptor.ID?, on monitor: Monitor.ID?
+    ) -> Bool {
+        if let controller, controller.settings.slideWorkspaceSwitchesUntracked, let monitor,
+           let pending = controller.layoutRefreshController.workspaceSwipe.pendingLiveShortcut(on: monitor) {
+            return pending.target == target
+        }
+        return current == target && canSkipSwitch(toVisibleWorkspace: target)
+    }
+
     @discardableResult
     func switchWorkspace(
         rawWorkspaceID: String,
@@ -31,15 +40,11 @@ extension WorkspaceNavigationHandler {
     ) -> Bool {
         guard let controller else { return false }
         let currentWorkspace = controller.activeWorkspace()
-        if let currentWorkspace,
-           currentWorkspace.name == rawWorkspaceID,
-           canSkipSwitch(toVisibleWorkspace: currentWorkspace.id)
-        {
-            return false
-        }
-
+        let monitorId = interactionMonitorId(for: controller)
+        if let target = controller.workspaceManager.workspaceId(named: rawWorkspaceID),
+           isSelectedForShortcut(target, current: currentWorkspace?.id, on: monitorId) { return false }
         if controller.settings.slideWorkspaceSwitchesUntracked, affectedWorkspaces.isEmpty,
-           let monitorId = interactionMonitorId(for: controller),
+           let monitorId,
            let currentWorkspace,
            controller.workspaceManager.monitor(for: currentWorkspace.id)?.id == monitorId,
            let targetWorkspaceId = controller.workspaceManager.workspaceId(named: rawWorkspaceID),
@@ -180,7 +185,7 @@ extension WorkspaceNavigationHandler {
               let targetWorkspace = workspaceSlot(slot),
               let currentWorkspace = controller.workspaceManager.activeWorkspaceOrFirst(on: monitorId)
         else { return false }
-        if currentWorkspace.id == targetWorkspace.id, canSkipSwitch(toVisibleWorkspace: targetWorkspace.id) {
+        if isSelectedForShortcut(targetWorkspace.id, current: currentWorkspace.id, on: monitorId) {
             if autoBackAndForth {
                 workspaceBackAndForth()
             }
@@ -193,7 +198,7 @@ extension WorkspaceNavigationHandler {
     }
 
     @discardableResult
-    private func activateWorkspaceInOrder(
+    func activateWorkspaceInOrder(
         _ targetWorkspace: WorkspaceDescriptor,
         from currentWorkspaceId: WorkspaceDescriptor.ID,
         on monitorId: Monitor.ID,
@@ -275,7 +280,10 @@ extension WorkspaceNavigationHandler {
         guard let currentMonitorId = interactionMonitorId(for: controller)
         else { return }
 
-        guard let prevWorkspace = controller.workspaceManager.previousWorkspace(on: currentMonitorId) else {
+        let pending = controller.settings.slideWorkspaceSwitchesUntracked
+            ? controller.layoutRefreshController.workspaceSwipe.pendingLiveShortcut(on: currentMonitorId) : nil
+        guard let prevWorkspace = pending.flatMap({ controller.workspaceManager.descriptor(for: $0.previous) })
+            ?? controller.workspaceManager.previousWorkspace(on: currentMonitorId) else {
             return
         }
 

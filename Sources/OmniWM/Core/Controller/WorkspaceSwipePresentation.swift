@@ -60,7 +60,7 @@ final class WorkspaceSwipePresentation {
 
     private func hasDisplayWork(_ flight: Flight, _ displayId: CGDirectDisplayID) -> Bool {
         flight.preparation.monitor.displayId == displayId
-            && (!flight.committing || flight.isKeyboard && !flight.motionFinished)
+            && (!flight.committing || flight.animatesAfterCommit && !flight.motionFinished)
             && (flight.motion.target != nil || flight.carry != nil || flight.liveSlide?.followsDisplayLink == true)
     }
 
@@ -124,6 +124,7 @@ final class WorkspaceSwipePresentation {
             return refuseOrFallBack(from: predecessor, axis: axis, cumulative: cumulative)
         }
         if controller.settings.captureFreeWorkspaceSwipes {
+            predecessor?.queuedShortcut = nil
             let flight = Flight(preparation: preparation, destination: destination, axis: axis, cumulative: cumulative,
                                 isNext: isNext, timestamp: timestamp, recognitionMovement: recognitionMovement,
                                 directTouch: directTouch, captureFree: true)
@@ -375,7 +376,7 @@ extension WorkspaceSwipePresentation {
         flight.serial = latestSerial
         flights[monitor.id] = flight
         if tracksGesture { gestureFlight = flight }
-        trace(predecessor == nil ? "began" : "chained")
+        trace(predecessor == nil ? "began" : "chained", for: flight)
     }
 
     func cancel(reason: String) {
@@ -498,7 +499,7 @@ extension WorkspaceSwipePresentation {
             slide.adoptPlacedWindows(in: controller, destination: flight.destination)
             flight.liveSlide = nil
         }
-        trace(takesFocus ? "committed" : "committed-background", progress: flight.progress)
+        trace(takesFocus ? "committed" : "committed-background", progress: flight.progress, for: flight)
         let placementSubmitted: LayoutRefreshController.PostLayoutAction = { [weak self, weak flight] in
             guard let self, let flight else { return }
             didSubmitPlacement(flight)

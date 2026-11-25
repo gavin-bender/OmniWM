@@ -5,8 +5,14 @@ import AppKit
 
 extension WorkspaceSwipePresentation {
     func pendingSwitchTarget(on monitorId: Monitor.ID) -> WorkspaceDescriptor.ID? {
-        guard let flight = flights[monitorId], !flight.committing, flight.motion.target == 1 else { return nil }
-        return flight.destination.id
+        guard let flight = flights[monitorId], flight.motion.target == 1 else { return nil }
+        return flight.queuedShortcut?.target ?? (flight.committing ? nil : flight.destination.id)
+    }
+
+    func pendingLiveShortcut(on monitorId: Monitor.ID) -> (target: WorkspaceDescriptor.ID, previous: WorkspaceDescriptor.ID)? {
+        guard let flight = flights[monitorId], flight.captureFree, flight.motion.target == 1 else { return nil }
+        return (flight.queuedShortcut?.target ?? flight.destination.id,
+                flight.queuedShortcut?.previous ?? flight.preparation.source.id)
     }
 
     func animateSwitch(
@@ -14,13 +20,22 @@ extension WorkspaceSwipePresentation {
         on monitorId: Monitor.ID,
         isNext explicitIsNext: Bool?
     ) -> Bool {
-        guard controller?.settings.captureFreeWorkspaceSwipes != true, let controller, canAnimateSwitch(to: targetId, on: monitorId),
+        guard let controller, canAnimateSwitch(to: targetId, on: monitorId),
               let monitor = controller.workspaceManager.monitor(byId: monitorId)
         else { return false }
-        let preview = previewSurface(controller, for: monitorId)
-        guard preview.hasCaptureAccess() else { return false }
         let existing = flights[monitorId]
         let predecessor = existing.flatMap { $0.committing || $0.motion.target == 1 ? $0 : nil }
+        if let predecessor, let pending = pendingLiveShortcut(on: monitorId) {
+            // Each set of real windows has one owner through placement. Keep the
+            // latest shortcut and start its slide once that ownership is released.
+            if targetId != pending.target {
+                predecessor.queuedShortcut = (targetId, pending.target, explicitIsNext)
+            }
+            return true
+        }
+        let live = controller.settings.captureFreeWorkspaceSwipes
+        let preview = live ? nil : previewSurface(controller, for: monitorId)
+        if let preview, !preview.hasCaptureAccess() { return false }
         if let existing, predecessor == nil { cancel(existing, reason: "keyboard") }
 
         guard let sourceId = predecessor?.destination.id
@@ -36,7 +51,7 @@ extension WorkspaceSwipePresentation {
             monitor: monitor, frame: monitor.visibleFrame, source: source,
             previous: isNext ? nil : destination, next: isNext ? destination : nil
         )
-        if let predecessor,
+        if let preview, let predecessor,
            let handled = handOff(from: predecessor, into: preparation, toward: destination, using: preview)
         {
             return handled
@@ -47,13 +62,16 @@ extension WorkspaceSwipePresentation {
             axis: controller.workspaceManager.descriptor(for: sourceId)
                 .flatMap { controller.mouseEventHandler.workspaceSwipeAxis(for: $0, on: monitor) }
                 ?? controller.settings.gestures.workspaceSwipeAxis,
-            cumulative: 1, isNext: isNext, timestamp: now, recognitionMovement: nil
+            cumulative: 0, isNext: isNext, timestamp: now, recognitionMovement: nil, captureFree: live
         )
         flight.isKeyboard = true
         guard participantsAreCurrent(flight) else {
-            if predecessor != nil { preview.stop() }
+            if predecessor != nil { preview?.stop() }
             trace("keyboard-fallback-participants")
             return false
+        }
+        guard let preview else {
+            return beginLiveSlide(flight, tracksGesture: false)
         }
         guard predecessor != nil || showKeyboardPreview(preview, for: flight) else {
             trace("keyboard-fallback-preview-unavailable")

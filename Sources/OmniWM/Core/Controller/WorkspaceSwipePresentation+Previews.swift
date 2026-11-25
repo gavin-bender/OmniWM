@@ -77,8 +77,9 @@ extension WorkspaceSwipePresentation {
         )
     }
 
-    func trace(_ action: String, progress: Double = 0) {
+    func trace(_ action: String, progress: Double = 0, for presentedFlight: Flight? = nil) {
         guard TrackpadScrollTrace.shared.isActive else { return }
+        let flight = presentedFlight ?? self.flight
         TrackpadScrollTrace.record(.workspacePresentation(
             renderer: flight?.liveSlide?.followsDisplayLink == true ? "dock" :
                 (controller?.settings.captureFreeWorkspaceSwipes == true ? "accessibility" : "preview"),

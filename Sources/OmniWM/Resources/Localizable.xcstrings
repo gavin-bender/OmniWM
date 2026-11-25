@@ -1,7 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Drag to move live windows. Quick or repeated swipes switch on release. With a compatible yabai-sb Dock service, vertical swipes and horizontal column drags use the compositor. Keyboard workspace switches are instant." : {
+    "Drag to move live windows. Quick or repeated swipes switch on release. With a compatible yabai-sb Dock service, vertical swipes and horizontal column drags use the compositor." : {
 
     },
     "Capture-Free Workspace Swipes" : {
@@ -58,7 +58,7 @@
     "Slide Workspace Switches" : {
 
     },
-    "Workspace switches from shortcuts, the command palette and omniwmctl slide like a trackpad swipe. Needs Screen Recording." : {
+    "Animate workspace shortcuts using the same transition as a swipe. Enable Capture-Free Workspace Swipes to move live windows without Screen Recording." : {
 
     },
     "Choose how the palette searches windows, apps, commands, and files." : {
