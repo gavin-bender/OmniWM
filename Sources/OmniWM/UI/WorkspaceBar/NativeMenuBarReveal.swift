@@ -57,9 +57,9 @@ extension WorkspaceBarManager {
         let distanceFromTop = monitor.frame.maxY - pointer.y
         let atRevealEdge = (0 ... 1).contains(distanceFromTop)
         let insideMenuStrip = (0 ... WorkspaceBarGeometry.menuBarHeight(for: monitor)).contains(distanceFromTop)
-        // Yield the edge before macOS finishes revealing its menu, then keep the strip available for clicks.
-        let keepHidden = revealedMenuMonitor == monitor.id && insideMenuStrip
-        nativeMenuBarVisibilityChanged(on: nativeVisible || atRevealEdge || keepHidden ? monitor.id : nil)
+        // A click inside the bar can transiently report native visibility. Only the screen edge starts a handoff.
+        let keepHidden = revealedMenuMonitor == monitor.id && (insideMenuStrip || nativeVisible)
+        nativeMenuBarVisibilityChanged(on: atRevealEdge || keepHidden ? monitor.id : nil)
     }
 
     func nativeMenuBarVisibilityChanged(on monitor: Monitor.ID?) {

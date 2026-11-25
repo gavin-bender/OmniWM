@@ -33,11 +33,10 @@ final class WorkspaceBarIslandPanel {
             : [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         let level = resolved.windowLevel.nsWindowLevel
         let overlapsMenu = WorkspaceBarGeometry.effectivePosition(for: monitor, resolved: resolved) == .overlappingMenuBar
-        panel.level = if resolved.yieldToNativeMenuBar, overlapsMenu {
-            NSWindow.Level(rawValue: min(level.rawValue, NSWindow.Level.mainMenu.rawValue - 1))
-        } else if fillsMenuBar {
+        panel.level = if fillsMenuBar {
             NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-        } else if resolved.fullWidth, overlapsMenu {
+        } else if overlapsMenu, resolved.fullWidth || resolved.yieldToNativeMenuBar {
+            // The visible bar receives clicks. An edge reveal orders it out entirely.
             NSWindow.Level(rawValue: max(level.rawValue, NSWindow.Level.statusBar.rawValue + 1))
         } else {
             level
