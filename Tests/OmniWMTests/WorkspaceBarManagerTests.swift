@@ -151,11 +151,23 @@ final class WorkspaceBarManagerTests: XCTestCase {
         manager.apply([bar])
         let panel = try XCTUnwrap(manager.barsByMonitor[monitor.id]?.primary.panel)
 
-        manager.nativeMenuBarVisibilityChanged(on: monitor.id)
+        XCTAssertLessThan(panel.level.rawValue, NSWindow.Level.mainMenu.rawValue)
+        func sample(_ belowTop: CGFloat, nativeVisible: Bool = false) {
+            manager.updateNativeMenuBarVisibility(
+                pointer: CGPoint(x: monitor.frame.midX, y: monitor.frame.maxY - belowTop),
+                monitors: [monitor], nativeVisible: nativeVisible
+            )
+        }
+        sample(0)
         XCTAssertFalse(panel.isVisible)
         manager.apply([bar])
+        sample(10)
         XCTAssertFalse(panel.isVisible)
-        manager.nativeMenuBarVisibilityChanged(on: nil)
+        sample(100, nativeVisible: true)
+        XCTAssertFalse(panel.isVisible)
+        sample(100)
+        XCTAssertTrue(panel.isVisible)
+        sample(10)
         XCTAssertTrue(panel.isVisible)
         try await manager.shellConfiguration.set(false, key: "yieldToNativeMenuBar")
         manager.apply([bar])

@@ -6,19 +6,11 @@ import AppKit
 final class NativeMenuBarReveal {
     private var timer: Timer?
 
-    func start(_ changed: @escaping @MainActor (Bool) -> Void) {
+    func start(_ sample: @escaping @MainActor () -> Void) {
         guard timer == nil else { return }
-        var previous = NSMenu.menuBarVisible()
-        changed(previous)
-        // Hover reveals change AppKit's visibility without posting Carbon menu bar events.
+        sample()
         let timer = Timer(timeInterval: 0.1, repeats: true) { _ in
-            MainActor.assumeIsolated {
-                let visible = NSMenu.menuBarVisible()
-                if visible != previous {
-                    previous = visible
-                    changed(visible)
-                }
-            }
+            MainActor.assumeIsolated { sample() }
         }
         self.timer = timer
         RunLoop.main.add(timer, forMode: .common)
@@ -46,12 +38,28 @@ extension WorkspaceBarManager {
             revealedMenuMonitor = nil
             return
         }
-        nativeMenuBarReveal.start { [weak self] shown in
-            guard let self else { return }
-            let pointer = NSEvent.mouseLocation
-            let monitor = pointer.monitorApproximation(in: controller?.workspaceManager.monitors ?? [])
-            nativeMenuBarVisibilityChanged(on: shown ? monitor?.id : nil)
+        nativeMenuBarReveal.start { [weak self] in
+            guard let self, let controller else { return }
+            updateNativeMenuBarVisibility(
+                pointer: controller.currentMouseLocation(),
+                monitors: controller.workspaceManager.monitors,
+                nativeVisible: NSMenu.menuBarVisible()
+            )
         }
+    }
+
+    func updateNativeMenuBarVisibility(pointer: CGPoint, monitors: [Monitor], nativeVisible: Bool) {
+        guard let monitor = pointer.monitorApproximation(in: monitors),
+              monitorsYieldingToMenuBar.contains(monitor.id) else {
+            nativeMenuBarVisibilityChanged(on: nil)
+            return
+        }
+        let distanceFromTop = monitor.frame.maxY - pointer.y
+        let atRevealEdge = (0 ... 1).contains(distanceFromTop)
+        let insideMenuStrip = (0 ... WorkspaceBarGeometry.menuBarHeight(for: monitor)).contains(distanceFromTop)
+        // Yield the edge before macOS finishes revealing its menu, then keep the strip available for clicks.
+        let keepHidden = revealedMenuMonitor == monitor.id && insideMenuStrip
+        nativeMenuBarVisibilityChanged(on: nativeVisible || atRevealEdge || keepHidden ? monitor.id : nil)
     }
 
     func nativeMenuBarVisibilityChanged(on monitor: Monitor.ID?) {
