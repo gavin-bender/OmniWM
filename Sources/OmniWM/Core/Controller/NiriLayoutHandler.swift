@@ -108,6 +108,13 @@ enum StructuralMutationOutcome: Equatable {
         case window(WindowHandle)
     }
 
+    struct DockScrollSession {
+        let id: AnimationDriver.GestureSessionID
+        let available: Bool
+        var usingAccessibility: Set<WindowToken> = []
+    }
+
+    var dockScrollSession: DockScrollSession?
     var scrollAnimationByDisplay: [CGDirectDisplayID: WorkspaceDescriptor.ID] = [:]
 
     init(controller: WMController?) {

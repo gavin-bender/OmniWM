@@ -406,7 +406,10 @@ extension WorkspaceSwipePresentation {
         guard flights[monitorId] === flight else { return }
         flight.landingTask?.cancel()
         flight.landingTask = nil
-        if let slide = flight.liveSlide { finishLiveSlide(slide) }
+        if let slide = flight.liveSlide {
+            let committed = flight.committing && controller?.workspaceManager.activeWorkspace(on: monitorId)?.id == flight.destination.id
+            finishLiveSlide(slide, keepingIncomingPlacement: committed)
+        }
         flight.liveSlide = nil
         flights[monitorId] = nil
         flight.handoff?.cancel()
@@ -480,7 +483,7 @@ extension WorkspaceSwipePresentation {
             flight.landingTask = Task { [weak self, weak flight] in
                 await landing.value
                 guard !Task.isCancelled, let self, let flight, isCurrent(flight), flight.liveSlide === slide else { return }
-                finishLiveSlide(slide)
+                finishLiveSlide(slide, keepingIncomingPlacement: true)
                 flight.liveSlide = nil
             }
         }

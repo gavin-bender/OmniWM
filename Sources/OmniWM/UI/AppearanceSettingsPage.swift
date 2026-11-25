@@ -75,7 +75,7 @@ struct AppearanceSettingsPage: View {
 
                 Toggle("Capture-Free Workspace Swipes", isOn: $settings.captureFreeWorkspaceSwipes)
                     .id("Capture-Free Workspace Swipes")
-                SettingsCaption(localized: "Drag to move live windows. Quick or repeated swipes switch on release. Vertical drags use the compatible yabai-sb Dock service when available. Keyboard workspace switches are instant.")
+                SettingsCaption(localized: "Drag to move live windows. Quick or repeated swipes switch on release. With a compatible yabai-sb Dock service, vertical swipes and horizontal column drags use the compositor. Keyboard workspace switches are instant.")
 
                 Toggle("Slide Workspace Switches", isOn: $settings.slideWorkspaceSwitches)
                     .id("Slide Workspace Switches")

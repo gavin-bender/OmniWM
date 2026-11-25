@@ -106,8 +106,7 @@ final class LayoutDiffExecutor {
         let preparation = prepareFrameOnlyUpdates(diff.frameChanges, controller: controller)
         Self.applyFrameUpdates(
             preparation.frameUpdates,
-            isAnimationTick: plan.isAnimationTick,
-            isInteractiveResize: plan.isInteractiveResize,
+            plan: plan,
             controller: controller
         )
         refreshController.applyWorkspaceMonitorRelocationFrameUpdates(
@@ -120,19 +119,19 @@ final class LayoutDiffExecutor {
 
     static func applyFrameUpdates(
         _ frameUpdates: [AXFrameApplicationTarget],
-        isAnimationTick: Bool,
-        isInteractiveResize: Bool = false,
+        plan: WorkspaceLayoutPlan,
         controller: WMController
     ) {
         guard !frameUpdates.isEmpty else { return }
         let axManager = controller.axManager
-        if !isAnimationTick {
+        let frameUpdates = controller.niriLayoutHandler.applyDockScrollPositions(frameUpdates, plan: plan)
+        if !plan.isAnimationTick {
             for update in frameUpdates where axManager.skyLightLivePosition(for: update.windowId) != nil {
                 axManager.forceApplyNextFrame(for: update.windowId)
             }
         }
-        guard isInteractiveResize else {
-            axManager.applyFramesParallel(frameUpdates, verify: !isAnimationTick)
+        guard plan.isInteractiveResize else {
+            axManager.applyFramesParallel(frameUpdates, verify: !plan.isAnimationTick)
             return
         }
         let moves = frameUpdates.filter { $0.components == .position }

@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import OmniWMSystemGestures
 import QuartzCore
 
 extension NiriLayoutHandler {
@@ -31,6 +32,43 @@ extension NiriLayoutHandler {
             return
         }
         controller.layoutRefreshController.startScrollAnimation(for: workspaceId)
+    }
+
+    func applyDockScrollPositions(
+        _ updates: [AXFrameApplicationTarget], plan: WorkspaceLayoutPlan
+    ) -> [AXFrameApplicationTarget] {
+        guard plan.isAnimationTick, plan.isActiveWorkspace, plan.monitor.orientation == .horizontal, !plan.isInteractiveResize,
+              let controller, controller.settings.captureFreeWorkspaceSwipes,
+              controller.workspaceManager.animationDriver.trackpadGestureActive(in: plan.workspaceId),
+              let session = controller.workspaceManager.animationDriver.gestureSessionID(in: plan.workspaceId),
+              scrollAnimationByDisplay[plan.monitor.displayId] == plan.workspaceId else { return updates }
+        if dockScrollSession?.id != session {
+            dockScrollSession = DockScrollSession(id: session, available: omniwm_dock_slide_available())
+        }
+        guard dockScrollSession?.available == true else { return updates }
+        let ax = controller.axManager
+        return updates.filter { update in
+            let token = WindowToken(pid: update.pid, windowId: update.windowId)
+            guard update.components == .position,
+                  let entry = controller.workspaceManager.entry(for: token), entry.workspaceId == plan.workspaceId,
+                  entry.mode == .tiling, entry.layoutReason == .standard, entry.hiddenState == nil,
+                  let window = entry.axRef, sameAXWindowIdentity(window, update.expectedWindow),
+                  !ax.isAwaitingFrameWrite(update.windowId),
+                  !ax.hasInFlightFrameWrite(for: token),
+                  dockScrollSession?.usingAccessibility.contains(token) == false,
+                  !ax.positionsAllowedToWrite([.init(token: token, frame: update.frame)], allowInactive: false).isEmpty
+            else { return true }
+            // Even an unconfirmed submission may have moved the real window. The
+            // first subsequent AX write must run when the gesture returns to its start.
+            ax.forceApplyNextFrame(for: update.windowId)
+            let target = ScreenCoordinateSpace.toWindowServer(rect: update.frame)
+            guard omniwm_dock_scroll_window(UInt32(update.windowId), target) else {
+                dockScrollSession?.usingAccessibility.insert(token)
+                return true
+            }
+            ax.recordSkyLightMove(windowId: update.windowId, origin: update.frame.origin)
+            return false
+        }
     }
 
     func registerScrollAnimation(_ workspaceId: WorkspaceDescriptor.ID, on displayId: CGDirectDisplayID) -> Bool {

@@ -13,6 +13,7 @@ typedef struct {
 } OmniWMDockSlideMove;
 
 bool omniwm_dock_slide_available(void);
+bool omniwm_dock_scroll_window(uint32_t window, CGRect target);
 bool omniwm_dock_slide_geometry(uint32_t window, CGRect *_Nonnull base, CGAffineTransform *_Nonnull transform);
 bool omniwm_dock_slide_at_position(CGAffineTransform transform, CGPoint position);
 bool omniwm_dock_slide_submit(const OmniWMDockSlideMove *_Nonnull moves, size_t count);

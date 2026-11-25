@@ -94,6 +94,34 @@ static int queueRequest(const void *request, size_t size) {
     return fd;
 }
 
+// A column scroll only changes X. Leave scaling effects, resizes and vertical
+// placement to their owners. The Dock may move the window even when the separate
+// Space reassociation fails, so verify the drawing origin for every submission.
+bool omniwm_dock_scroll_window(uint32_t window, CGRect target) {
+    CGRect base;
+    CGAffineTransform matrix;
+    if (CGRectIsEmpty(target) || !isfinite(target.origin.y) || !isfinite(target.size.width)
+        || !isfinite(target.size.height) || !omniwm_dock_slide_geometry(window, &base, &matrix)
+        || !omniwm_dock_slide_at_position(matrix, base.origin)
+        || fabs(base.origin.y - target.origin.y) > 0.5
+        || fabs(base.size.width - target.size.width) > 0.5 || fabs(base.size.height - target.size.height) > 0.5
+        || !isfinite(target.origin.x) || target.origin.x < INT32_MIN || target.origin.x > INT32_MAX
+        || !isfinite(base.origin.y) || base.origin.y < INT32_MIN || base.origin.y > INT32_MAX) return false;
+    if (omniwm_dock_slide_at_position(matrix, target.origin)) return true;
+
+    struct __attribute__((packed)) { uint16_t length; uint8_t opcode; uint32_t wid; int32_t x, y; }
+        request = {13, 6, window, (int32_t)lround(target.origin.x), (int32_t)lround(base.origin.y)};
+    int fd = queueRequest(&request, sizeof(request));
+    if (fd < 0) return false;
+    struct pollfd p = {.fd = fd, .events = POLLIN};
+    uint8_t ack;
+    bool dispatched = poll(&p, 1, 2) > 0 && read(fd, &ack, 1) == 1 && (ack == 0 || ack == 3);
+    close(fd);
+    if (!dispatched) return false;
+    return omniwm_dock_slide_geometry(window, &base, &matrix)
+        && omniwm_dock_slide_at_position(matrix, target.origin);
+}
+
 static int queueMove(OmniWMDockSlideMove move) {
     // Choose scale 1 in do_window_scale, then translate to the requested top-left.
     struct __attribute__((packed)) {

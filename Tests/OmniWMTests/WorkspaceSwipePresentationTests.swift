@@ -297,6 +297,33 @@ final class WorkspaceSwipePresentationTests: XCTestCase {
         XCTAssertEqual(controller.workspaceManager.activeWorkspace(on: monitor.id)?.id, destination)
     }
 
+    func testIncomingWindowChangesColumnsOnlyWhileOutsideTheEntireDesktop() throws {
+        let screen = CGRect(x: 0, y: 0, width: 1800, height: 1182)
+        let screens = [screen, screen.offsetBy(dx: 0, dy: -900)]
+        let desktop = screens[0].union(screens[1])
+        let parked = CGRect(x: 1799, y: 64, width: 876, height: 1102)
+        for direction: CGFloat in [-1, 1] {
+            let origin = try XCTUnwrap(LiveWorkspaceSlide.stagingOrigin(
+                for: parked, targetX: -609, incomingDY: direction, screens: screens
+            ))
+            // The physical move can change both the base and the drawing X by the
+            // parking distance. Neither intermediate position may intersect a display.
+            for x in [origin.x, CGFloat(-609)] {
+                XCTAssertFalse(desktop.intersects(CGRect(origin: .init(x: x, y: origin.y), size: parked.size)))
+            }
+            XCTAssertEqual(origin.x, parked.minX)
+        }
+        XCTAssertNil(LiveWorkspaceSlide.stagingOrigin(
+            for: parked.offsetBy(dx: -200, dy: 0), targetX: 16, incomingDY: 1, screens: screens
+        ))
+        XCTAssertNil(LiveWorkspaceSlide.stagingOrigin(
+            for: parked, targetX: 0, incomingDY: 1, screens: screens + [screen.offsetBy(dx: screen.width, dy: 0)]
+        ))
+        XCTAssertNil(LiveWorkspaceSlide.stagingOrigin(
+            for: parked, targetX: parked.minX, incomingDY: 1, screens: screens
+        ))
+    }
+
     func testRapidLiveSwipesPreserveOrderAndReverseAfterPlacement() throws {
         var now = 1.0
         let (controller, swipe, monitor, source) = try fixture(mediaTimeProvider: { now })

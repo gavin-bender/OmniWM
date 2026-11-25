@@ -350,8 +350,7 @@ extension LayoutVisibilityApplication {
     private func applyFrames() {
         LayoutDiffExecutor.applyFrameUpdates(
             frameUpdates,
-            isAnimationTick: plan.isAnimationTick,
-            isInteractiveResize: plan.isInteractiveResize,
+            plan: plan,
             controller: controller
         )
         refreshController.applyWorkspaceMonitorRelocationFrameUpdates(

@@ -16,6 +16,8 @@ final class LiveWorkspaceSlide {
         let incoming: Bool
     }
 
+    typealias PositionWriter = @MainActor (Member, CGRect, Bool) -> Bool
+
     let members: [Member]
     private let viewport: CGRect
     private var dockSlide: DockWorkspaceSlide?
@@ -23,10 +25,17 @@ final class LiveWorkspaceSlide {
     private var minimumHeights: [Int: CGFloat] = [:]
     private var lastFrames: [Int: CGRect] = [:]
 
-    init(members: [Member], viewport: CGRect, dockDisplay: CGRect? = nil) {
+    init(
+        members: [Member], viewport: CGRect, dockDisplay: CGRect? = nil,
+        writeDockPosition: @escaping PositionWriter = { member, frame, verify in
+            AXWindowService.setFrame(member.window, frame: frame, components: .position, verify: verify).failureReason == nil
+        }
+    ) {
         self.members = members
         self.viewport = viewport
-        if let dockDisplay { dockSlide = DockWorkspaceSlide(members: members, display: dockDisplay) }
+        if let dockDisplay {
+            dockSlide = DockWorkspaceSlide(members: members, display: dockDisplay, writePosition: writeDockPosition)
+        }
     }
 
     /// AX constrains title bars to the top of the screen. Only the part below that edge
@@ -48,6 +57,17 @@ final class LiveWorkspaceSlide {
         }
         return CGRect(x: frame.minX.rounded(), y: frame.minY.rounded(),
                       width: frame.width.rounded(), height: max(1, frame.height.rounded()))
+    }
+
+    static func stagingOrigin(
+        for base: CGRect, targetX: CGFloat, incomingDY: CGFloat, screens: [CGRect]
+    ) -> CGPoint? {
+        guard incomingDY != 0, !screens.isEmpty,
+              screens.allSatisfy({ $0.intersection(base).width <= FrameTolerance.frameWrite }),
+              abs(base.minX - targetX) > FrameTolerance.frameWrite else { return nil }
+        let desktop = screens.reduce(CGRect.null) { $0.union($1) }
+        let y = incomingDY > 0 ? desktop.minY - base.height - 1 : desktop.maxY + 1
+        return CGPoint(x: base.minX, y: y)
     }
 
     func update(source: CGVector, destination: CGVector) -> Bool {
@@ -126,8 +146,10 @@ final class LiveWorkspaceSlide {
         dockSlide?.owns(UInt32(id)) == true
     }
 
-    func restore() -> [Member] {
-        let unresolved = dockSlide?.restore() ?? []
+    func restore(keepingIncomingPlacement: Bool, retryPark: (Member) -> Void) -> [Member] {
+        var unparked: [Member] = []
+        let unresolved = dockSlide?.restore(keepingIncomingPlacement: keepingIncomingPlacement, unparked: &unparked) ?? []
+        for member in unparked { retryPark(member) }
         dockSlide = nil
         for member in members {
             guard let last = lastFrames[member.window.windowId] else { continue }
@@ -187,9 +209,18 @@ extension WorkspaceSwipePresentation {
     }
 
     @discardableResult
-    func finishLiveSlide(_ slide: LiveWorkspaceSlide) -> Bool {
+    func finishLiveSlide(_ slide: LiveWorkspaceSlide, keepingIncomingPlacement: Bool = false) -> Bool {
         let translated = slide.translatedMembers
-        let unresolved = slide.restore()
+        let unresolved = slide.restore(keepingIncomingPlacement: keepingIncomingPlacement) { member in
+            guard let controller, let refreshController,
+                  let entry = controller.workspaceManager.entry(for: member.token), let window = entry.axRef,
+                  sameAXWindowIdentity(window, member.window), let monitor = controller.workspaceManager.monitor(for: entry.workspaceId),
+                  controller.workspaceManager.activeWorkspaceOrFirst(on: monitor.id)?.id != entry.workspaceId
+            else { return }
+            controller.axManager.markParkPending(for: entry.windowId, pid: entry.pid)
+            refreshController.hideWindow(entry, monitor: monitor, side: refreshController.preferredHideSide(for: monitor),
+                                         reason: .workspaceInactive)
+        }
         guard !translated.isEmpty else { return unresolved.isEmpty }
         for member in translated { retiredSlideWindows[member.token] = member.window }
         for member in unresolved { pendingSlideResets[member.token] = member.window }
@@ -250,8 +281,14 @@ private final class DockWorkspaceSlide {
     private var landing: DockSlideLanding?
 
     private let display: CGRect
+    private var needsStaging = true
+    private var stagedIncoming: [LiveWorkspaceSlide.Member] = []
+    private var pendingStages: [UInt32: (targetX: CGFloat, deadline: ContinuousClock.Instant)] = [:]
 
-    init?(members: [LiveWorkspaceSlide.Member], display: CGRect) {
+    private let writePosition: LiveWorkspaceSlide.PositionWriter
+
+    init?(members: [LiveWorkspaceSlide.Member], display: CGRect, writePosition: @escaping LiveWorkspaceSlide.PositionWriter) {
+        self.writePosition = writePosition
         self.display = ScreenCoordinateSpace.toWindowServer(rect: display)
         guard !members.isEmpty, omniwm_dock_slide_available() else { return nil }
         for member in members {
@@ -268,13 +305,39 @@ private final class DockWorkspaceSlide {
     }
 
     func update(_ members: [LiveWorkspaceSlide.Member], source: CGVector, destination: CGVector) -> Bool {
+        if needsStaging {
+            needsStaging = false
+            guard stageIncoming(members, incomingDY: destination.dy - source.dy) else { return false }
+        }
         var moves: [OmniWMDockSlideMove] = []
         for member in members {
             let id = UInt32(member.window.windowId)
-            guard let base = bases[id] else { return false }
+            guard var base = bases[id] else { return false }
             var currentBase = CGRect.zero
             var currentMatrix = CGAffineTransform.identity
-            guard omniwm_dock_slide_geometry(id, &currentBase, &currentMatrix), currentBase == base else { return false }
+            guard omniwm_dock_slide_geometry(id, &currentBase, &currentMatrix) else { return false }
+            if let stage = pendingStages[id] {
+                // AX can acknowledge its move a frame before WindowServer changes the
+                // base. Keep this surface offscreen while the other windows start moving.
+                let clampedX = max(display.minX, min(stage.targetX, display.maxX - base.width))
+                if currentBase != base, currentBase.size == base.size,
+                   min(abs(currentBase.minX - stage.targetX), abs(currentBase.minX - clampedX)) <= FrameTolerance.frameWrite,
+                   let previous = positions[id] {
+                    let shifted = CGPoint(x: previous.x + currentBase.minX - base.minX,
+                                          y: previous.y + currentBase.minY - base.minY)
+                    if [shifted, previous, currentBase.origin].contains(where: { omniwm_dock_slide_at_position(currentMatrix, $0) }) {
+                        base = currentBase
+                        bases[id] = currentBase
+                        positions[id] = CGPoint(x: -currentMatrix.tx, y: -currentMatrix.ty)
+                        pendingStages[id] = nil
+                    }
+                }
+                if pendingStages[id] != nil {
+                    guard ContinuousClock.now < stage.deadline else { return false }
+                    continue
+                }
+            }
+            guard currentBase == base else { return false }
             let atBase = omniwm_dock_slide_at_position(currentMatrix, base.origin)
             guard atBase || positions[id].map({ omniwm_dock_slide_at_position(currentMatrix, $0) }) == true else {
                 return false
@@ -301,6 +364,35 @@ private final class DockWorkspaceSlide {
         return true
     }
 
+    /// AX moves the physical window underneath its compositor translation. A horizontal
+    /// move from the parking strip at landing would briefly apply that distance twice.
+    /// Move the physical window once, while its entire surface is beyond the desktop.
+    private func stageIncoming(_ members: [LiveWorkspaceSlide.Member], incomingDY: CGFloat) -> Bool {
+        guard incomingDY != 0 else { return true }
+        let screens = NSScreen.screens.map { ScreenCoordinateSpace.toWindowServer(rect: $0.frame) }
+        for member in members where member.incoming {
+            let id = UInt32(member.window.windowId)
+            let target = member.original.offsetBy(dx: member.layout.minX - member.original.minX, dy: 0)
+            let targetX = ScreenCoordinateSpace.toWindowServer(rect: target).minX
+            guard let base = bases[id], let hidden = LiveWorkspaceSlide.stagingOrigin(
+                for: base, targetX: targetX, incomingDY: incomingDY, screens: screens
+            ) else { continue }
+            var move = OmniWMDockSlideMove(window: id, baseWidth: Float(base.width), baseHeight: Float(base.height),
+                                           target: hidden, resetFirst: false, apply: true)
+            ownedWindows.insert(id)
+            guard omniwm_dock_slide_submit(&move, 1) else { return false }
+            var observed = CGRect.zero
+            var matrix = CGAffineTransform.identity
+            guard omniwm_dock_slide_geometry(id, &observed, &matrix), observed == base,
+                  omniwm_dock_slide_at_position(matrix, hidden) else { return false }
+            stagedIncoming.append(member)
+            positions[id] = hidden
+            guard writePosition(member, target, false) else { return false }
+            pendingStages[id] = (targetX, ContinuousClock.now + WorkspaceSwipePresentation.handoffTimeout)
+        }
+        return true
+    }
+
     func owns(_ window: UInt32) -> Bool { ownedWindows.contains(window) }
 
     func beginLanding(_ members: [LiveWorkspaceSlide.Member]) -> Task<Void, Never> {
@@ -317,9 +409,15 @@ private final class DockWorkspaceSlide {
         return Task.detached(priority: .high) { await landing.run(targets, display: display) }
     }
 
-    func restore() -> Set<UInt32> {
+    func restore(keepingIncomingPlacement: Bool, unparked: inout [LiveWorkspaceSlide.Member]) -> Set<UInt32> {
         landing?.stop()
         landing = nil
+        if !keepingIncomingPlacement {
+            for member in stagedIncoming {
+                if !writePosition(member, member.original, true) { unparked.append(member) }
+            }
+        }
+        stagedIncoming.removeAll()
         let unresolved = ownedWindows.filter { !omniwm_dock_slide_restore_translation($0) }
         ownedWindows.removeAll()
         return unresolved
