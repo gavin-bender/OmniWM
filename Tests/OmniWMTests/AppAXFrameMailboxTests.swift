@@ -339,6 +339,22 @@ final class AppAXFrameMailboxTests: XCTestCase {
         XCTAssertEqual(cache.state(for: pid), true)
     }
 
+    func testOverlappingSwipeAndLayoutWritesShareOneEnhancedUIOverride() throws {
+        let cache = LockedEnhancedUIStateMap()
+        let pid = pid_t(410_204)
+        cache.store(true, for: pid)
+        let first = try XCTUnwrap(cache.enabledOverride(for: pid))
+        var toggles: [Bool] = []
+        XCTAssertFalse(first.acquire { false })
+        XCTAssertTrue(first.acquire { toggles.append(false); return true })
+        cache.store(true, for: pid)
+        let second = try XCTUnwrap(cache.enabledOverride(for: pid))
+        XCTAssertTrue(second.acquire { XCTFail("already disabled"); return false })
+        first.release { XCTFail("another writer is active") }
+        second.release { toggles.append(true) }
+        XCTAssertEqual(toggles, [false, true])
+    }
+
     func testEnhancedUICacheInvalidationRestoresProbe() {
         let generations = LockedWindowGenerationMap()
         let request = request(id: 1, windowId: 410_103, generations: generations)

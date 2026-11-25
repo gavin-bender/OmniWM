@@ -15,42 +15,43 @@ struct AppAXEnhancedUIWriteScope {
     private let key: CFString
     private let tracing: Bool
     let wasEnabled: Bool
+    private let activeOverride: LockedEnhancedUIStateMap.Override?
     private let probeNs: UInt64
     private let disableNs: UInt64
 
     init(axApp: AXUIElement, pid: pid_t, tracing: Bool) {
         self.axApp = axApp
         self.tracing = tracing
-        key = "AXEnhancedUserInterface" as CFString
-        var enabled = false
+        let key = "AXEnhancedUserInterface" as CFString
+        self.key = key
+        let cache = LockedEnhancedUIStateMap.shared
         var value: CFTypeRef?
         let probeStartNs = tracing ? DispatchTime.now().uptimeNanoseconds : 0
-        if let cached = LockedEnhancedUIStateMap.shared.state(for: pid) {
-            enabled = cached
-        } else {
+        if cache.state(for: pid) == nil {
             AppAXContextRuntimeMetrics.shared.noteEnhancedUICalls(1)
             if AXUIElementCopyAttributeValue(axApp, key, &value) == .success,
                let boolValue = value as? Bool
             {
-                enabled = boolValue
-                LockedEnhancedUIStateMap.shared.store(boolValue, for: pid)
+                cache.store(boolValue, for: pid)
             }
         }
         let probeEndNs = tracing ? DispatchTime.now().uptimeNanoseconds : 0
-        wasEnabled = enabled
-        let disableStartNs = tracing && enabled ? DispatchTime.now().uptimeNanoseconds : 0
-        if enabled {
+        let gate = cache.enabledOverride(for: pid)
+        wasEnabled = gate != nil
+        let disableStartNs = tracing && wasEnabled ? DispatchTime.now().uptimeNanoseconds : 0
+        let acquired = gate?.acquire {
             AppAXContextRuntimeMetrics.shared.noteEnhancedUICalls(1)
-            AXUIElementSetAttributeValue(axApp, key, kCFBooleanFalse)
+            return AXUIElementSetAttributeValue(axApp, key, kCFBooleanFalse) == .success
         }
-        let disableEndNs = tracing && enabled ? DispatchTime.now().uptimeNanoseconds : 0
+        activeOverride = acquired == true ? gate : nil
+        let disableEndNs = tracing && wasEnabled ? DispatchTime.now().uptimeNanoseconds : 0
         probeNs = AppAXFrameWriteTrace.elapsedNanoseconds(from: probeStartNs, to: probeEndNs)
         disableNs = AppAXFrameWriteTrace.elapsedNanoseconds(from: disableStartNs, to: disableEndNs)
     }
 
     func restore() -> AppAXEnhancedUITiming {
         let restoreStartNs = tracing && wasEnabled ? DispatchTime.now().uptimeNanoseconds : 0
-        if wasEnabled {
+        activeOverride?.release {
             AppAXContextRuntimeMetrics.shared.noteEnhancedUICalls(1)
             AXUIElementSetAttributeValue(axApp, key, kCFBooleanTrue)
         }

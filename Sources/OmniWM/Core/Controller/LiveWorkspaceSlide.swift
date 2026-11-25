@@ -28,7 +28,12 @@ final class LiveWorkspaceSlide {
     init(
         members: [Member], viewport: CGRect, dockDisplay: CGRect? = nil,
         writeDockPosition: @escaping PositionWriter = { member, frame, verify in
-            AXWindowService.setFrame(member.window, frame: frame, components: .position, verify: verify).failureReason == nil
+            // AppKit can animate AX position writes for enhanced-UI apps. The
+            // physical move from the parking strip must finish before the reveal.
+            let pid = member.token.pid
+            let scope = AppAXEnhancedUIWriteScope(axApp: AXUIElementCreateApplication(pid), pid: pid, tracing: false)
+            defer { _ = scope.restore() }
+            return AXWindowService.setFrame(member.window, frame: frame, components: .position, verify: verify).failureReason == nil
         }
     ) {
         self.members = members

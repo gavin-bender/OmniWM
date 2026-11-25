@@ -5,6 +5,7 @@ import AppKit
 import ApplicationServices
 import Dispatch
 import Foundation
+import Synchronization
 
 final class LockedWindowIdSet: @unchecked Sendable {
     private let lock = NSLock()
@@ -117,8 +118,29 @@ final class LockedWindowGenerationMap: @unchecked Sendable {
 }
 
 final class LockedEnhancedUIStateMap: @unchecked Sendable {
+    // Staging a swipe and writing an ordinary frame can overlap in the same app.
+    // The last writer restores the app-wide flag, regardless of completion order.
+    final class Override: Sendable {
+        private let writers = Mutex(0)
+
+        func acquire(disable: () -> Bool) -> Bool {
+            writers.withLock { count in
+                guard count > 0 || disable() else { return false }
+                count += 1
+                return true
+            }
+        }
+
+        func release(restore: () -> Void) {
+            writers.withLock { count in
+                count -= 1
+                if count == 0 { restore() }
+            }
+        }
+    }
+
     private enum State {
-        case enabled
+        case enabled(Override)
         case disabled(expiresAt: ContinuousClock.Instant)
     }
 
@@ -151,21 +173,17 @@ final class LockedEnhancedUIStateMap: @unchecked Sendable {
     }
 
     func store(_ enabled: Bool, for pid: pid_t) {
-        if enabled {
-            lock.lock()
-            statesByPid[pid] = .enabled
-            lock.unlock()
-            return
+        lock.withLock {
+            if case .enabled? = statesByPid[pid] { return }
+            statesByPid[pid] = enabled ? .enabled(Override()) : .disabled(expiresAt: clock().advanced(by: Self.disabledStateLifetime))
         }
+    }
 
-        let expiresAt = clock().advanced(by: Self.disabledStateLifetime)
-        lock.lock()
-        if case .enabled? = statesByPid[pid] {
-            lock.unlock()
-            return
+    func enabledOverride(for pid: pid_t) -> Override? {
+        lock.withLock {
+            guard case let .enabled(override)? = statesByPid[pid] else { return nil }
+            return override
         }
-        statesByPid[pid] = .disabled(expiresAt: expiresAt)
-        lock.unlock()
     }
 
     func invalidate(_ pid: pid_t) {
