@@ -46,7 +46,7 @@ local function gauge(ctx, glyph)
             opacity = if heat then 1 else 0, animate = { duration = 0.5, curve = "easeOut" } },
         ui.path{ w = size, h = size, viewBox = viewBox,
             d = "M48 23 Q50 19 52 23 L56 48 A6.3 6.3 0 1 1 44 48 Z", fill = ink,
-            rotate = -135 + 270 * step / 20, animate = { duration = 0.3, curve = "easeOut" } } }
+            rotate = -135 + 270 * step / 20, animate = { duration = 2, curve = "easeOut" } } }
 end
 
 function render(ctx: Context)

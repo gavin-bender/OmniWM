@@ -159,6 +159,30 @@ extension ShellLayerScene {
                 width: layer.bounds.height,
                 height: layer.bounds.width
             ))
+        // These layers have a top-left anchor. Interpolating two complete transforms
+        // blends their translation independently of the rotation and moves the pivot.
+        if layer is CAShapeLayer, case let .ease(seconds) = animation.motion,
+           animation.curve?.keyframes == nil, paint.scale == 1, (scales[slot] ?? 1) == 1,
+           finalSize == layer.bounds.size, finalSize.width == finalSize.height,
+           (rotations[slot] ?? 0) != paint.rotation, abs(paint.rotation) < .pi,
+           abs(rotations[slot] ?? 0) < .pi
+        {
+            let angle = atan2(from.transform.m12, from.transform.m11)
+            let sweep = paint.rotation - angle
+            let steps = max(1, Int(ceil(abs(sweep) / (.pi / 90))))
+            let frames = CAKeyframeAnimation(keyPath: "transform")
+            frames.values = (0 ... steps).map { index in
+                let rotation = angle + sweep * CGFloat(index) / CGFloat(steps)
+                return NSValue(caTransform3D: Self.scaleTransform(
+                    scale: 1, rotation: rotation, size: finalSize, quarter: false
+                ))
+            }
+            frames.duration = seconds / animation.speed
+            frames.timingFunction = animation.make("transform").timingFunction
+            frames.beginTime = layer.convertTime(now(), from: nil)
+            layer.add(frames, forKey: "transform")
+            return
+        }
         add(
             animation,
             to: layer,

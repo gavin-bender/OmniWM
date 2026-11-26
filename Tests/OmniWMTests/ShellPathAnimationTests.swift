@@ -45,6 +45,27 @@ final class ShellPathAnimationTests: XCTestCase {
         }
     }
 
+    func testNeedleBaseStaysCenteredDuringFullRangeSweeps() throws {
+        for direction in [-1, 1] {
+            let widget = try ShellRenderedWidget(name: "pivot", source: """
+            function render(ctx)
+                return ui.path{ w = 100, h = 100, viewBox = {0, 0, 100, 100},
+                    d = "M48 23 Q50 19 52 23 L56 48 A6.3 6.3 0 1 1 44 48 Z", fill = "#FFFFFFFF",
+                    rotate = (ctx.data.seconds == 1 and 135 or -135) * \(direction),
+                    animate = { duration = \(duration), curve = "linear" } }
+            end
+            """, scale: 1)
+            let frames = try animatedFrames(widget, side: side, duration: duration)
+            for (fraction, pixels) in frames.animated {
+                XCTAssertEqual(alpha(pixels, x: center, y: center), .max, "Pivot at \(fraction)")
+                if fraction == 0.5 {
+                    // This offscreen layer tree uses an upward y-axis.
+                    XCTAssertEqual(alpha(pixels, x: center, y: center + 17), .max, "Needle crosses noon")
+                }
+            }
+        }
+    }
+
     func testStatsGaugeMorphsAlongTheRing() throws {
         let widget = try statsGauge(side: gaugeSide)
         let frames = try animatedFrames(widget, side: gaugeSide, duration: try statsGaugeDuration())
