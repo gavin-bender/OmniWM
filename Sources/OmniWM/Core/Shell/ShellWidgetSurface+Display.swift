@@ -26,6 +26,19 @@ extension ShellWidgetSurface {
         return true
     }
 
+    func refreshWindowIcon(_ id: String, text: ShellTextStore) {
+        iconImages = iconImages.filter { $0.key.source != .window || $0.key.reference != id }
+        var commands: [ShellLayerCommand] = []
+        for handle in layout.core.elements(matching: { $0.iconSource == .window && text.string($0.iconRef) == id }) {
+            let content = layout.core.content(of: handle)
+            commands.append(textCommand(handle, text: text, content: TextPatch(
+                id: content.text, style: content.style, color: content.color,
+                maxWidth: content.maxWidth, lines: content.lines
+            )))
+        }
+        if !commands.isEmpty { scene.submit(commands, animated: false) }
+    }
+
     func backingScaleCommands(text: ShellTextStore) -> [ShellLayerCommand] {
         var commands: [ShellLayerCommand] = []
         for handle in layout.core.elements(matching: { _ in true }) {

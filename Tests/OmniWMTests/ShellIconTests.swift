@@ -125,6 +125,36 @@ final class ShellIconTests: XCTestCase {
         XCTAssertEqual(lookups.requested, [knownProcess, missingProcess])
     }
 
+    func testWindowIconRefreshReplacesCachedImageWithoutChangingWindowID() throws {
+        @MainActor final class BrowserIcon {
+            var image: NSImage?
+        }
+        let browser = BrowserIcon()
+        browser.image = NSImage(size: NSSize(width: 8, height: 8), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
+        let resources = ShellResources(motion: MotionPolicy(animationsEnabled: false), windowIcon: { _ in browser.image })
+        let bytes = try output(#"function render(ctx) return ui.icon{ window = "browser", w = 8, h = 8 } end"#)
+        let text = ShellTextStore()
+        text.ingest(wire: bytes)
+        let surface = ShellWidgetSurface(scale: 2, resources: resources, directories: [])
+        self.surface = surface
+        XCTAssertTrue(surface.apply(bytes, text: text))
+        ShellLayerScene.engineQueue.sync {}
+        let layer = try XCTUnwrap(surface.view.layer?.sublayers?.first?.sublayers?.first)
+        XCTAssertNotNil(layer.contents)
+
+        browser.image = nil
+        surface.refreshWindowIcon("another-window", text: text)
+        ShellLayerScene.engineQueue.sync {}
+        XCTAssertNotNil(layer.contents)
+        surface.refreshWindowIcon("browser", text: text)
+        ShellLayerScene.engineQueue.sync {}
+        XCTAssertNil(layer.contents)
+    }
+
     func testMissingIconsDrawTheirPlaceholderAndTintsRecolorIcons() throws {
         let missing = try drawnImage("ui.icon{ window = \"ow_missing\", placeholder = \"app.dashed\" }")
         XCTAssertNotNil(missing)

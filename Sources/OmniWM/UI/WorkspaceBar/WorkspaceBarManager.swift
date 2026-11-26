@@ -55,6 +55,9 @@ final class WorkspaceBarManager {
     var shellEdgeHover = ShellEdgeHover()
     var shellVars: [String: String] = [:]
     var shellItemIcons: [String: NSImage] = [:]
+    lazy var browserFavicons = WorkspaceBarBrowserFavicons { [weak self] id in
+        self?.shellHost?.windowIconDidChange(id)
+    }
     var shellCompactedScratchpads: [Monitor.ID: Set<Int>] = [:]
     var lastBars: [DesiredBarSurface] = []
     var lastIslands: [DesiredIslandSurface] = []

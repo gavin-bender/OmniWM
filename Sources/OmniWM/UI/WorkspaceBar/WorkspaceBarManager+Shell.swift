@@ -87,6 +87,7 @@ extension WorkspaceBarManager {
         controller?.settings.hiddenBar.profileOverride = nil
         let host = shellHost
         shellHost = nil
+        browserFavicons.synchronize([:])
         lastBars = []
         lastIslands = []
         notificationBadges.onLabelsChange = nil
@@ -200,7 +201,7 @@ extension WorkspaceBarManager {
             appVolumes: controller?.appVolumeMixer,
             media: controller?.mediaController,
             calendar: controller?.calendarController,
-            windowIcon: { [weak self] id in self?.shellItemIcons[id] },
+            windowIcon: { [weak self] id in self?.browserFavicons.images[id] ?? self?.shellItemIcons[id] },
             iconOverride: { [weak self] bundleId in
                 self?.controller?.workspaceBarIconResolver.image(for: bundleId)
             },
@@ -281,12 +282,23 @@ extension WorkspaceBarManager {
     private func shellBars() -> [ShellBarKey: ShellBarData] {
         var result: [ShellBarKey: ShellBarData] = [:]
         var icons: [String: NSImage] = [:]
+        var browsers: [String: WorkspaceBarBrowserFavicons.Window] = [:]
         shellCompactedScratchpads = [:]
         guard let controller else { return result }
         let settings = controller.settings.workspaceBar
         let showsLayout = controller.settings.statusBar.showLayout
         for bar in lastBars where keepsShellInstance(bar) {
             let resolved = settings.resolved(for: bar.monitor)
+            let projection = bar.snapshot.projection
+            for item in projection.items.flatMap(\.windows) + projection.scratchpads.flatMap(\.windows) {
+                guard let bundle = item.bundleId, WorkspaceBarBrowserFavicons.supports(bundle),
+                      controller.workspaceBarIconResolver.image(for: bundle) == nil,
+                      let window = item.allWindows.first(where: \.isFocused) ?? item.allWindows.first,
+                      let reference = controller.workspaceManager.entry(for: window.id)?.axRef
+                else { continue }
+                let id = ShellBarData.id(item.id, shellSessionToken)
+                browsers[id] = .init(reference: reference, title: window.title)
+            }
             var data = ShellBarData(
                 monitor: bar.monitor,
                 snapshot: bar.snapshot,
@@ -315,6 +327,7 @@ extension WorkspaceBarManager {
             }
         }
         shellItemIcons = icons
+        browserFavicons.synchronize(browsers)
         return result
     }
 

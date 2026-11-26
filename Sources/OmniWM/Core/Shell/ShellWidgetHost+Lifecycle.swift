@@ -198,6 +198,14 @@ extension ShellWidgetHost {
         redrawInstances()
     }
 
+    func windowIconDidChange(_ id: String) {
+        for state in widgets.values {
+            for instance in state.instances.values {
+                instance.surface?.refreshWindowIcon(id, text: state.text)
+            }
+        }
+    }
+
     private func redrawInstances() {
         for state in widgets.values {
             for instance in state.instances.values {

@@ -146,7 +146,7 @@ extension ShellBarData {
         )
     }
 
-    private static func id(_ token: WindowToken, _ sessionToken: String) -> String {
+    static func id(_ token: WindowToken, _ sessionToken: String) -> String {
         IPCWindowOpaqueID.encode(pid: token.pid, windowId: token.windowId, sessionToken: sessionToken)
     }
 }
