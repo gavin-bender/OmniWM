@@ -59,6 +59,7 @@ final class ShellDataFeed {
     var started = false
     var paused = false
     private var powerSource: CFRunLoopSource?
+    private var thermalPressureObserver: (any NSObjectProtocol)?
     private var lowPowerObserver: (any NSObjectProtocol)?
     var cpuMeter = CPUMeter()
     var data = ShellWidgetData()
@@ -173,6 +174,7 @@ final class ShellDataFeed {
     func start() {
         guard !started else { return }
         started = true
+        listenToThermalPressure(!paused && demands(.thermalPressure))
         listenToAwake(!paused && demands(.awake))
         listenToMicrophone(!paused && demands(.microphone))
         listenToBadges()
@@ -196,10 +198,43 @@ final class ShellDataFeed {
         listenToCalendar(false)
         listenToReminders(false)
         listenToNotifications(false)
+        listenToThermalPressure(false)
         devices.map(stopDevices)
         weatherTask?.cancel()
         weatherTask = nil
         removePowerSource()
+    }
+
+    func listenToThermalPressure(_ listening: Bool) {
+        guard listening != (thermalPressureObserver != nil) else { return }
+        guard listening else {
+            thermalPressureObserver.map(NotificationCenter.default.removeObserver)
+            thermalPressureObserver = nil
+            data.thermalPressure = nil
+            return
+        }
+        thermalPressureObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.thermalPressureObserver != nil else { return }
+                let next = Self.currentThermalPressure
+                guard next != self.data.thermalPressure else { return }
+                self.data.thermalPressure = next
+                self.publish()
+            }
+        }
+        data.thermalPressure = Self.currentThermalPressure
+    }
+
+    private static var currentThermalPressure: String? {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: "nominal"
+        case .fair: "fair"
+        case .serious: "serious"
+        case .critical: "critical"
+        @unknown default: nil
+        }
     }
 
     func setPaused(_ isPaused: Bool) {

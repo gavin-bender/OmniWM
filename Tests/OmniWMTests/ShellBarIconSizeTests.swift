@@ -24,7 +24,6 @@ final class ShellBarIconSizeTests: XCTestCase {
         ("omniwm", ["omniwm", "rectangle.split.3x1"]),
         ("privacy", ["mic.fill", "video.fill"]),
         ("stats", ["cpu", "memorychip"]),
-        ("system-stats", ["gauge.with.needle"]),
         ("volume", ["speaker.wave.2.fill"]),
         ("weather", ["sun.max"]),
         ("world-clock", ["globe"]),
@@ -82,6 +81,38 @@ final class ShellBarIconSizeTests: XCTestCase {
                 }
             }
         }
+    }
+
+    func testSystemStatsNeedleTracksSharedCPUReading() throws {
+        let widget = try ShellRenderedWidget("system-stats")
+        let data = try bar(scale: 1)
+        for (load, angle): (Double?, Float) in [(nil, -135), (0, -135), (49, 0), (51, 0), (100, 135)] {
+            widget.set("cpu") { writer in
+                if let load { writer.number(load) } else { writer.null() }
+            }
+            widget.render(data)
+            let needle = try XCTUnwrap(widget.tree().last { $0.kind == .path })
+            XCTAssertEqual(needle.paint.rotate, angle)
+            XCTAssertNotEqual(needle.content.motion, 0)
+        }
+    }
+
+    func testGaugeColorsOnlyOnePressureSegmentAndFillsTheTrackAtCritical() throws {
+        let widget = try ShellRenderedWidget("system-stats")
+        let data = try bar(scale: 1)
+        var segments = Set<String>()
+        for state in ["nominal", "fair", "serious", "critical"] {
+            widget.set("thermalPressure") { $0.string(state) }
+            widget.render(data)
+            let paths = widget.tree().filter { $0.kind == .path }
+            guard paths.count == 3 else { return XCTFail("Expected track, pressure segment, and needle") }
+            XCTAssertEqual(paths[1].paint.opacity, state == "nominal" ? 0 : 1)
+            XCTAssertEqual(paths[0].content.text == paths[1].content.text, state == "critical")
+            if state != "nominal" { segments.insert(widget.text.string(paths[1].content.text)) }
+            let color = state == "critical" ? ShellRole.error : .warning
+            XCTAssertEqual(Int(paths[1].paint.fill.role & 0xFF), color.rawValue + 1)
+        }
+        XCTAssertEqual(segments.count, 3)
     }
 
     func testWiFiFanFillsTheBarSymbolBox() throws {

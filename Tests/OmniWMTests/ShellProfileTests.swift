@@ -227,7 +227,7 @@ final class ShellDefaultsTests: XCTestCase {
         XCTAssertEqual(config.center, ["active-window"])
         XCTAssertEqual(
             config.trailing,
-            ["media", "notifications", "volume", "wifi", "battery-details", "control-center", "system-stats", "clock"]
+            ["media", "notifications", "volume", "battery-wifi", "control-center", "system-stats", "clock"]
         )
         XCTAssertEqual(config.hiddenBarWidget, "hidden-bar")
         XCTAssertEqual(config.systemStatsWidget, "system-stats")
@@ -273,6 +273,7 @@ final class ShellDefaultsTests: XCTestCase {
             "active-window",
             "battery",
             "battery-details",
+            "battery-wifi",
             "wifi",
             "bluetooth",
             "input-source",

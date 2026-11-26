@@ -56,6 +56,7 @@ enum ShellDataKey: String, CaseIterable, Sendable {
     case brightness
     case connection
     case commandPalette
+    case thermalPressure
 
     private static let order = allCases
     static let table = order.map(\.rawValue).joined(separator: "\n")
@@ -162,6 +163,7 @@ struct ShellWidgetData: Equatable, Sendable {
     var connection: ShellConnection?
     var bluetooth: ShellBluetooth?
     var user: ShellUser?
+    var thermalPressure: String?
     var thermal: ShellThermal?
     var networkHistory: ShellNetworkHistory?
     var appearance: ShellAppearance?
@@ -206,6 +208,7 @@ extension ShellWidgetData {
             | Self.changed(.connection, when: connection != previous.connection)
             | Self.changed(.bluetooth, when: bluetooth != previous.bluetooth)
             | Self.changed(.user, when: user != previous.user)
+            | Self.changed(.thermalPressure, when: thermalPressure != previous.thermalPressure)
             | Self.changed(.thermal, when: thermal != previous.thermal)
             | Self.changed(.networkHistory, when: networkHistory != previous.networkHistory)
             | Self.changed(.appearance, when: appearance != previous.appearance)

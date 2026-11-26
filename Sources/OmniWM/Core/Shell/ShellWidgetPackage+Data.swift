@@ -231,6 +231,11 @@ extension ShellWidgetPackage {
         if changed & ShellDataKey.user.bit != 0 {
             setValue(instance, .user) { writer in next.user.map { $0.write(into: &writer) } ?? writer.null() }
         }
+        if changed & ShellDataKey.thermalPressure.bit != 0 {
+            setValue(instance, .thermalPressure) { writer in
+                next.thermalPressure.map { writer.string($0) } ?? writer.null()
+            }
+        }
         if changed & ShellDataKey.thermal.bit != 0 {
             setValue(instance, .thermal) { writer in next.thermal.map { $0.write(into: &writer) } ?? writer.null() }
         }

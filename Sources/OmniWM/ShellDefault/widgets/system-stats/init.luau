@@ -21,6 +21,34 @@ local function secondaryHasContent(bar: Bar): boolean
     return false
 end
 
+-- A closed outline gives both ends round caps, including at the bar's smallest size.
+local function rimPath(fraction)
+    local angle = math.rad(45 - 270 * fraction)
+    local x, y = math.cos(angle), math.sin(angle)
+    local large = if fraction > 2/3 then 1 else 0
+    return string.format("M80.406 80.406 A43 43 0 %d 0 %.3f %.3f A4 4 0 0 0 %.3f %.3f A35 35 0 %d 1 74.749 74.749 A4 4 0 0 0 80.406 80.406 Z",
+        large, 50 + 43*x, 50 + 43*y, 50 + 35*x, 50 + 35*y, large)
+end
+
+local rim = rimPath(1)
+local pressurePaths = { fair = rimPath(0.15), serious = rimPath(0.48), critical = rim }
+local viewBox = { 0, 0, 100, 100 }
+
+local function gauge(ctx, glyph)
+    local size, ink = glyph.size, glyph.color or "foreground"
+    local cpu, pressure = ctx.data.cpu, ctx.data.thermalPressure
+    local heat = pressurePaths[pressure]
+    local step = math.round(math.clamp(cpu or 0, 0, 100) / 5)
+    return ui.stack{ w = size, h = size,
+        ui.path{ w = size, h = size, viewBox = viewBox, d = rim, fill = ink },
+        ui.path{ w = size, h = size, viewBox = viewBox, d = heat or pressurePaths.fair,
+            fill = if pressure == "critical" then "error" else "warning",
+            opacity = if heat then 1 else 0, animate = { duration = 0.5, curve = "easeOut" } },
+        ui.path{ w = size, h = size, viewBox = viewBox,
+            d = "M48 23 Q50 19 52 23 L56 48 A6.3 6.3 0 1 1 44 48 Z", fill = ink,
+            rotate = -135 + 270 * step / 20, animate = { duration = 0.3, curve = "easeOut" } } }
+end
+
 function render(ctx: Context)
     local bar = ctx.data.bar
     local style = bar.style
@@ -30,13 +58,20 @@ function render(ctx: Context)
     local behaviour = { onClick = ui.popout, help = omniwm.l10n("Show system stats") }
     local glyph = { name = "gauge.with.needle", size = look.px(ctx, "symbol") }
     local frame = look.systemStatsButton and look.systemStatsButton(ctx, glyph)
+    local icon
+    if look.symbols and look.symbols[glyph.name] then
+        icon = if frame then look.glyph(glyph) else look.barGlyph(ctx, glyph)
+    else
+        if not frame and not style.vertical then glyph.size = look.px(ctx, "barSymbol") end
+        icon = gauge(ctx, glyph)
+    end
     local button
     if frame then
-        frame[1] = look.glyph(glyph)
+        frame[1] = icon
         button = ui.stack(frame)
     else
         local props = table.clone(behaviour)
-        props[1] = look.barGlyph(ctx, glyph)
+        props[1] = icon
         button = look.bar(ctx, props)
     end
     for key, value in behaviour do

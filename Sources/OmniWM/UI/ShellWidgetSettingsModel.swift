@@ -117,6 +117,7 @@ enum ShellWidgetSettingsModel {
         case "calendar": String(localized: "Upcoming events and your calendar.")
         case "privacy": String(localized: "Microphone and camera activity.")
         case "control-center": String(localized: "Audio, media, calendar, weather, and system controls.")
+        case "battery-wifi": String(localized: "Battery charge and network signal in one gauge.")
         case "battery",
              "battery-details": String(localized: "Battery charge and power information.")
         case "launcher": String(localized: "Open the command palette.")

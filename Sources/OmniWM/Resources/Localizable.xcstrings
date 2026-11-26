@@ -156104,6 +156104,9 @@
         }
       }
     },
+    "Battery & Wi-Fi" : {
+
+    },
     "Battery Details" : {
       "localizations" : {
         "ar" : {
@@ -157937,6 +157940,9 @@
 
     },
     "Bar" : {
+
+    },
+    "Battery charge and network signal in one gauge." : {
 
     },
     "Battery charge and power information." : {

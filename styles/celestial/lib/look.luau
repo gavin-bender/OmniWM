@@ -628,6 +628,7 @@ return require("./skin")({
         props.role = nil
         return ui.text(props)
     end,
+    symbols = SYMBOLS,
     glyph = function(props)
         local name = SYMBOLS[props.name]
         if not name then

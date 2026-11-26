@@ -27,7 +27,7 @@ final class ShellBundledWidgetTests: XCTestCase {
     private static let names = [
         "clock", "battery", "volume", "weather", "stats", "workspaces", "scratchpads", "omniwm", "system-stats",
         "hidden-bar", "media", "calendar", "launcher", "active-window", "input-source", "wifi", "bluetooth",
-        "battery-details", "world-clock", "privacy", "control-center"
+        "battery-wifi", "battery-details", "world-clock", "privacy", "control-center"
     ]
 
     private static let essentials = [
@@ -754,11 +754,40 @@ final class ShellBundledWidgetTests: XCTestCase {
         }
     }
 
+    func testBatteryWiFiGaugeReflectsPowerAndSignalIndependently() throws {
+        let base = try fullData().filter { !["battery", "power", "wifi", "connection"].contains($0.0) }
+        let cases: [(Double?, String, ShellWiFi?, Bool, String, ShellRole?, Int)] = [
+            (20, "battery", ShellWiFi(power: true, connected: true, rssi: -66), false, "wifi", .error, 3),
+            (80, "ac", ShellWiFi(), false, "wifi.slash", .success, 0),
+            (54, "battery", ShellWiFi(power: true), false, "wifi", .foreground, 0),
+            (nil, "", nil, true, "network", nil, 4)
+        ]
+        for (level, source, wifi, wired, symbol, ring, dots) in cases {
+            var data = base
+            if let level {
+                data.append(("battery", value { $0.number(level) }))
+                data.append(("power", value { ShellPower(source: source).write(into: &$0) }))
+            }
+            if let wifi { data.append(("wifi", value { wifi.write(into: &$0) })) }
+            if wired {
+                data.append(("connection", value { ShellConnection(kind: "ethernet", interface: "en0").write(into: &$0) }))
+            }
+            try renderStyle("default", widget: "battery-wifi", data: data, inspect: { view, nodes, text in
+                guard view == OMNI_VIEW_BAR else { return }
+                XCTAssertTrue(nodes.contains { text.string($0.text) == symbol })
+                let lit = UInt16(ShellRole.foreground.rawValue + 1) | 0xFF00
+                XCTAssertEqual(nodes.filter { $0.fill_role == lit }.count, dots)
+                let strokes = nodes.filter { $0.stroke_width > 0 && $0.stroke_role >> 8 == 255 }
+                XCTAssertEqual(strokes.map { Int($0.stroke_role & 0xFF) - 1 }, ring.map { [$0.rawValue] } ?? [])
+            })
+        }
+    }
+
     func testDefaultPopoutsUseOneNativeGlassSurfaceWithFullAndMissingData() throws {
         let full = try fullData { $0.style.height = 32 }
         let variants = [full, full.filter { (Self.essentials + ["hiddenBar"]).contains($0.0) }]
         let widgets = [
-            "battery-details", "bluetooth", "calendar", "control-center", "hidden-bar-menu",
+            "battery-wifi", "battery-details", "bluetooth", "calendar", "control-center", "hidden-bar-menu",
             "input-source", "media", "stats", "system-stats", "volume", "weather", "world-clock", "wifi"
         ]
         for widget in widgets {
@@ -768,7 +797,7 @@ final class ShellBundledWidgetTests: XCTestCase {
                     let empty = nodes.isEmpty || nodes.count == 1 && nodes[0].width == 0 && nodes[0].height == 0
                     if empty {
                         XCTAssertTrue([
-                            "battery-details", "bluetooth", "calendar", "input-source", "weather", "wifi", "world-clock"
+                            "battery-wifi", "battery-details", "bluetooth", "calendar", "input-source", "weather", "wifi", "world-clock"
                         ].contains(widget), widget)
                         for node in nodes {
                             XCTAssertEqual(node.text, 0, widget)

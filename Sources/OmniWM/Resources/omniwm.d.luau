@@ -666,6 +666,7 @@ export type Data = {
     brightness: Brightness?,
     connection: Connection?,
     commandPalette: CommandPalette?,
+    thermalPressure: ("nominal" | "fair" | "serious" | "critical")?,
 }
 
 export type Format = {

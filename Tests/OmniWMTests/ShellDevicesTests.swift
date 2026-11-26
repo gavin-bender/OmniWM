@@ -250,6 +250,23 @@ final class ShellDevicesTests: XCTestCase {
         XCTAssertNil(devices.thermal.value)
     }
 
+    func testPressureDemandFollowsVisibilityWithoutTemperatureSamples() {
+        let feed = ShellDataFeed(devices: ShellDevices(), deliver: { _ in })
+        defer { feed.stop() }
+        let demand = read([.thermalPressure])
+        feed.setDemand(demand.deps, cadence: demand.cadence)
+        feed.start()
+        XCTAssertNotNil(feed.current.thermalPressure)
+        XCTAssertNil(feed.current.thermal)
+        feed.setPaused(true)
+        XCTAssertNil(feed.current.thermalPressure)
+        feed.setPaused(false)
+        XCTAssertNotNil(feed.current.thermalPressure)
+        let clock = read([.clock])
+        feed.setDemand(clock.deps, cadence: clock.cadence)
+        XCTAssertNil(feed.current.thermalPressure)
+    }
+
     func testTheAppearanceIsReadOnlyWhileAWidgetReadsIt() throws {
         XCTAssertEqual(ShellAppearance.of(try XCTUnwrap(NSAppearance(named: .darkAqua))), ShellAppearance(dark: true))
         XCTAssertEqual(ShellAppearance.of(try XCTUnwrap(NSAppearance(named: .aqua))), ShellAppearance(dark: false))
