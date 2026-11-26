@@ -60,6 +60,47 @@ final class DurableParkTests: XCTestCase {
         XCTAssertEqual(moves, 1)
     }
 
+    func testClampedWindowKeepsAXParkUntilItsNextReveal() throws {
+        for deferred in [false, true] {
+            let fixture = try Self.layoutParkFixture(pid: 972_003, windowId: 972_103, isAnimationTick: false)
+            let manager = fixture.controller.axManager
+            let id = fixture.token.windowId
+            let entry = try XCTUnwrap(fixture.controller.workspaceManager.entry(for: fixture.token))
+            let target = AXFrameApplicationTarget(
+                pid: fixture.token.pid, window: try XCTUnwrap(entry.axRef), frame: fixture.parkedFrame
+            )
+            let exterior = try XCTUnwrap(LayoutRefreshController.exteriorParkFrame(
+                target.frame, monitor: fixture.monitor, monitors: [fixture.monitor]
+            ))
+            var attempts = 0
+            manager.finishParkPlacement = { _ in
+                attempts += 1
+                return deferred ? nil : exterior
+            }
+            func confirmPark() throws -> AXFrameApplyResult {
+                let request = try XCTUnwrap(manager.prepareParkFrameApplications([target]).first)
+                let result = WindowAdmissionTestSupport.successfulFrameResult(request: request)
+                manager.handleParkFrameApplyResults([result])
+                return result
+            }
+
+            let first = try confirmPark()
+            for _ in 0 ..< 3 {
+                manager.markParkPending(for: id, pid: fixture.token.pid)
+                _ = try confirmPark()
+                XCTAssertEqual(manager.verifiedParkFrame(for: id), target.frame)
+            }
+            manager.parkLedger.refineVerifiedPlacement(first) {
+                XCTFail("A delayed move must not restart exterior parking after a repair")
+                return exterior
+            }
+            XCTAssertEqual(attempts, 1)
+            manager.cancelParkFrameJobs([(fixture.token.pid, id)])
+            _ = try confirmPark()
+            XCTAssertEqual(attempts, 2)
+        }
+    }
+
     func testClampedPortraitParkRequiresAXVerificationOfCorrectedPosition() throws {
         for failure: AXFrameWriteFailureReason in [.verificationMismatch, .positionWriteFailed(.failure)] {
             try assertClampedPortraitParkRequiresAXVerification(failure: failure)
