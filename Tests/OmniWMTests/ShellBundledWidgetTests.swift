@@ -349,6 +349,25 @@ final class ShellBundledWidgetTests: XCTestCase {
         })
     }
 
+    func testProductivityCompletionRingRequiresAllTasksAndANonemptyList() throws {
+        let source = try ShellRenderedWidget.bundledSource("productivity")
+        for (rows, count, complete) in [
+            ("{}", "0/0", false),
+            ("{{checked=true},{checked=false}}", "1/2", false),
+            ("{{checked=true},{checked=true}}", "2/2", true)
+        ] {
+            let modules = source.modules.map { module in
+                module.path.hasSuffix("/productivity/notion.luau")
+                    ? ShellWidgetSource.Module(path: module.path, source: "return {snapshot=function() return \(rows) end}")
+                    : module
+            }
+            let widget = try ShellRenderedWidget(name: "productivity", source: source.main, modules: modules, chunk: source.chunk)
+            widget.render(ShellBarData())
+            XCTAssertEqual(widget.strings().contains(count), !complete)
+            XCTAssertEqual(widget.strings().contains("checkmark"), complete)
+        }
+    }
+
     func testProductivityStartPauseResumeAndModeSwitch() throws {
         let widget = try ShellRenderedWidget("productivity")
         let bar = ShellBarData()

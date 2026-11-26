@@ -49,11 +49,13 @@ function render(ctx)
     local done, count = totals(rows)
     local record, seconds = timer.read(ctx)
     local scale = look.scale(ctx)
+    local complete = count > 0 and done == count
+    local check = if complete then animated("complete", look.glyph{ name = "checkmark", size = 9 * scale, color = "accent" }) else nil
     local props = { key = "productivity", animate = motion, help = omniwm.l10n("Productivity"), onClick = ui.popout,
-        if rows then animated("progress", stats.gauge(if count > 0 then 100 * done / count else 0, 15 * scale, "accent"))
+        if rows then animated("progress", stats.gauge(if count > 0 then 100 * done / count else 0, 15 * scale, "accent", check))
         else animated("checklist", look.glyph{ name = "checklist", size = 15 * scale }) }
     if not ctx.data.bar.style.vertical then
-        if rows then table.insert(props, animated("tasks", look.text{ text = done .. "/" .. count, size = 13 * scale })) end
+        if rows and not complete then table.insert(props, animated("tasks", look.text{ text = done .. "/" .. count, size = 13 * scale })) end
         if record.deadline or record.remaining then
             if record.mode == "Pomodoro" and record.phase ~= "Focus" then
                 table.insert(props, animated("break", look.glyph{ name = "cup.and.saucer", size = 12 * scale }))
