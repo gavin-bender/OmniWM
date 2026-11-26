@@ -29,6 +29,12 @@ In **Settings → Keyboard Shortcuts**, search for **Top Bar** to change the cyc
 - macOS-hidden windows are marked with an eye-slash badge; selecting a hidden window unhides its app and focuses that exact window.
 - Non-empty [scratchpad](/features/scratchpads/) slots appear as pills; clicking a pill toggles that scratchpad.
 
+## Productivity
+
+Productivity shows a Notion checklist’s completion ring and count. Click it to check off tasks, run a countdown or Pomodoro session, or play **Lofi hip hop radio** in Kaset. The timer and radio work independently. Pomodoro uses 25-minute focus sessions with a five-minute break, or a 15-minute break after the fourth round. Press **Start** when you’re ready for the next phase.
+
+To connect a checklist, give a Notion internal connection read and update content access and share the checklist page with it. In **Settings > Styles & Widgets > Bar > Productivity**, paste the page link from **Share > Copy link** and save the token in Keychain. Allow the widget to reach **api.notion.com** when prompted. For a calendar database, copy the calendar view link. Productivity counts cards starting today in your local time zone and updates their Status or Done checkbox when clicked. Ordinary checklist pages use their top-level to-do blocks. Both refresh every minute and offer a manual refresh beside the count. For custom bar layouts, add **Productivity** from **Add Widget…**.
+
 ## System Stats
 
 Optionally show a System Stats button that opens a CPU, memory, GPU, disk, and uptime popup. The `Toggle System Stats` hotkey and `omniwmctl command toggle-system-stats` drive the same popup. They do nothing while the bar holding that button is hidden; if the widget isn't in the bar, as in Vitreus, the popup opens at the screen edge. See the [CLI reference](/reference/cli/overview/). The button is the shell's `system-stats` widget, so it must stay in one of the bar's groups (`trailing` by default).

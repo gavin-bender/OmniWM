@@ -310,8 +310,9 @@ extension ShellHTTPService {
         func start(_ id: ShellServiceID, session: URLSession) {
             guard let transfer = state.withLock({ $0.transfers[id] }) else { return }
             do {
-                let request = try transfer.request.request()
+                var request = try transfer.request.request()
                 if let failure = transfer.policy.failure(request.url) { throw failure }
+                try ProductivityNotionCredential.authorize(&request, policy: transfer.policy)
                 let task = session.dataTask(with: request)
                 let deadline = DispatchSource.makeTimerSource(queue: queue)
                 deadline.schedule(deadline: .now() + deadlineDelay(transfer.request.timeout))
@@ -461,7 +462,10 @@ extension ShellHTTPService {
         ) {
             let transfer = transfer(for: task)
             let failure = transfer?.policy.failure(request.url)
-            completionHandler(transfer == nil || failure != nil ? nil : request)
+            let authenticated = transfer?.request.headers.keys.contains {
+                $0.caseInsensitiveCompare(ProductivityNotionCredential.marker) == .orderedSame
+            } == true
+            completionHandler(transfer == nil || failure != nil || authenticated ? nil : request)
             if let transfer, let failure { finish(transfer.id, error: failure.code) }
         }
     }

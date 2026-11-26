@@ -229,6 +229,26 @@ final class ShellHTTPServiceTests: XCTestCase {
         XCTAssertEqual(policy.decide(try XCTUnwrap(URL(string: "file://api.example/path"))), .denied)
     }
 
+    func testProductivityCredentialRejectsOtherWidgetsAndDestinations() throws {
+        let source = ShellWidgetPrincipal(role: .bar, name: "productivity", source: "/test/productivity")
+        let hosts: Set<String> = ["api.notion.com", "other.example"]
+        let policy = ShellHTTPPolicy.widget(source, hosts: hosts, permissions: .init(allowing: hosts, for: source))
+        let block = "/v1/blocks/12345678123456781234567812345678/children"
+        for (destination, caller) in [
+            ("https://api.notion.com" + block, ShellHTTPPolicy.approved(hosts)),
+            ("https://other.example" + block, policy),
+            ("https://api.notion.com:8080" + block, policy),
+            ("https://api.notion.com/v1/users", policy)
+        ] {
+            var request = URLRequest(url: try XCTUnwrap(URL(string: destination)))
+            request.setValue("1", forHTTPHeaderField: ProductivityNotionCredential.marker)
+            XCTAssertThrowsError(try ProductivityNotionCredential.authorize(&request, policy: caller)) {
+                XCTAssertEqual($0 as? ShellHTTPFailure, ShellHTTPFailure("invalid_notion_request"))
+            }
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+        }
+    }
+
     func testPlainHTTPIsAllowedOnlyForDeclaredLoopbackHosts() throws {
         let policy = ShellHTTPPolicy.approved(["api.example", "localhost", "127.0.0.1", "::1", "127.0.0.1.example"])
         let cases = [

@@ -333,6 +333,122 @@ final class ShellBundledWidgetTests: XCTestCase {
         )
     }
 
+    func testProductivityShowsNotionBeforeTimerAndKasetWithoutAConnection() throws {
+        try renderStyle("default", widget: "productivity", data: fullData(), inspect: { view, nodes, text in
+            guard view == OMNI_VIEW_POPOUT else { return }
+            let labels = nodes.map { text.string($0.text) }
+            let tasks = try XCTUnwrap(labels.firstIndex(of: "Today in Notion"))
+            let timer = try XCTUnwrap(labels.firstIndex(of: "25:00"))
+            let radio = try XCTUnwrap(labels.firstIndex(of: "Lofi hip hop radio"))
+            XCTAssertLessThan(tasks, timer)
+            XCTAssertLessThan(timer, radio)
+            XCTAssertTrue(labels.contains("Start"))
+        })
+    }
+
+    func testProductivityStartPauseResumeAndModeSwitch() throws {
+        let widget = try ShellRenderedWidget("productivity")
+        let bar = ShellBarData()
+        widget.render(bar)
+        func click(_ title: String) throws {
+            let node = try XCTUnwrap(widget.renderPopout().first { widget.text.string($0.content.help) == title })
+            widget.invoke(node.content.action, view: OMNI_VIEW_POPOUT)
+        }
+        try click("Start")
+        try click("Pause")
+        widget.render(bar)
+        XCTAssertTrue(widget.strings().contains("pause.fill"))
+        try click("Resume")
+        try click("Timer")
+        _ = widget.renderPopout()
+        XCTAssertTrue(widget.strings(OMNI_VIEW_POPOUT).contains("10:00"))
+        widget.render(bar)
+        XCTAssertFalse(widget.strings().contains("pause.fill"))
+    }
+
+    func testProductivityChecklistPaginatesAndCommitsOnlyAcknowledgedEdits() throws {
+        let bundled = try ShellRenderedWidget.bundledSource("productivity")
+        let notion = try XCTUnwrap(bundled.modules.first { $0.path.hasSuffix("/productivity/notion.luau") })
+        let test = """
+        local pending, last
+        local omniwm = { l10n = function(key) return key end,
+            http = function(request, callback) pending, last = callback, request; return {} end }
+        local function module()
+        \(notion.source)
+        end
+        local checklist = module()
+        local id = "12345678123456781234567812345678"
+        local dashed = "12345678-1234-5678-1234-567812345678"
+        local input
+        local ctx = { select = function() return input end }
+        local task = { type = "to_do", id = "task", to_do = { checked = false, rich_text = {{plain_text = "Review"}} } }
+        function render()
+            for _, link in {id, dashed, "https://www.notion.so/team/Checklist-" .. id .. "?source=copy_link",
+                " notion://www.notion.so/" .. dashed .. "/#block ", "https://team.notion.site/Checklist-" .. dashed,
+                "https://www.notion.so/database?v=view&p=" .. id} do
+                input = link
+                checklist.refresh(ctx)
+                assert(last.url == "https://api.notion.com/v1/blocks/" .. id .. "/children?page_size=100")
+                pending({ok = true, json = {results = {}}})
+                last = nil
+            end
+            for _, link in {"https://other.example/" .. id, "https://notion.so/page?v=" .. id .. "#" .. id} do
+                input = link
+                checklist.refresh(ctx)
+                assert(last == nil and select(2, checklist.snapshot(ctx)))
+            end
+            input = "https://www.notion.so/Checklist-" .. id
+            checklist.refresh(ctx)
+            pending({ok = true, json = {results = {task}, has_more = true, next_cursor = "next"}})
+            assert(last.url:find("start_cursor=next", 1, true))
+            pending({ok = true, json = {results = {{type = "paragraph"}}, has_more = false}})
+            local rows = checklist.snapshot(ctx)
+            assert(#rows == 1 and rows[1].title == "Review")
+            checklist.toggle(ctx, rows[1])
+            assert(last.method == "PATCH" and json.decode(last.body).to_do.checked and not rows[1].checked)
+            pending({ok = false, status = 403})
+            assert(not rows[1].checked and select(2, checklist.snapshot(ctx)))
+            checklist.toggle(ctx, rows[1])
+            pending({ok = true, json = {}})
+            assert(rows[1].checked)
+
+            local viewID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            input = "https://app.notion.com/" .. id .. "?v=" .. viewID
+            checklist.refresh(ctx)
+            assert(last.url:find("/views/" .. viewID, 1, true))
+            pending({ok = true, json = { data_source_id = id, configuration = {date_property_id = "when"} }})
+            assert(last.url:find("/data_sources/" .. id, 1, true))
+            pending({ok = true, json = {properties = {
+                Name = {type = "title"}, Date = {type = "date", id = "other"}, Due = {type = "date", id = "when"},
+                Stage = {type = "status", status = {groups = {
+                    {name = "To-do", option_ids = {"todo"}}, {name = "Complete", option_ids = {"finished"}}
+                }}}
+            }}})
+            assert(last.method == "POST" and json.decode(last.body).filter["and"][1].property == "Due")
+            local function card(day, status)
+                return {id = id, properties = {Name = {title = {{plain_text = "Calendar card"}}},
+                    Due = {date = {start = day}}, Stage = {status = {id = status}}}}
+            end
+            pending({ok = true, json = {results = {card(os.date("%Y-%m-%d"), "staged"), card("2000-01-01", "todo")},
+                has_more = true, next_cursor = "calendar-next"}})
+            assert(json.decode(last.body).start_cursor == "calendar-next")
+            pending({ok = true, json = {results = {card(os.date("%Y-%m-%d"), "finished")}}})
+            rows = checklist.snapshot(ctx)
+            assert(#rows == 2 and not rows[1].checked and rows[2].checked)
+            checklist.toggle(ctx, rows[1])
+            assert(last.method == "PATCH" and last.url:find("/pages/" .. id, 1, true))
+            assert(json.decode(last.body).properties.Stage.status.id == "finished")
+            pending({ok = true, json = {}})
+            checklist.toggle(ctx, rows[1])
+            assert(json.decode(last.body).properties.Stage.status.id == "staged")
+            return ui.text{ text = "Synced" }
+        end
+        """
+        let widget = try ShellRenderedWidget(name: "checklist", source: test)
+        widget.render(ShellBarData())
+        XCTAssertTrue(widget.strings().contains("Synced"))
+    }
+
     func testStylesKeepWorkspaceInteractionContractAtEveryEdge() throws {
         for style in ["default", "wayline", "nocturne", "celestial"] {
             for edge in ["top", "bottom", "left", "right"] {

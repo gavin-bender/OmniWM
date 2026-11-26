@@ -1,6 +1,120 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Calendar tasks need a date and a Status or checkbox property." : {
+      "extractionState" : "manual"
+    },
+    "Check the Notion Status groups for this calendar." : {
+      "extractionState" : "manual"
+    },
+    "Copy the link to a specific calendar view in Notion." : {
+      "extractionState" : "manual"
+    },
+    "No calendar tasks scheduled for today." : {
+      "extractionState" : "manual"
+    },
+    "%@ · Round %lld of 4" : {
+      "extractionState" : "manual"
+    },
+    "%lld of %lld done" : {
+      "extractionState" : "manual"
+    },
+    "Allow api.notion.com in Network & Permissions." : {
+      "extractionState" : "manual"
+    },
+    "Break" : {
+      "extractionState" : "manual"
+    },
+    "Check page sharing and connection permissions." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t open Kaset." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t sync with Notion. Try refreshing." : {
+      "extractionState" : "manual"
+    },
+    "Countdown" : {
+      "extractionState" : "manual"
+    },
+    "Countdown duration (minutes)" : {
+      "extractionState" : "manual"
+    },
+    "Paste the page link from Notion’s Share menu." : {
+      "extractionState" : "manual"
+    },
+    "Focus" : {
+      "extractionState" : "manual"
+    },
+    "Invalid Notion cursor." : {
+      "extractionState" : "manual"
+    },
+    "Invalid Notion response." : {
+      "extractionState" : "manual"
+    },
+    "Loading checklist…" : {
+      "extractionState" : "manual"
+    },
+    "Lofi hip hop radio" : {
+      "extractionState" : "manual"
+    },
+    "Long break" : {
+      "extractionState" : "manual"
+    },
+    "No checkboxes on this page." : {
+      "extractionState" : "manual"
+    },
+    "Notion checklist page link" : {
+      "extractionState" : "manual"
+    },
+    "Notion is busy. Try again shortly." : {
+      "extractionState" : "manual"
+    },
+    "Pause" : {
+      "extractionState" : "manual"
+    },
+    "Pomodoro" : {
+      "extractionState" : "manual"
+    },
+    "Productivity" : {
+      "extractionState" : "manual"
+    },
+    "Refresh checklist" : {
+      "extractionState" : "manual"
+    },
+    "Refresh to load your checklist." : {
+      "extractionState" : "manual"
+    },
+    "Refresh unavailable." : {
+      "extractionState" : "manual"
+    },
+    "Resume" : {
+      "extractionState" : "manual"
+    },
+    "Save your connection token in widget settings." : {
+      "extractionState" : "manual"
+    },
+    "Set a checklist page and token in widget settings." : {
+      "extractionState" : "manual"
+    },
+    "Start" : {
+      "extractionState" : "manual"
+    },
+    "The Notion token was rejected." : {
+      "extractionState" : "manual"
+    },
+    "Timer" : {
+      "extractionState" : "manual"
+    },
+    "Timer complete" : {
+      "extractionState" : "manual"
+    },
+    "Today in Notion" : {
+      "extractionState" : "manual"
+    },
+    "Untitled task" : {
+      "extractionState" : "manual"
+    },
     "Power Mode" : {
       "extractionState" : "manual"
     },

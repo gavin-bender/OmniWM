@@ -125,7 +125,8 @@ private struct WorkspaceBarContentView: View {
             ForEach(slice.shellWidgets(in: snapshot, lane: lane)) { widget in
                 ShellWidgetSlot(
                     widget: widget, view: shellSurface?(widget.id), cuttable: zones != nil,
-                    resizeDuration: animationsEnabled && !snapshot.orientation.isVertical && widget.id == "media"
+                    resizeDuration: animationsEnabled && !snapshot.orientation.isVertical
+                        && (widget.id == "media" || widget.id == "productivity")
                         ? 0.24 / animationSpeed : nil
                 )
                     .layoutValue(key: WorkspaceBarZoneLayout.Lane.self, value: lane)

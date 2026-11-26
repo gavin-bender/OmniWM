@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Internal connection token" : {},
+    "Keychain unavailable." : {},
+    "Notion checklists, focus timers and lofi radio in Kaset." : {},
+    "Notion connection" : {},
+    "Remove Token" : {},
+    "Save Token" : {},
+    "Share your checklist page with this Notion connection and paste its link above." : {},
+    "Token removed." : {},
+    "Token saved in Keychain." : {},
     "macOS could not apply this power mode." : {
 
     },
