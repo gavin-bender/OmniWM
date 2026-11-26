@@ -47,6 +47,7 @@ local function pageID(ctx)
 end
 
 local function failure(result)
+    if result.error == "notion_saved_token_unavailable" then return omniwm.l10n("Couldn’t read the saved connection. Save your token in Notion settings.") end
     if result.error == "notion_keychain_locked" then return omniwm.l10n("Reconnect your saved token in Notion settings.") end
     if result.error == "notion_token_unavailable" then return omniwm.l10n("Save your connection token in widget settings.") end
     if result.status == 401 then return omniwm.l10n("The Notion token was rejected.") end

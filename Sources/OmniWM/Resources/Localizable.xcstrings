@@ -1,7 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Keychain reconnected." : {},
+    "Connection saved on this Mac." : {},
     "Reconnect" : {},
     "Internal connection token" : {},
     "Keychain unavailable." : {},
@@ -11,7 +11,6 @@
     "Save Token" : {},
     "Share your checklist page with this Notion connection and paste its link above." : {},
     "Token removed." : {},
-    "Token saved in Keychain." : {},
     "macOS could not apply this power mode." : {
 
     },

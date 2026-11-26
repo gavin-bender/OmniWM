@@ -1,6 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Couldn’t read the saved connection. Save your token in Notion settings." : { "extractionState" : "manual" },
     "Open Applications" : { "extractionState" : "manual" },
     "Notion Settings" : { "extractionState" : "manual" },
     "Network & Permissions" : { "extractionState" : "manual" },

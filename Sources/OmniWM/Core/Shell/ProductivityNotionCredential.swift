@@ -19,27 +19,21 @@ enum ProductivityNotionCredential {
 
     static func save(_ token: String?, source: String) -> OSStatus {
         tokens.withLock { cache in
-            let status = write(token, source: source)
-            guard status == errSecSuccess else { return status }
-            cache[source] = nil
-            if let token, (try? readSilently(source: source)) != token { return errSecInteractionNotAllowed }
-            cache[source] = token
-            return errSecSuccess
+            let store = ProductivityNotionTokenStore(source: source)
+            do {
+                if let token {
+                    try store.save(token)
+                } else {
+                    for legacy in [false, true] {
+                        let status = SecItemDelete(item(source, legacy: legacy) as CFDictionary)
+                        guard status == errSecSuccess || status == errSecItemNotFound else { return status }
+                    }
+                    try store.remove()
+                }
+                cache[source] = token
+                return errSecSuccess
+            } catch { return errSecIO }
         }
-    }
-
-    private static func write(_ token: String?, source: String) -> OSStatus {
-        let query = item(source)
-        guard let token else {
-            let legacyStatus = SecItemDelete(item(source, legacy: true) as CFDictionary)
-            guard legacyStatus == errSecSuccess || legacyStatus == errSecItemNotFound else { return legacyStatus }
-            let status = SecItemDelete(query as CFDictionary)
-            return status == errSecItemNotFound ? errSecSuccess : status
-        }
-        let value = [kSecValueData as String: Data(token.utf8)]
-        let status = SecItemUpdate(query as CFDictionary, value as CFDictionary)
-        guard status == errSecItemNotFound else { return status }
-        return SecItemAdd(query.merging(value) { _, new in new } as CFDictionary, nil)
     }
 
     static func permits(method: String?, path: String) -> Bool {
@@ -67,7 +61,18 @@ enum ProductivityNotionCredential {
 
         let token = try tokens.withLock { cache in
             if let token = cache[principal.source] { return token }
-            let token = try readSilently(source: principal.source)
+            let store = ProductivityNotionTokenStore(source: principal.source)
+            let token: String
+            do {
+                if let saved = try store.load() {
+                    token = saved
+                } else {
+                    token = try readSilently(source: principal.source)
+                    // A readable legacy credential can still serve this session if migration fails.
+                    try? store.save(token)
+                }
+            } catch let failure as ShellHTTPFailure { throw failure }
+            catch { throw ShellHTTPFailure("notion_saved_token_unavailable") }
             cache[principal.source] = token
             return token
         }
@@ -111,14 +116,18 @@ enum ProductivityNotionCredential {
     }
 
     // Called only by the user's Reconnect button. Allow Keychain to request consent
-    // here, then verify a fresh noninteractive read before reporting success.
+    // here to import a token saved by an earlier build.
     static func reconnect(source: String) -> OSStatus {
         tokens.withLock { cache in
+            let store = ProductivityNotionTokenStore(source: source)
+            if let saved = try? store.load() {
+                cache[source] = saved
+                return errSecSuccess
+            }
             let (status, token) = read(source)
             guard status == errSecSuccess, let token else { return status }
-            let saved = write(token, source: source)
-            guard saved == errSecSuccess else { return saved }
-            guard (try? readSilently(source: source)) == token else { return errSecInteractionNotAllowed }
+            do { try store.save(token) }
+            catch { return errSecIO }
             cache[source] = token
             return errSecSuccess
         }

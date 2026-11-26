@@ -19,7 +19,7 @@ struct ProductivityNotionSettings: View {
                 Button("Reconnect") {
                     let status = ProductivityNotionCredential.reconnect(source: source)
                     if status == errSecSuccess { refresh() }
-                    message = status == errSecSuccess ? String(localized: "Keychain reconnected.")
+                    message = status == errSecSuccess ? String(localized: "Connection saved on this Mac.")
                         : SecCopyErrorMessageString(status, nil) as String? ?? String(localized: "Keychain unavailable.")
                 }
                 Button("Remove Token") { update(nil) }
@@ -35,7 +35,7 @@ struct ProductivityNotionSettings: View {
         if status == errSecSuccess {
             refresh()
             token = ""
-            message = value == nil ? String(localized: "Token removed.") : String(localized: "Token saved in Keychain.")
+            message = value == nil ? String(localized: "Token removed.") : String(localized: "Connection saved on this Mac.")
         } else {
             message = SecCopyErrorMessageString(status, nil) as String? ?? String(localized: "Keychain unavailable.")
         }
