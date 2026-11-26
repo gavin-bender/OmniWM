@@ -61,26 +61,14 @@ extension LayoutRefreshController {
             return .unavailable
         }
 
-        let moveEpsilon: CGFloat = 0.01
-        if abs(frame.origin.x - origin.x) < moveEpsilon,
-           abs(frame.origin.y - origin.y) < moveEpsilon
-        {
-            return .alreadyHidden(
-                WindowPositionPlan(
-                    entry: entry,
-                    frame: CGRect(origin: origin, size: frame.size)
-                ),
-                hiddenState: hiddenState
-            )
+        let target = CGRect(origin: origin, size: frame.size)
+        let plan = WindowPositionPlan(entry: entry, frame: target)
+        let atVerifiedPark = controller.axManager.parkTargetFrame(for: entry.windowId) == target
+            && controller.axManager.verifiedParkFrame(for: entry.windowId) == frame
+        if atVerifiedPark || frame.approximatelyEqual(to: target, tolerance: 0.01) {
+            return .alreadyHidden(plan, hiddenState: hiddenState)
         }
-
-        return .movable(
-            WindowPositionPlan(
-                entry: entry,
-                frame: CGRect(origin: origin, size: frame.size)
-            ),
-            hiddenState: hiddenState
-        )
+        return .movable(plan, hiddenState: hiddenState)
     }
 
     private func updatedHiddenState(

@@ -10,7 +10,7 @@ import Foundation
 final class AXParkFrameLedger {
     private struct ParkFrameTargetState {
         let target: AXFrameApplicationTarget
-        var isVerified: Bool
+        var verifiedFrame: CGRect?
     }
 
     private(set) var pendingParkWindowIds: Set<Int> = []
@@ -60,7 +60,7 @@ final class AXParkFrameLedger {
         if let retainedTarget {
             parkFrameTargetStatesByWindowId[windowId] = ParkFrameTargetState(
                 target: retainedTarget,
-                isVerified: false
+                verifiedFrame: nil
             )
         } else {
             parkFrameTargetStatesByWindowId.removeValue(forKey: windowId)
@@ -68,7 +68,7 @@ final class AXParkFrameLedger {
         pendingParkWindowIds.insert(windowId)
         parkPIDByWindowId[windowId] = pid
         let cancelledTarget = pending?.request.frame
-            ?? (targetState?.isVerified == true ? targetState?.target.frame : nil)
+            ?? targetState?.verifiedFrame
         if let cancellationReason, let cancelledTarget {
             FrameApplyTrace.recordEvent(
                 pid: pid,
@@ -91,12 +91,17 @@ final class AXParkFrameLedger {
     }
 
     func verifiedParkFrame(for windowId: Int) -> CGRect? {
-        guard let state = parkFrameTargetStatesByWindowId[windowId],
-              state.isVerified
-        else {
-            return nil
-        }
-        return state.target.frame
+        parkFrameTargetStatesByWindowId[windowId]?.verifiedFrame
+    }
+
+    func refineVerifiedPlacement(_ result: AXFrameApplyResult, move: () -> CGRect?) {
+        guard var state = parkFrameTargetStatesByWindowId[result.windowId],
+              state.verifiedFrame == result.targetFrame, state.target.frame == result.targetFrame,
+              state.target.pid == result.pid, sameAXWindowIdentity(state.target.expectedWindow, result.expectedWindow),
+              let destination = move()
+        else { return }
+        state.verifiedFrame = destination
+        parkFrameTargetStatesByWindowId[result.windowId] = state
     }
 
     func parkTargetFrame(for windowId: Int) -> CGRect? {
@@ -253,7 +258,7 @@ extension AXParkFrameLedger {
             parkPIDByWindowId[windowId] = target.pid
 
             if let state = parkFrameTargetStatesByWindowId[windowId],
-               state.isVerified,
+               state.verifiedFrame != nil,
                state.target.pid == target.pid,
                sameAXWindowIdentity(state.target.expectedWindow, target.expectedWindow),
                state.target.frame == target.frame
@@ -293,6 +298,7 @@ extension AXParkFrameLedger {
 
     func processParkFrameApplyResults(
         _ results: [AXFrameApplyResult],
+        finishPlacement: (AXFrameApplyResult) -> CGRect? = { _ in nil },
         onFailure: (AXFrameApplyResult) -> Void = { _ in }
     ) -> [AXFrameApplicationRequest] {
         var retries: [AXFrameApplicationRequest] = []
@@ -318,7 +324,7 @@ extension AXParkFrameLedger {
                         window: result.expectedWindow,
                         frame: result.targetFrame
                     ),
-                    isVerified: true
+                    verifiedFrame: finishPlacement(result) ?? result.targetFrame
                 )
                 parkPIDByWindowId[windowId] = result.pid
                 pendingParkWindowIds.remove(windowId)
@@ -365,7 +371,7 @@ extension AXParkFrameLedger {
     ) -> AXFrameApplicationRequest {
         parkFrameTargetStatesByWindowId[target.windowId] = ParkFrameTargetState(
             target: target,
-            isVerified: false
+            verifiedFrame: nil
         )
         let request = AXFrameApplicationRequest(
             requestId: makeNextParkFrameRequestId(),

@@ -2,12 +2,64 @@
 // Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
 import Foundation
+import OmniWMSystemGestures
 
 @MainActor
 extension LayoutRefreshController {
     struct WindowPositionPlan {
         let entry: WindowState
         let frame: CGRect
+    }
+
+    func finishParkPlacement(_ result: AXFrameApplyResult, retry: Bool = true) -> CGRect? {
+        let token = WindowToken(pid: result.pid, windowId: result.windowId)
+        guard let controller, let entry = controller.workspaceManager.entry(for: token),
+              entry.hiddenState != nil, let window = entry.axRef,
+              sameAXWindowIdentity(window, result.expectedWindow),
+              !workspaceSwipe.isPresentingIncomingWindow(token),
+              let monitor = controller.workspaceManager.monitor(for: entry.workspaceId),
+              let destination = Self.exteriorParkFrame(
+                  result.targetFrame, monitor: monitor, monitors: controller.workspaceManager.monitors
+              ), omniwm_dock_slide_available()
+        else { return nil }
+
+        let id = UInt32(result.windowId)
+        var base = CGRect.zero
+        var transform = CGAffineTransform.identity
+        let expected = ScreenCoordinateSpace.toWindowServer(rect: result.targetFrame)
+        let target = ScreenCoordinateSpace.toWindowServer(rect: destination)
+        if omniwm_dock_slide_geometry(id, &base, &transform), omniwm_dock_slide_at_position(transform, base.origin) {
+            if base == target || (base == expected && omniwm_dock_scroll_window(id, target)) { return destination }
+        }
+        // AX can acknowledge the write before the app commits its frame to WindowServer.
+        if retry {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) { [weak self] in
+                guard let self, let controller = self.controller else { return }
+                controller.axManager.parkLedger.refineVerifiedPlacement(result) {
+                    self.finishParkPlacement(result, retry: false)
+                }
+            }
+        }
+        return nil
+    }
+
+    // AX requires one point of screen contact. Once it settles, the Dock can
+    // move the physical window the remaining distance beyond an exterior edge.
+    static func exteriorParkFrame(_ frame: CGRect, monitor: Monitor, monitors: [Monitor]) -> CGRect? {
+        let contact = frame.intersection(monitor.visibleFrame)
+        guard !contact.isEmpty, contact.width == hiddenWindowEdgeRevealEpsilon else { return nil }
+        // A flush window still casts its WindowServer shadow across the display.
+        let shadowClearance: CGFloat = 64
+        let destination: CGRect
+        if frame.minX == contact.minX, contact.maxX == monitor.visibleFrame.maxX {
+            destination = frame.offsetBy(dx: monitor.frame.maxX + shadowClearance - frame.minX, dy: 0)
+        } else if frame.maxX == contact.maxX, contact.minX == monitor.visibleFrame.minX {
+            destination = frame.offsetBy(dx: monitor.frame.minX - shadowClearance - frame.maxX, dy: 0)
+        } else {
+            return nil
+        }
+        let shadow = destination.insetBy(dx: -shadowClearance, dy: -shadowClearance)
+        return monitors.contains { !$0.frame.intersection(shadow).isEmpty } ? nil : destination
     }
 
     func repairWorkspaceInactivePark(for entry: WindowState, observedFrame: CGRect) {
@@ -75,15 +127,21 @@ extension LayoutRefreshController {
                   side: side,
                   reason: .layoutTransient
               ),
-              !observedFrame.size.isWithinFrameTolerance(of: parkFrame.size) || !observedFrame.approximatelyEqual(
-                  to: CGRect(origin: parkOrigin, size: observedFrame.size),
-                  tolerance: FrameTolerance.frameWrite
-              ),
               !controller.workspaceManager.isWindowSuppressedByMacOS(entry.token),
               !controller.axManager.macOSHiddenAppPIDs.contains(entry.pid),
               !controller.workspaceManager.spaceTopology.isWindowOnKnownInactiveSpace(entry.windowId)
         else { return }
 
+        let verified = controller.axManager.verifiedParkFrame(for: entry.windowId)
+        let target = CGRect(origin: parkOrigin, size: observedFrame.size)
+        let expected = parkFrame == target ? verified ?? target : target
+        guard !observedFrame.size.isWithinFrameTolerance(of: parkFrame.size)
+            || !observedFrame.approximatelyEqual(to: expected, tolerance: FrameTolerance.frameWrite)
+        else { return }
+
+        if verified != nil {
+            controller.axManager.markParkPending(for: entry.windowId, pid: entry.pid)
+        }
         hideWindow(
             entry,
             monitor: monitor,

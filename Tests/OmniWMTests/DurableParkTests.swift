@@ -9,6 +9,57 @@ import XCTest
 
 @MainActor
 final class DurableParkTests: XCTestCase {
+    func testExteriorParkClearsThePhysicalEdgeAndAvoidsAdjacentDisplays() throws {
+        let monitor = Self.monitor()
+        let rightPark = CGRect(x: monitor.visibleFrame.maxX - 1, y: 16, width: 800, height: 600)
+        let leftPark = CGRect(x: monitor.visibleFrame.minX - 799, y: 16, width: 800, height: 600)
+        for parked in [leftPark, rightPark] {
+            let exterior = try XCTUnwrap(LayoutRefreshController.exteriorParkFrame(
+                parked, monitor: monitor, monitors: [monitor]
+            ))
+            XCTAssertTrue(monitor.frame.intersection(exterior.insetBy(dx: -64, dy: -64)).isEmpty)
+            XCTAssertEqual(exterior.size, parked.size)
+            XCTAssertEqual(exterior.minY, parked.minY)
+        }
+        let adjacentFrame = monitor.frame.offsetBy(dx: monitor.frame.width, dy: 0)
+        let adjacent = Monitor(
+            id: .init(displayId: 78), displayId: 78, frame: adjacentFrame, visibleFrame: adjacentFrame,
+            hasNotch: false, name: "Adjacent"
+        )
+        XCTAssertNil(LayoutRefreshController.exteriorParkFrame(rightPark, monitor: monitor, monitors: [monitor, adjacent]))
+        XCTAssertNil(LayoutRefreshController.exteriorParkFrame(monitor.visibleFrame, monitor: monitor, monitors: [monitor]))
+    }
+
+    func testConfirmedExteriorParkSurvivesReconciliationAndReleasesOnReveal() throws {
+        let fixture = try Self.layoutParkFixture(pid: 972_002, windowId: 972_102, isAnimationTick: false)
+        let manager = fixture.controller.axManager
+        let entry = try XCTUnwrap(fixture.controller.workspaceManager.entry(for: fixture.token))
+        let target = AXFrameApplicationTarget(pid: fixture.token.pid, window: try XCTUnwrap(entry.axRef), frame: fixture.parkedFrame)
+        let request = try XCTUnwrap(manager.prepareParkFrameApplications([target]).first)
+        let exterior = try XCTUnwrap(LayoutRefreshController.exteriorParkFrame(
+            fixture.parkedFrame, monitor: fixture.monitor, monitors: [fixture.monitor]
+        ))
+        var moves = 0
+        manager.finishParkPlacement = { _ in
+            moves += 1
+            return exterior
+        }
+        let result = WindowAdmissionTestSupport.successfulFrameResult(request: request)
+        manager.handleParkFrameApplyResults([result, result])
+        XCTAssertEqual(moves, 1)
+        XCTAssertEqual(manager.verifiedParkFrame(for: fixture.token.windowId), exterior)
+        fixture.controller.layoutRefreshController.repairLayoutTransientPark(for: entry, side: .left, observedFrame: exterior)
+        XCTAssertTrue(manager.prepareParkFrameApplications([target]).isEmpty)
+        XCTAssertEqual(manager.cancelParkFrameJobs([(fixture.token.pid, fixture.token.windowId)]), [fixture.token])
+        manager.handleParkFrameApplyResults([result])
+        manager.parkLedger.refineVerifiedPlacement(result) {
+            XCTFail("A late compositor move must not reclaim a revealed window")
+            return exterior
+        }
+        XCTAssertNil(manager.verifiedParkFrame(for: fixture.token.windowId))
+        XCTAssertEqual(moves, 1)
+    }
+
     func testClampedPortraitParkRequiresAXVerificationOfCorrectedPosition() throws {
         for failure: AXFrameWriteFailureReason in [.verificationMismatch, .positionWriteFailed(.failure)] {
             try assertClampedPortraitParkRequiresAXVerification(failure: failure)

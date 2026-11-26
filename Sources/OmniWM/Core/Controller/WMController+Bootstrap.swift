@@ -10,6 +10,9 @@ extension WMController {
         axManager.isWindowParked = { [workspaceManager] windowId in
             workspaceManager.withEntry(forWindowId: windowId) { $0.hiddenState != nil } == true
         }
+        axManager.finishParkPlacement = { [weak self] result in
+            self?.layoutRefreshController.finishParkPlacement(result)
+        }
         axManager.onParkFrameApplyFailed = { [weak self] result in
             self?.layoutRefreshController.repairLayoutTransientPark(after: result)
         }
