@@ -23,7 +23,7 @@ final class ShellMenuWidgetTests: XCTestCase {
         for profile in ShellProfiles.names(in: shell) {
             _ = try ShellProfiles.select(profile, in: shell)
             let config = ShellConfig.resolve(shellDirectory: shell)
-            guard config.leading.contains("apple-menu") else {
+            guard config.leading.contains("app-menu") else {
                 XCTAssertEqual(profile, "vitreus")
                 continue
             }

@@ -1,4 +1,4 @@
-leading = ["apple-menu", "app-menu", "omniwm", "workspaces", "scratchpads"]
+leading = ["omniwm", "app-menu", "workspaces", "scratchpads"]
 center = ["active-window"]
 trailing = ["media", "notifications", "volume", "wifi", "battery-details", "control-center", "system-stats", "clock"]
 

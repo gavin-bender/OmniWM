@@ -177,6 +177,10 @@ extension ShellConfig {
             }
         }
         config.leading = names(table["leading"], key: "leading", &problems)
+        // Layout edits saved a copy of the entire lane, including the former stock menu buttons.
+        if config.leading.starts(with: ["apple-menu", "app-menu", "omniwm"]) {
+            config.leading.replaceSubrange(0 ..< 3, with: ["omniwm", "app-menu"])
+        }
         config.center = names(table["center"], key: "center", &problems)
         config.trailing = names(table["trailing"], key: "trailing", &problems)
         config.priority = names(table["priority"], key: "priority", &problems)

@@ -48,7 +48,7 @@ struct MenuItemSnapshot {
 @MainActor
 struct MenuAXReader {
     static let itemAttributeKeys = [
-        "AXTitle", "AXRole", "AXRoleDescription", "AXEnabled",
+        "AXTitle", "AXIdentifier", "AXRole", "AXRoleDescription", "AXEnabled",
         "AXMenuItemMarkChar", "AXMenuItemCmdChar", "AXMenuItemCmdModifiers", "AXChildren"
     ]
 

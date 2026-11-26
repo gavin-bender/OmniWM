@@ -126,7 +126,7 @@ final class ShellVitreusBarTests: XCTestCase {
             "controlsSymbol": .string("cogwheel"),
             "layout": .string("island"), "size": .number(1),
             "pieces": .strings([
-                "apple", "app", "workspaces", "scratchpads", "title", "tray", "search", "stats", "omniwm", "controls",
+                "app", "workspaces", "scratchpads", "title", "tray", "search", "stats", "omniwm", "controls",
                 "clock"
             ]),
             "pins": .strings([]), "addons": .strings([]), "dockOverlap": .bool(false), "visualiser": .bool(false),
@@ -188,7 +188,7 @@ final class ShellVitreusBarTests: XCTestCase {
         XCTAssertEqual(rows[1][1], 0.945)
         XCTAssertEqual(Array(lines.dropFirst()), [
             "workspaces,clock,omniwm", "omniwm,title", "omniwm",
-            "apple,app,workspaces,scratchpads,title,tray,search,stats,omniwm,controls,clock"
+            "app,workspaces,scratchpads,title,tray,search,stats,omniwm,controls,clock"
         ])
     }
 

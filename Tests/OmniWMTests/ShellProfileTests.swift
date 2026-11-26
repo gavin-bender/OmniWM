@@ -190,14 +190,23 @@ final class ShellDefaultsTests: XCTestCase {
                 XCTAssertEqual(config.leading + config.center + config.trailing, [], profile)
                 continue
             }
-            XCTAssertEqual(Array(config.leading.prefix(3)), ["apple-menu", "app-menu", "omniwm"], profile)
-            for name in ["apple-menu", "app-menu"] {
+            XCTAssertEqual(Array(config.leading.prefix(2)), ["omniwm", "app-menu"], profile)
+            XCTAssertFalse(config.leading.contains("apple-menu"), profile)
+            for name in ["omniwm", "app-menu"] {
                 XCTAssertEqual(config.widget(name), shell.appendingPathComponent("default/widgets/\(name)/init.luau"))
                 XCTAssertEqual(config.leading.filter { $0 == name }.count, 1, profile)
                 XCTAssertFalse(config.center.contains(name), profile)
                 XCTAssertFalse(config.trailing.contains(name), profile)
             }
         }
+    }
+
+    func testSavedMenuButtonOrderIsMergedAndKeepsTheOtherWidgets() throws {
+        let shell = root.appendingPathComponent("shell", isDirectory: true)
+        XCTAssertEqual(try ShellStyleFixture.prepare(into: shell), [])
+        try Data(#"profiles.default.leading = ["apple-menu", "app-menu", "omniwm", "clock"]"#.utf8)
+            .write(to: shell.appendingPathComponent("shell.toml"))
+        XCTAssertEqual(ShellConfig.resolve(shellDirectory: shell).leading, ["omniwm", "app-menu", "clock"])
     }
 
     func testScratchpadIconCountComesFromTheResolvedProfileAndIsClamped() throws {
@@ -223,7 +232,7 @@ final class ShellDefaultsTests: XCTestCase {
         XCTAssertEqual(config.profile, "default")
         XCTAssertEqual(config.themeName, "native")
         XCTAssertEqual(config.theme, .native)
-        XCTAssertEqual(config.leading, ["apple-menu", "app-menu", "omniwm", "workspaces", "scratchpads"])
+        XCTAssertEqual(config.leading, ["omniwm", "app-menu", "workspaces", "scratchpads"])
         XCTAssertEqual(config.center, ["active-window"])
         XCTAssertEqual(
             config.trailing,

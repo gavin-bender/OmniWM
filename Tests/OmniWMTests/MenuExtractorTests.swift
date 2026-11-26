@@ -431,6 +431,27 @@ final class MenuExtractorTests: XCTestCase {
         XCTAssertTrue(items[1].submenu?.axRootElement.map { CFEqual($0, recentRoot) } == true)
     }
 
+    func testAppleCommandPairsKeepOnlyTheConfirmationItemsAndTheirAXTargets() throws {
+        let root = AXUIElementCreateApplication(91_640)
+        let rows = (1 ... 4).map { AXUIElementCreateApplication(91_640 + Int32($0)) }
+        let commands = [
+            ("Redémarrer…", "_restartRequested:", "", 0),
+            ("Redémarrer", "_restartNowRequested:", "", 10),
+            ("Log Out…", "_logOutRequested:", "Q", 1),
+            ("Log Out", "_logOutNowRequested:", "Q", 3)
+        ]
+        let extractor = contentExtractor(children: [(root, rows)], attributes: zip(rows, commands).map { row, command in
+            (row, ["AXRole": "AXMenuItem", "AXEnabled": true, "AXTitle": command.0,
+                   "AXIdentifier": command.1, "AXMenuItemCmdChar": command.2, "AXMenuItemCmdModifiers": command.3])
+        })
+        let items = try extractor.buildSubmenu(from: root, target: nil, action: nil)
+        XCTAssertEqual(items.map(\.title), ["Redémarrer…", "Log Out…"])
+        XCTAssertEqual(items[1].keyEquivalentModifierMask, [.command, .shift])
+        for (item, row) in zip(items, [rows[0], rows[2]]) {
+            XCTAssertTrue(CFEqual(item.representedObject as CFTypeRef?, row))
+        }
+    }
+
     func testAppleSelectionDistinguishesEmptyContentsFromMissingAppleRoot() throws {
         let menuBar = AXUIElementCreateApplication(91_620)
         let apple = AXUIElementCreateApplication(91_621)

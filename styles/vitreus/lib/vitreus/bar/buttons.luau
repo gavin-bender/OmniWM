@@ -150,6 +150,7 @@ local function content(ctx, g, slot, name: string)
             color = "#FFFFFFFF",
         })
         help = if locked then omniwm.l10n("Secure Input is on: Option shortcuts are paused")
+            elseif ctx.data.bar.style.hidesMenuBar then omniwm.l10n("Window manager controls (right-click for Apple menu)")
             else omniwm.l10n("Window manager controls")
     else
         local passes = pencil.icon(name, size / 2 - pivot, size / 2 - pivot, bu, a, fr)
@@ -161,7 +162,7 @@ local function content(ctx, g, slot, name: string)
     return { ui.stack({
         key = "bar-" .. name, align = "topLeading", dx = cx - zone / 2,
         dy = if vertical then slot.cy - height / 2 else pill.y, w = zone + (if vertical then 0 else shift), h = height,
-        cursor = "pointer", help = help, onClick = click, onRightClick = if logo then click else nil,
+        cursor = "pointer", help = help, onClick = click, onRightClick = if logo and ctx.data.bar.style.hidesMenuBar then "menu apple" elseif logo then click else nil,
         onHover = hover(name, not logo),
         ui.stack(icon),
         if shift > 0 then ui.symbol({

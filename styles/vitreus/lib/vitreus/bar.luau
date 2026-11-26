@@ -26,7 +26,7 @@ local calm = table.freeze({ response = 0.513, bounce = 0.06 })
 local beat = table.freeze({ response = 2 * math.pi / math.sqrt(480), bounce = 1 - 15 / (2 * math.sqrt(480)) })
 local swellWidth, swellHeight = 10, 6
 local defaults = table.freeze({
-    "apple", "app", "workspaces", "scratchpads", "title", "tray", "search", "stats", "omniwm", "controls", "clock",
+    "app", "workspaces", "scratchpads", "title", "tray", "search", "stats", "omniwm", "controls", "clock",
 })
 local owners = table.freeze({
     apple = menus, app = menus, workspaces = marks, scratchpads = scratchpads, title = title, tray = tray,

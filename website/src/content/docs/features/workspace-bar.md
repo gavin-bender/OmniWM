@@ -23,6 +23,7 @@ In **Settings → Keyboard Shortcuts**, search for **Top Bar** to change the cyc
 
 ## Clicking the bar
 
+- When the workspace bar replaces the macOS menu bar, click the OmniWM button for controls, right-click for the Apple menu, or Option-click for hidden menu bar icons.
 - Choose the OmniWM button icon under **Settings > Styles & Widgets > Bar > OmniWM > Symbol**. Options include GB Signature and GB Apple Cutout.
 - Click a workspace chip to switch to that workspace.
 - Click an app icon to focus that window directly.

@@ -278,13 +278,13 @@ final class ShellWidgetBarLifecycleTests: XCTestCase {
             try Data(contentsOf: XCTUnwrap(ShellConfig.bundledWidget("clock")))
         )
         XCTAssertTrue(FileManager.default.fileExists(atPath: shell.appendingPathComponent("widgets").path))
-        let expected = ["apple-menu", "app-menu", "omniwm"]
+        let expected = ["omniwm", "app-menu"]
         await waitForBarModel(of: manager, on: monitor) {
             let ids = manager.barsByMonitor[monitor.id]?.model.snapshot.shellWidgets.map(\.id) ?? []
             return Set(ids).isSuperset(of: expected)
         }
         XCTAssertEqual(
-            manager.barsByMonitor[monitor.id].map { Array($0.model.snapshot.shellWidgets.prefix(3).map(\.id)) },
+            manager.barsByMonitor[monitor.id].map { Array($0.model.snapshot.shellWidgets.prefix(expected.count).map(\.id)) },
             expected
         )
     }

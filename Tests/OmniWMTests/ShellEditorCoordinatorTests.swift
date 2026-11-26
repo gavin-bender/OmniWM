@@ -173,7 +173,7 @@ final class ShellEditorCoordinatorTests: XCTestCase {
         try await configuration.editBar { $0.leading = ["clock"] }
         XCTAssertEqual(configuration.config.leading, ["clock"])
         try await configuration.resetBarLayout()
-        XCTAssertEqual(Array(configuration.config.leading.prefix(3)), ["apple-menu", "app-menu", "omniwm"])
+        XCTAssertEqual(Array(configuration.config.leading.prefix(2)), ["omniwm", "app-menu"])
         try await configuration.updateMonitor(monitor()) { $0.height = 72 }
         XCTAssertEqual(configuration.config.barOverride?.monitorOverrides.first?.height, 72)
         try await configuration.updateMonitor(monitor(), change: nil)

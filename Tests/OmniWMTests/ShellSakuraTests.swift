@@ -34,7 +34,7 @@ final class ShellSakuraTests: XCTestCase {
         XCTAssertEqual(config.theme.light, config.theme.dark)
         XCTAssertEqual(
             config.leading,
-            ["apple-menu", "app-menu", "omniwm", "workspaces", "scratchpads", "active-window"]
+            ["omniwm", "app-menu", "workspaces", "scratchpads", "active-window"]
         )
         XCTAssertEqual(config.center, ["clock"])
         XCTAssertEqual(

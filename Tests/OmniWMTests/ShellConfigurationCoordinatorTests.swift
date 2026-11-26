@@ -840,7 +840,7 @@ final class ShellConfigurationCoordinatorTests: XCTestCase {
 
         try await coordinator.resetBarLayout()
 
-        XCTAssertEqual(Array(coordinator.config.leading.prefix(3)), ["apple-menu", "app-menu", "omniwm"])
+        XCTAssertEqual(Array(coordinator.config.leading.prefix(2)), ["omniwm", "app-menu"])
         let document = try parsedBarConfiguration(shell)
         XCTAssertEqual(document["profile"], .string("default"))
         guard case let .table(profiles)? = document["profiles"],

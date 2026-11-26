@@ -5584,6 +5584,17 @@
         }
       }
     },
+    "Window manager controls (right-click for Apple menu)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Window manager controls (right-click for Apple menu)"
+          }
+        }
+      }
+    },
     "Window manager controls" : {
       "extractionState" : "manual",
       "localizations" : {

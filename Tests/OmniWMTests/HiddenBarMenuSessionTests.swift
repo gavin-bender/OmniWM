@@ -111,7 +111,7 @@ final class HiddenBarMenuSessionTests: XCTestCase {
         XCTAssertEqual(page.rows.map(\.title), ["Command", "Disabled", ""])
         XCTAssertEqual(page.rows.map(\.enabled), [true, false, false])
         XCTAssertEqual(page.rows[0].mark, "✓")
-        XCTAssertEqual(page.rows[0].shortcut, "⇧⌘K")
+        XCTAssertEqual(page.rows[0].shortcut, "⇧K")
         XCTAssertTrue(page.rows[2].separator)
         XCTAssertNil(page.backID)
         XCTAssertEqual(session.bundleID, "com.example.menu")

@@ -2,10 +2,10 @@
 # Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
 theme = "native"
-leading = ["apple-menu", "app-menu", "omniwm", "workspaces", "scratchpads"]
+leading = ["omniwm", "app-menu", "workspaces", "scratchpads"]
 center = ["active-window"]
 trailing = ["productivity", "media", "notifications", "volume", "battery-wifi", "control-center", "system-stats", "clock"]
-priority = ["workspaces", "app-menu", "apple-menu", "clock", "control-center", "omniwm", "hidden-bar", "battery-wifi", "volume", "notifications", "scratchpads", "system-stats", "productivity", "media", "active-window"]
+priority = ["workspaces", "app-menu", "omniwm", "clock", "control-center", "hidden-bar", "battery-wifi", "volume", "notifications", "scratchpads", "system-stats", "productivity", "media", "active-window"]
 hiddenBarWidget = "hidden-bar"
 systemStatsWidget = "system-stats"
 

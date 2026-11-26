@@ -194,6 +194,16 @@ final class MenuExtractor {
         )
     }
 
+    // AppKit exports both sides of its modifier-dependent Apple commands through AXChildren.
+    // Their action identifiers are independent of the current language and frontmost app.
+    private static let appleAlternatePrimaries = [
+        "_systemInformationRequested:": "_aboutThisMacRequested:",
+        "_forceQuitRequested:": "_forceQuitPanelRequested:",
+        "_restartNowRequested:": "_restartRequested:",
+        "_shutDownNowRequested:": "_shutDownRequested:",
+        "_logOutNowRequested:": "_logOutRequested:"
+    ]
+
     private func buildMenuItems(
         from snapshots: [MenuItemSnapshot],
         target: AnyObject?,
@@ -207,9 +217,15 @@ final class MenuExtractor {
         var isFirst = true
         var needsSeparator = false
 
+        var previousIdentifier: String?
         for snapshot in snapshots {
             autoreleasepool {
                 let itemData = snapshot.attributes
+                let identifier = itemData["AXIdentifier"] as? String
+                defer { previousIdentifier = identifier }
+                if let identifier, let primary = Self.appleAlternatePrimaries[identifier], previousIdentifier == primary {
+                    return
+                }
                 let isApple = MenuAXReader.isAppleMenuItem(itemData)
                 if let item = buildSingleMenuItem(
                     from: snapshot,
@@ -352,8 +368,7 @@ extension NSEvent.ModifierFlags {
         if mods & 1 != 0 { flags.insert(.shift) }
         if mods & 2 != 0 { flags.insert(.option) }
         if mods & 4 != 0 { flags.insert(.control) }
-        if mods & 8 != 0 { flags.insert(.command) }
-        if flags.isEmpty { flags.insert(.command) }
+        if mods & 8 == 0 { flags.insert(.command) }
         return flags
     }
 }

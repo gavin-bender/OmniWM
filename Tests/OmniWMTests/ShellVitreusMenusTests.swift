@@ -44,7 +44,8 @@ final class ShellVitreusMenusTests: XCTestCase {
     }
 
     func widget(
-        _ shell: URL, layout: String = "island", pieces: [String]? = nil, hides: Bool = true,
+        _ shell: URL, layout: String = "island", pieces: [String]? = ["apple", "app"] + ShellVitreusMenusTests.classic,
+        hides: Bool = true,
         app: ShellMenuApp? = safari, title: String = "A document", tray: Bool = false
     ) throws -> ShellRenderedWidget {
         let widget = try ShellRenderedWidget(
@@ -123,6 +124,15 @@ final class ShellVitreusMenusTests: XCTestCase {
 }
 
 extension ShellVitreusMenusTests {
+    func testDefaultLayoutCombinesTheAppleAndOmniWMButtons() throws {
+        let widget = try widget(shell(), pieces: nil)
+        XCTAssertFalse(has(widget, "bar-apple"))
+        XCTAssertTrue(has(widget, "bar-app"))
+        let button = try content(widget, "bar-omniwm")
+        XCTAssertEqual(widget.text.string(button.action), "shell menu")
+        XCTAssertEqual(widget.text.string(button.secondaryAction), "menu apple")
+    }
+
     func testTheMenusRunTheNativeMenuActionsWithTheButtonsHaloHoverAndHelp() throws {
         let widget = try widget(shell())
         for (name, help, rest) in [("apple", "Apple Menu", 0.65), ("app", "Safari", 0.88)] {

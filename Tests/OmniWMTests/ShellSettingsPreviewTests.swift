@@ -30,7 +30,7 @@ final class ShellSettingsPreviewTests: XCTestCase {
         let settings = WorkspaceBarSettings()
         for profile in ShellProfiles.names(in: directory) where profile != "vitreus" {
             let config = try config(profile, in: directory)
-            XCTAssertTrue(config.leading.contains("apple-menu"), profile)
+            XCTAssertFalse(config.leading.contains("apple-menu"), profile)
             XCTAssertTrue(config.leading.contains("app-menu"), profile)
             let request = ShellSettingsPreview.Request(
                 config: config, surface: .bar, style: ShellSettingsPreview.style(settings: settings, config: config),

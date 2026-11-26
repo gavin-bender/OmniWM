@@ -29,9 +29,13 @@ function render(ctx: Context)
     local symbol, name = layoutMark(ctx.data.bar)
     local mark = symbol
         and look.barGlyph(ctx, { name = symbol, size = look.px(ctx, "symbol"), help = omniwm.l10n(name) })
-    local behaviour = { onClick = "shell menu", onRightClick = "shell menu",
-        help = locked and omniwm.l10n("Secure Input is on: Option shortcuts are paused")
-            or omniwm.l10n("Window manager controls") }
+    local behaviour = {
+        onClick = "shell menu",
+        onRightClick = if style.hidesMenuBar then "menu apple" else "shell menu",
+        help = if locked then omniwm.l10n("Secure Input is on: Option shortcuts are paused")
+            elseif style.hidesMenuBar then omniwm.l10n("Window manager controls (right-click for Apple menu)")
+            else omniwm.l10n("Window manager controls"),
+    }
     local button
     if frame then
         frame[1] = controlsSymbol(choice, locked, glyph)

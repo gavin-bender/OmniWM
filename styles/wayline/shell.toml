@@ -2,7 +2,7 @@
 # Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
 theme = "wayline"
-leading = ["apple-menu", "app-menu", "omniwm", "workspaces", "scratchpads", "active-window"]
+leading = ["omniwm", "app-menu", "workspaces", "scratchpads", "active-window"]
 center = ["clock"]
 trailing = ["media", "notifications", "volume", "wifi", "battery-details", "control-center", "system-stats"]
 

@@ -30,6 +30,20 @@ final class WorkspaceBarMenuButtonTests: XCTestCase {
         XCTAssertEqual(widget.clicks.map(\.button), [.left, .right])
     }
 
+    func testMergedButtonRoutesRightClickToAppleWhenReplacingTheMenuBar() throws {
+        let widget = try ShellRenderedWidget("omniwm")
+        var style = ShellBarStyle()
+        style.hidesMenuBar = true
+        widget.render(ShellBarData(style: style))
+        XCTAssertTrue(widget.strings().contains("gearshape.fill"))
+        let center = CGPoint(x: 10, y: 10)
+        for button in [ShellEvent.Button.left, .right] {
+            widget.surface.press(at: center, button: button)
+            widget.surface.release(at: center, event: ShellEvent(button: button, modifiers: []))
+        }
+        XCTAssertEqual(widget.clicks.map(\.action), [ShellRequest.statusMenuCommand, "menu apple"])
+    }
+
     func testControlsSymbolChoicesRenderAndYieldToSecureInput() throws {
         let widget = try ShellRenderedWidget("omniwm")
         for (choice, symbol) in [("tiled-windows", "rectangle.split.2x1.fill"), ("sliders", "slider.horizontal.3"),

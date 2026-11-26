@@ -21,7 +21,7 @@ final class ShellBarIconSizeTests: XCTestCase {
         ("launcher", ["magnifyingglass"]),
         ("media", ["play.fill"]),
         ("notifications", ["bell.badge"]),
-        ("omniwm", ["omniwm", "rectangle.split.3x1"]),
+        ("omniwm", ["gearshape.fill", "rectangle.split.3x1"]),
         ("privacy", ["mic.fill", "video.fill"]),
         ("stats", ["cpu", "memorychip"]),
         ("volume", ["speaker.wave.2.fill"]),
