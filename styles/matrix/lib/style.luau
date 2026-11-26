@@ -53,9 +53,12 @@ function style.panel(props)
     props.pad = props.pad or 14
     props.gap = props.gap or 12
     props.center = false
+    local background = props.backgroundShader
+    props.backgroundShader = nil
+    if background then background.radius = 2 end
     return ui.stack{ w = props.w, h = props.h, radius = 2, material = "clear", attach = true,
         fill = "background", border = "border", borderWidth = 1, open = 0.2, close = 0.16,
-        ui.shader{ source = "matrix-rain.metal", values = { 0.13, 0.7, 15, 0 }, fps = 30, radius = 2 },
+        background or ui.shader{ source = "matrix-rain.metal", values = { 0.13, 0.7, 15, 0 }, fps = 30, radius = 2 },
         ui.column(props) }
 end
 

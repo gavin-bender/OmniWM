@@ -155,7 +155,7 @@ local function skin(look)
             props.border = "border"
             props.borderWidth = 1
         end
-        return ui.column(props)
+        return require("./panel-column")(props)
     end
     look.group = look.group or function(props)
         props.pad = props.pad or 12

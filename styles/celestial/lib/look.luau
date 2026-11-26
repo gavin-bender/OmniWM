@@ -166,7 +166,7 @@ local function panel(_, props)
     props.shadow = "shadow/0.35"
     props.shadowRadius = 10
     props.center = false
-    return ui.column{ material = "clear", pad = tokens.padding.small, ui.column(props) }
+    return ui.column{ material = "clear", pad = tokens.padding.small, require("./panel-column")(props) }
 end
 
 local PALETTE_MODES = {

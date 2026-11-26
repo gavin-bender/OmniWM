@@ -230,7 +230,7 @@ local function framedPanel(ctx, props, width)
     props.pad = props.pad or 12
     props.gap = props.gap or 10
     props.center = false
-    return panel(ctx.data.bar.style, width, ui.column(props))
+    return panel(ctx.data.bar.style, width, require("./panel-column")(props))
 end
 
 local COMPACT_STATS_TINTS = { cpu = "accent", memory = "blue", gpu = "purple", disk = "orange", down = "green", up = "teal" }
@@ -1165,7 +1165,7 @@ return require("./skin")({
     batteryPanel = function(ctx, m)
         local width = 320
         local inner = width - 26
-        return framedPanel(ctx, { gap = 10,
+        return framedPanel(ctx, { gap = 10, backgroundShader = require("./battery").background(m),
             ui.row{ w = inner, gap = 0,
                 ui.box{ w = 2, h = 1 },
                 ui.text{ text = omniwm.l10n("Battery"), size = 15, weight = "bold" } },

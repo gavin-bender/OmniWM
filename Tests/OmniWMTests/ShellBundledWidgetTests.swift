@@ -898,6 +898,22 @@ final class ShellBundledWidgetTests: XCTestCase {
         }
     }
 
+    func testBatteryHyperspaceSitsBehindThePowerControlsAcrossStyles() throws {
+        let power = ShellPower(mode: .high, supportsHighPower: true)
+        let data = try fullData().filter { $0.0 != "power" } + [("power", value { power.write(into: &$0) })]
+        for style in [ShellDefaults.profile] + (try ShellStyleFixture.names()) {
+            for widget in ["battery", "battery-wifi"] {
+                try renderStyle(style, widget: widget, data: data, inspect: { view, nodes, text in
+                    guard view == OMNI_VIEW_POPOUT else { return }
+                    let label = style + "/" + widget
+                    let stars = try XCTUnwrap(nodes.firstIndex { text.string($0.text) == "battery-hyperspace.metal" }, label)
+                    let controls = try XCTUnwrap(nodes.firstIndex { text.string($0.action) == "battery mode high" }, label)
+                    XCTAssertLessThan(stars, controls, label)
+                })
+            }
+        }
+    }
+
     func testBatteryWiFiGaugeReflectsPowerAndSignalIndependently() throws {
         let base = try fullData().filter { !["battery", "power", "wifi", "connection"].contains($0.0) }
         let cases: [(Double?, String, ShellWiFi?, Bool, String, ShellRole?, Int)] = [

@@ -1007,6 +1007,7 @@ export type ShaderProps = Props & {
     texture: string?,
     values: { number }?,
     fps: number?,
+    animateInLowPower: boolean?,
     audio: boolean?,
 }
 

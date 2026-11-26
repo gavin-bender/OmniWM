@@ -204,6 +204,7 @@ public struct Content: Equatable, Sendable, BitwiseCopyable {
     public var motion: UInt8
     public var opensPopout: Bool
     public var params: SIMD4<Float>
+    public var animateInLowPower = false
     public var rate: UInt8
     public var target: UInt32
     public var menu: Bool

@@ -169,10 +169,17 @@ function battery.content(ctx, width: number?, m)
     return ui.column(rows)
 end
 
+function battery.background(m)
+    if not m or not modeSymbols[m.activeMode] then return nil end
+    local low = m.activeMode == "low"
+    return ui.shader{ key = "hyperspace", source = "battery-hyperspace.metal", decorative = true,
+        values = { if low then 1 else 0 }, fps = if low then 8 else 30, animateInLowPower = low }
+end
+
 function battery.popout(ctx)
     local m = battery.model(ctx)
     return look.batteryPanel and look.batteryPanel(ctx, m)
-        or look.panel(ctx, { w = look.width + 28,
+        or look.panel(ctx, { w = look.width + 28, backgroundShader = battery.background(m),
             look.heading(omniwm.l10n("Battery"), look.width), battery.content(ctx, nil, m) })
 end
 

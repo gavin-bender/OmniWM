@@ -253,12 +253,12 @@ extension ShellWidgetSurface {
         motionPolicy.animationsEnabled && !ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
-    func shaderInput(_ content: Content) -> ShellShaderInput {
-        let animates = loops
+    func shaderInput(_ content: Content, lowPower: Bool = ProcessInfo.processInfo.isLowPowerModeEnabled) -> ShellShaderInput {
+        let limit = lowPower ? (content.animateInLowPower ? 8 : 0) : 60
         let rate = content.audio && content.rate == 0 ? 30 : Int(content.rate)
         return ShellShaderInput(
             values: content.params,
-            rate: animates ? min(rate, 60) : 0,
+            rate: motionPolicy.animationsEnabled ? min(rate, limit) : 0,
             colors: palette.shaderColors,
             audio: content.audio,
             image: content.textureRef == 0 ? nil : text.flatMap {

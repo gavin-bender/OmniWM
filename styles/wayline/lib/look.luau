@@ -134,11 +134,11 @@ local function titledPanel(_, props, gap)
     local width = props.w or 320
     local header = props[1]
     header.h = 44
-    local body = { w = width, pad = 12, gap = gap, center = false }
+    local body = { w = width, pad = 12, gap = gap, center = false, backgroundShader = props.backgroundShader }
     for index = 2, #props do
         body[#body + 1] = props[index]
     end
-    return frame(width, 44, header, ui.column(body))
+    return frame(width, 44, header, require("./panel-column")(body))
 end
 
 local function controlCenterCards(node)
@@ -1017,8 +1017,8 @@ return require("./skin")({
             local card = if m then content[index] else content
             card.radius, card.fill = 9, "elevatedSurface"
         end
-        return frame(width, 44, header, ui.column{ w = width, pad = 16, gap = 10, center = false,
-            content })
+        return frame(width, 44, header, require("./panel-column"){ w = width, pad = 16, gap = 10, center = false,
+            backgroundShader = require("./battery").background(m), content })
     end,
     mediaBar = function(ctx, m)
         local style = ctx.data.bar.style

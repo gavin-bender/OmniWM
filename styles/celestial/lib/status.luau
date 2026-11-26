@@ -66,7 +66,7 @@ local function panel(width: number, rows)
     rows.shadow = "shadow/0.35"
     rows.shadowRadius = 10
     rows.center = false
-    return ui.column{ material = "clear", pad = tokens.padding.small, ui.column(rows) }
+    return ui.column{ material = "clear", pad = tokens.padding.small, require("./panel-column")(rows) }
 end
 
 local function networkPanel(ctx: Context, m)
@@ -136,7 +136,7 @@ local function batteryPanel(ctx: Context, m)
             heading("battery_unknown", omniwm.l10n("Battery"), omniwm.l10n("Unavailable"), inner),
         })
     end
-    local rows = {
+    local rows = { backgroundShader = require("./battery").background(m),
         ui.row{ w = inner, gap = tokens.spacing.medium,
             surface.icon(icons.battery(m.level / 100, m.charging), { size = tokens.icon.large,
                 color = m.low and "error" or "accent", filled = true }),

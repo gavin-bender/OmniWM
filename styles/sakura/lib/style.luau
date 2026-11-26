@@ -53,9 +53,12 @@ function style.panel(props)
     props.pad = props.pad or 14
     props.gap = props.gap or 12
     props.center = false
+    local background = props.backgroundShader
+    props.backgroundShader = nil
+    if background then background.radius = 22 end
     return ui.stack{ w = props.w, h = props.h, radius = 22, material = "clear",
         fill = "background", border = "border/0.8", borderWidth = 1, open = 0.22, close = 0.18,
-        ui.shader{ source = "sakura-petals.metal", values = { 0.36, 0.8, 13, 0 }, fps = 30, radius = 22 },
+        background or ui.shader{ source = "sakura-petals.metal", values = { 0.36, 0.8, 13, 0 }, fps = 30, radius = 22 },
         ui.column(props) }
 end
 

@@ -163,7 +163,8 @@ final class ShellBatteryBoltTests: XCTestCase {
             (nil, false, nil, nil)
         ]
         for name in ["battery", "battery-wifi"] {
-            let widget = try ShellRenderedWidget(name)
+            let widget = try ShellRenderedWidget(source: ShellRenderedWidget.bundledSource(name),
+                                                 resources: ShellResources(motion: MotionPolicy(animationsEnabled: true)))
             for (mode, lowPower, label, symbol) in cases {
                 let power = ShellPower(lowPower: lowPower, mode: mode, supportsHighPower: true)
                 for layout in [Layout.beside, .vertical] {
@@ -175,13 +176,53 @@ final class ShellBatteryBoltTests: XCTestCase {
                     } else {
                         XCTAssertFalse(help.contains("Power Mode"), help)
                     }
-                    for tree in [bar, widget.renderPopout()] {
+                    let popout = widget.renderPopout()
+                    let shaders = popout.filter { $0.kind == .shader }.map { widget.text.string($0.content.text) }
+                    XCTAssertEqual(shaders, symbol == nil ? [] : ["battery-hyperspace.metal"], name)
+                    if let content = popout.first(where: { $0.kind == .shader })?.content {
+                        let low = symbol == "leaf.fill"
+                        XCTAssertEqual(content.params.x, low ? 1 : 0)
+                        XCTAssertEqual(widget.surface.shaderInput(content, lowPower: true).rate, low ? 8 : 0)
+                        XCTAssertEqual(widget.surface.shaderInput(content, lowPower: false).rate, low ? 8 : 30)
+                        widget.resources.motion.systemReducesMotion = true
+                        XCTAssertEqual(widget.surface.shaderInput(content, lowPower: true).rate, 0)
+                        widget.resources.motion.systemReducesMotion = false
+                    }
+                    XCTAssertFalse(bar.contains { $0.kind == .shader }, name)
+                    for tree in [bar, popout] {
                         let badges = tree.filter { $0.kind == .symbol }.map { widget.text.string($0.content.text) }
                             .filter { ["leaf.fill", "chevron.up.2"].contains($0) }
                         XCTAssertEqual(badges, symbol.map { [$0] } ?? [], name)
                     }
                 }
             }
+        }
+    }
+
+    func testHyperspaceRendersMovingStreaksOverATransparentBackground() async throws {
+        let widget = try ShellRenderedWidget("battery")
+        let shaders = try XCTUnwrap(ShellDefaults.bundled).appendingPathComponent("shaders")
+        let program = widget.resources.shaders.program(source: "battery-hyperspace.metal", directories: [shaders])
+        await waitForShaders(in: widget.resources.shaders) { !program.isCompiling }
+        let pipeline = try XCTUnwrap(program.pipeline, program.failure ?? "")
+        let size = CGSize(width: 320, height: 280)
+        func frame(at time: Double, low: Bool, accent: SIMD4<Float>) throws -> [UInt8] {
+            var colors = ShellShaderInput.Colors(repeating: .zero)
+            colors[ShellRole.accent.rawValue] = accent
+            colors[ShellRole.foreground.rawValue] = SIMD4(repeating: 1)
+            let input = ShellShaderInput(values: SIMD4(low ? 1 : 0, 0, 0, 0), rate: low ? 8 : 30, colors: colors)
+            return try ShellShaderTests.pixels(pipeline, input.uniforms(
+                size: size, scale: 1, elapsed: time, now: 0, transition: .settled
+            ), width: Int(size.width), height: Int(size.height))
+        }
+        for low in [true, false] {
+            let accent = SIMD4<Float>(1, 0, 0, 1)
+            let first = try frame(at: 0, low: low, accent: accent)
+            let alpha = stride(from: 3, to: first.count, by: 4).map { first[$0] }
+            XCTAssertTrue(alpha.contains(0))
+            XCTAssertGreaterThan(alpha.max() ?? 0, 50)
+            XCTAssertNotEqual(first, try frame(at: 0.5, low: low, accent: accent))
+            XCTAssertNotEqual(first, try frame(at: 0, low: low, accent: SIMD4(0, 0, 1, 1)))
         }
     }
 

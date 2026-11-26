@@ -201,6 +201,7 @@ enum ShellWireDecoder {
         content.manipulationCommit = wire.manipulation_commit
         content.manipulationFollow = wire.manipulation_follow
         content.effect = wire.effect_ref
+        content.animateInLowPower = wire.behavior_flags & UInt32(OMNI_NODE_BEHAVIOR_LOW_POWER_ANIMATION) != 0
         content.decorative = wire.behavior_flags & UInt32(OMNI_NODE_BEHAVIOR_DECORATIVE) != 0
         content.glassShape = UInt8((wire.behavior_flags >> 1) & 3)
         content.glassFollow = wire.shape_follow

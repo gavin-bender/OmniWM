@@ -67,7 +67,7 @@ function popout(ctx)
     if not charge and not network then
         return ui.box{ w = 0, h = 0 }
     end
-    local panel = { w = look.width + 28, ui.row{ w = look.width, gauge(44, charge, network) } }
+    local panel = { w = look.width + 28, backgroundShader = battery.background(charge), ui.row{ w = look.width, gauge(44, charge, network) } }
     if charge then
         panel[#panel + 1] = battery.content(ctx, look.width, charge)
     end
