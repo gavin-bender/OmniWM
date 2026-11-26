@@ -184,7 +184,7 @@ extension ShellSettingsPreview {
                     priority: priorities[image.name] ?? .max
                 )
             },
-            length: length, zones: zones, spacing: 8, inset: 4
+            length: length, zones: zones, spacing: 8, inset: zones.outerInset
         )
     }
 

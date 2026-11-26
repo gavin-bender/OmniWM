@@ -323,6 +323,7 @@ export type Media = {
 }
 
 export type CalendarEvent = {
+    compactTitle: string?,
     id: string,
     title: string,
     calendar: string,

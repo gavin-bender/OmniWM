@@ -14,6 +14,14 @@ final class CalendarController {
         NSLocale.currentLocaleDidChangeNotification
     ]
 
+    private let summarizeEvent: @MainActor (String, Int) async -> String?
+    private struct TitleRequest {
+        let title: String
+        let width: Int
+        let task: Task<Void, Never>
+    }
+
+    private var titleRequests: [String: TitleRequest] = [:]
     private let reader: CalendarReader
     private var listening = false
     private var remindersListening = false
@@ -30,7 +38,11 @@ final class CalendarController {
     private(set) var selectedDay: String?
     var onRemindersChange: (@MainActor (ShellReminders?) -> Void)?
 
-    init(reader: CalendarReader = CalendarReader()) {
+    init(
+        reader: CalendarReader = CalendarReader(),
+        summarizeEvent: @escaping @MainActor (String, Int) async -> String? = MediaBarTitle.summarizeEvent
+    ) {
+        self.summarizeEvent = summarizeEvent
         self.reader = reader
     }
 
@@ -135,6 +147,8 @@ final class CalendarController {
 
     func perform(_ command: ShellCalendarCommand) {
         switch command {
+        case let .fitTitle(id, width):
+            fitTitle(id, width: width)
         case .authorize:
             Task { [reader] in
                 await reader.requestAccess()
@@ -162,6 +176,23 @@ final class CalendarController {
         }
     }
 
+    private func fitTitle(_ id: String, width: Int) {
+        guard let event = calendar?.events.first(where: { $0.id == id }), !event.allDay else { return }
+        if let pending = titleRequests[id], pending.title == event.title, pending.width <= width { return }
+        titleRequests[id]?.task.cancel()
+        let task = Task { [weak self, summarizeEvent] in
+            let label = await summarizeEvent(event.title, width)
+            guard !Task.isCancelled, let self else { return }
+            titleRequests[id] = nil
+            guard let label, var snapshot = calendar,
+                  let index = snapshot.events.firstIndex(where: { $0.id == id && $0.title == event.title })
+            else { return }
+            snapshot.events[index].compactTitle = label
+            publish(snapshot)
+        }
+        titleRequests[id] = TitleRequest(title: event.title, width: width, task: task)
+    }
+
     private func refresh() {
         guard listening else { return }
         version += 1
@@ -173,12 +204,23 @@ final class CalendarController {
             guard version == self.version, self.listening else { return }
             if reading.calendar.reminders?.error == nil { reading.calendar.reminders?.error = remindersActionError }
             self.links = reading.links
+            let previous = Dictionary((calendar?.events ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            for index in reading.calendar.events.indices {
+                let event = reading.calendar.events[index]
+                if let cached = previous[event.id], cached.title == event.title {
+                    reading.calendar.events[index].compactTitle = cached.compactTitle
+                }
+            }
             self.publish(reading.calendar)
         }
     }
 
     private func publish(_ calendar: ShellCalendar?) {
         guard calendar != self.calendar else { return }
+        for (id, request) in titleRequests where calendar?.events.contains(where: { $0.id == id && $0.title == request.title }) != true {
+            request.task.cancel()
+            titleRequests[id] = nil
+        }
         self.calendar = calendar
         onChange?(calendar)
     }

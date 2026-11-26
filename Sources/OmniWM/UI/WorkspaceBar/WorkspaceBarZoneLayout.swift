@@ -26,7 +26,6 @@ struct WorkspaceBarZoneLayout: Layout {
     let zones: WorkspaceBarZones
     let vertical: Bool
     var spacing: CGFloat = 8
-    var inset: CGFloat = 4
 
     static func spans(
         of items: [Item],
@@ -67,7 +66,7 @@ struct WorkspaceBarZoneLayout: Layout {
             length: vertical ? bounds.height : bounds.width,
             zones: zones,
             spacing: spacing,
-            inset: inset
+            inset: zones.outerInset
         )
         for index in subviews.indices {
             let size = sizes[index]

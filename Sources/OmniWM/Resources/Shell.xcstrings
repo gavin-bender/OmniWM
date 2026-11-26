@@ -1,6 +1,79 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ at %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ at %@"
+          }
+        }
+      }
+    },
+    "tmrw at %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tmrw at %@"
+          }
+        }
+      }
+    },
+    "at %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "at %@"
+          }
+        }
+      }
+    },
+    "in %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in %@"
+          }
+        }
+      }
+    },
+    "Show upcoming events" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show upcoming events"
+          }
+        }
+      }
+    },
+    "Hide upcoming events" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide upcoming events"
+          }
+        }
+      }
+    },
+    "%@ left" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ left"
+          }
+        }
+      }
+    },
     "Couldn’t read the saved connection. Save your token in Notion settings." : { "extractionState" : "manual" },
     "Open Applications" : { "extractionState" : "manual" },
     "Notion Settings" : { "extractionState" : "manual" },

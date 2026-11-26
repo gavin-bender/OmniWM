@@ -41,9 +41,13 @@ enum ShellCalendarCommand: Equatable, Sendable {
     case open(event: String?)
     case month(delta: Int)
     case day(String)
+    case fitTitle(event: String, width: Int)
 
     init?(words: [String]) {
         switch words {
+        case let words where words.count == 3 && words[0] == "fit-title":
+            guard let width = Int(words[1]), (1 ... 128).contains(width) else { return nil }
+            self = .fitTitle(event: words[2], width: width)
         case ["authorize"]: self = .authorize
         case ["settings"]: self = .settings
         case ["open"]: self = .open(event: nil)
@@ -61,6 +65,7 @@ enum ShellCalendarCommand: Equatable, Sendable {
 struct ShellCalendarEvent: Equatable, Sendable {
     let id: String
     let title: String
+    var compactTitle: String?
     let calendar: String
     let color: String
     let start: Double
@@ -126,7 +131,9 @@ struct ShellCalendar: Equatable, Sendable {
 
 extension ShellCalendarEvent {
     fileprivate func write(into writer: inout ShellValueWriter) {
-        writer.map(10)
+        writer.map(11)
+        writer.key("compactTitle")
+        compactTitle.map { writer.string($0) } ?? writer.null()
         writer.key("id")
         writer.string(id)
         writer.key("title")

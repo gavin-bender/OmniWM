@@ -80,7 +80,9 @@ final class WorkspaceBarFullWidthTests: XCTestCase {
             return geometry.zones(frame: frame(bar, on: notched), monitor: notched, resolved: resolved)
         }
         XCTAssertEqual(zones(bar), WorkspaceBarZones(notch: 656 ... 856, mode: .splitAroundNotch))
+        XCTAssertEqual(zones(bar)?.outerInset, 20)
         bar.position = .bottom
+        XCTAssertEqual(zones(bar)?.outerInset, 4)
         XCTAssertEqual(zones(bar), WorkspaceBarZones(notch: nil, mode: .splitAroundNotch))
         bar.fullWidth = false
         XCTAssertNil(zones(bar))

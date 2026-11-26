@@ -163,6 +163,30 @@ final class ShellCalendarDayTests: XCTestCase {
         controller.setListening(false)
     }
 
+    func testRequestedClockLabelUsesMeasuredWidthAndSurvivesRefresh() async throws {
+        let item = event("Quarterly engineering planning and staffing review", start: Date().addingTimeInterval(300))
+        let store = Store(events: [item])
+        var widths: [Int] = []
+        let controller = CalendarController(reader: CalendarReader(operations: store.operations)) { title, width in
+            XCTAssertEqual(title, item.title)
+            widths.append(width)
+            return "Staffing review"
+        }
+        _ = await waitFor(controller) { !$0.events.isEmpty }
+        let command = ShellCalendarCommand.fitTitle(event: item.id, width: 83)
+        let labeled = await waitFor(controller, action: {
+            controller.perform(command)
+            controller.perform(command)
+        }) { $0.events.first?.compactTitle != nil }
+        XCTAssertEqual(widths, [83])
+        XCTAssertEqual(labeled.events.first?.title, item.title)
+        let refreshed = await waitFor(controller, action: { controller.perform(.month(delta: 1)) }) {
+            $0.month != labeled.month
+        }
+        XCTAssertEqual(refreshed.events.first?.compactTitle, "Staffing review")
+        controller.setListening(false)
+    }
+
     func testDaySnapshotSurfacesTheExistingReminderActionError() async {
         let store = Store(saveError: .readOnly)
         let controller = CalendarController(reader: CalendarReader(operations: store.operations))

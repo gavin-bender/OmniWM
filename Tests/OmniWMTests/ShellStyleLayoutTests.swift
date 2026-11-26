@@ -2491,7 +2491,7 @@ final class ShellStyleLayoutTests: XCTestCase {
         try assertCelestialWeatherLayout(widget, weather: weather, context: "weather")
     }
 
-    func testSharedClockBarsKeepOptionsTimeAndGesturesWithoutCalendarDemand() throws {
+    func testSharedClockBarsKeepOptionsTimeAndGestures() throws {
         let shell = try sharedLibraryShell("calendar")
         defer { try? FileManager.default.removeItem(at: shell) }
         for profile in ([ShellDefaults.profile] + (try ShellStyleFixture.names())).sorted() {
@@ -2524,7 +2524,10 @@ final class ShellStyleLayoutTests: XCTestCase {
                             ),
                             OMNI_OK, context
                         )
-                        XCTAssertEqual(stats.deps & (ShellDataKey.calendar.bit | ShellDataKey.seconds.bit), 0, context)
+                        let hasEvents = !vertical && ["default", "lake", "sakura", "vitreus"].contains(profile)
+                        let eventDeps = ShellDataKey.calendar.bit | ShellDataKey.seconds.bit
+                        XCTAssertEqual(stats.deps & eventDeps, hasEvents ? eventDeps : 0, context)
+                        XCTAssertEqual(widget.strings().contains("Team standup"), hasEvents, context)
                         let strings = widget.strings()
                         XCTAssertEqual(
                             strings.contains("calendar") || strings.contains("calendar_month") || strings
@@ -2577,6 +2580,123 @@ final class ShellStyleLayoutTests: XCTestCase {
             XCTAssertFalse(widget.strings().contains("am"), profile)
             XCTAssertFalse(widget.strings().contains("pm"), profile)
         }
+    }
+
+    func testClockEventRowsFollowTimeAndPopoutVisibilityToggle() throws {
+        let shell = try sharedLibraryShell("calendar")
+        defer { try? FileManager.default.removeItem(at: shell) }
+        let config = ShellConfig.resolve(shellDirectory: shell)
+        let widget = try makeWidget("clock", config: config, shell: shell)
+        let bar = fixture(config, height: 32, vertical: false)
+        calendarFixture(widget)
+        widget.render(bar)
+        for title in ["Team standup", "15m left", "Design review", "in 25m"] {
+            XCTAssertTrue(widget.strings().contains(title), title)
+        }
+        func frame(_ title: String) throws -> CGRect {
+            let node = try XCTUnwrap(widget.surface.layout.core.elements { widget.text.string($0.text) == title }.first)
+            return CGRect(widget.surface.layout.core.absoluteFrame(of: node))
+        }
+        XCTAssertEqual(try frame("15m left").maxX, try frame("in 25m").maxX, accuracy: 1)
+        XCTAssertLessThan(try frame("in 25m").maxX, try frame("9:41 AM").minX)
+        let expandedWidth = widget.surface.size.width
+        for label in ["Hide upcoming events", "Show upcoming events"] {
+            widget.layoutPopout()
+            let text = try XCTUnwrap(widget.surface.layout.core.elements { widget.text.string($0.text) == label }.first)
+            let frame = CGRect(widget.surface.layout.core.absoluteFrame(of: text))
+            let point = CGPoint(x: frame.midX, y: frame.midY)
+            widget.surface.press(at: point)
+            widget.surface.release(at: point)
+            widget.invoke(try XCTUnwrap(widget.actions.last), view: OMNI_VIEW_POPOUT)
+            widget.render(bar)
+            XCTAssertEqual(widget.strings().contains("Team standup"), label == "Show upcoming events")
+            XCTAssertTrue(widget.strings().contains("9:41 AM"))
+            if label == "Hide upcoming events" {
+                XCTAssertLessThan(widget.surface.size.width, expandedWidth)
+            }
+        }
+        widget.set("seconds") { $0.number(1_000_900) }
+        widget.render(bar)
+        XCTAssertFalse(widget.strings().contains("Team standup"))
+        XCTAssertTrue(widget.strings().contains("in 10m"))
+        XCTAssertEqual(try frame("in 10m").minX - frame("Design review").maxX, 3, accuracy: 1)
+        widget.set("seconds") { $0.number(1_001_500) }
+        widget.render(bar)
+        XCTAssertTrue(widget.strings().contains("45m left"))
+        calendarFixture(widget, access: "denied")
+        widget.render(bar)
+        XCTAssertFalse(widget.strings().contains("Design review"))
+        XCTAssertTrue(widget.strings().contains("Fri Oct 23"))
+    }
+
+    func testClockSwitchesFromCountdownToLocalStartTime() throws {
+        let widget = try ShellRenderedWidget("clock")
+        let cal = Calendar.current
+        let start = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 11, day: 25, hour: 17)))
+        let timestamp = start.timeIntervalSince1970
+        var snapshot = calendarFixture(widget)
+        snapshot.events = [ShellCalendarEvent(
+            id: "review", title: "Review", calendar: "Work", color: "#112233", start: timestamp,
+            end: timestamp + 1800, allDay: false, location: nil, time: "5:00\u{202F}PM", day: "Nov 25"
+        )]
+        widget.set("calendar") { snapshot.write(into: &$0) }
+        let weekday = try XCTUnwrap(ShellFormatter.date(timestamp, template: "EEE", zone: nil))
+        for (secondsBefore, expected) in [(7200, "in 2h 0m"), (7201, "at 5pm"), (86400, "tmrw at 5pm"),
+                                          (172800, "\(weekday) at 5pm")] {
+            widget.set("seconds") { $0.number(timestamp - Double(secondsBefore)) }
+            widget.render(ShellBarData())
+            XCTAssertTrue(widget.strings().contains(expected), expected)
+        }
+    }
+
+    func testClockFitsThanksgivingBesideTomorrowStartTime() throws {
+        let widget = try ShellRenderedWidget("clock")
+        var snapshot = calendarFixture(widget)
+        let start = try XCTUnwrap(Calendar.current.date(from: DateComponents(
+            year: 2026, month: 11, day: 26, hour: 16, minute: 30
+        ))).timeIntervalSince1970
+        let title = "Thanksgiving dinner"
+        snapshot.events = [ShellCalendarEvent(
+            id: "thanksgiving", title: title, calendar: "Home", color: "#112233", start: start,
+            end: start + 3600, allDay: false, location: nil, time: "4:30 PM", day: "Tomorrow"
+        )]
+        widget.set("calendar") { snapshot.write(into: &$0) }
+        widget.set("seconds") { $0.number(start - 86400) }
+        var bar = ShellBarData()
+        bar.style.height = 44
+        widget.render(bar)
+        XCTAssertTrue(widget.strings().contains("tmrw at 4:30pm"))
+        var service = omni_service_request()
+        XCTAssertFalse(omni_vm_next_service(widget.vm, &service), "The full title should fit without a summary")
+        let label = try XCTUnwrap(widget.surface.layout.core.elements { widget.text.string($0.text) == title }.first)
+        let frame = CGRect(widget.surface.layout.core.absoluteFrame(of: label))
+        let font = NSFont.systemFont(ofSize: 10 * 44 / 32)
+        XCTAssertGreaterThanOrEqual(frame.width + 1, (title as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    func testClockRequestsOneLabelForOverflowAndKeepsFullTitleInAgenda() throws {
+        let widget = try ShellRenderedWidget("clock")
+        var snapshot = calendarFixture(widget)
+        let title = "Planning for the quarterly product design review with the engineering team"
+        snapshot.events[0] = ShellCalendarEvent(
+            id: "planning", title: title, calendar: "Work", color: "#112233", start: 999_900,
+            end: 1_000_900, allDay: false, location: nil, time: "9:30 AM", day: "Today"
+        )
+        widget.set("calendar") { snapshot.write(into: &$0) }
+        let bar = ShellBarData()
+        widget.render(bar)
+        widget.render(bar)
+        var request = omni_service_request()
+        XCTAssertTrue(omni_vm_next_service(widget.vm, &request))
+        XCTAssertEqual(request.kind, OMNI_SERVICE_TIMER)
+        XCTAssertFalse(omni_vm_next_service(widget.vm, &request))
+        snapshot.events[0].compactTitle = "Design planning"
+        widget.set("calendar") { snapshot.write(into: &$0) }
+        widget.render(bar)
+        XCTAssertTrue(widget.strings().contains("Design planning"))
+        widget.layoutPopout()
+        XCTAssertTrue(widget.strings(OMNI_VIEW_POPOUT).contains(title))
+        XCTAssertFalse(widget.strings(OMNI_VIEW_POPOUT).contains("Design planning"))
     }
 
     func testSharedVerticalClocksParseSupportedFormatsAndFallbackForRegionalFormats() throws {

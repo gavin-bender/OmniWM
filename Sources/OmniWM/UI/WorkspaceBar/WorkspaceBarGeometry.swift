@@ -11,6 +11,9 @@ struct WorkspaceBarSplitLayout: Equatable {
 struct WorkspaceBarZones: Equatable {
     let notch: ClosedRange<CGFloat>?
     let mode: WorkspaceBarFullWidthNotchMode
+
+    // A full-width bar sharing the notch band also reaches the rounded display corners.
+    var outerInset: CGFloat { notch == nil ? 4 : 20 }
 }
 
 struct WorkspaceBarSplitAvailableWidths: Equatable {
