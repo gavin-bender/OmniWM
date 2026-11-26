@@ -83,6 +83,27 @@ final class ShellBarIconSizeTests: XCTestCase {
         }
     }
 
+    func testClickingPlaybackIndicatorTogglesWithoutOpeningMediaPanel() throws {
+        let widget = try ShellRenderedWidget("media")
+        var media = ShellMedia()
+        media.title = "Song"
+        for playing in [true, false] {
+            media.playing = playing
+            widget.set("media") { media.write(into: &$0) }
+            widget.render(try bar(scale: 1))
+            let button = try XCTUnwrap(widget.surface.layout.core.elements {
+                widget.text.string($0.action) == "media toggle"
+            }.first)
+            let frame = CGRect(widget.surface.layout.core.absoluteFrame(of: button))
+            let point = CGPoint(x: frame.midX, y: frame.midY)
+            let before = widget.clicks.count
+            widget.surface.press(at: point)
+            widget.surface.release(at: point)
+            XCTAssertEqual(widget.clicks.count, before + 1)
+            XCTAssertEqual(widget.clicks.last?.action, "media toggle")
+        }
+    }
+
     func testMusicBarKeepsQualifiersOnlyWhenTheyFit() throws {
         let widget = try ShellRenderedWidget("media")
         let bar = try bar(scale: 1)

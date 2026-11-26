@@ -181,9 +181,6 @@ final class MediaAdapterReader: Sendable {
         }
         let pid = (object["pid"] as? NSNumber)?.int32Value ?? 0
         let title = object["title"] as? String ?? ""
-        guard pid != 0 || !title.isEmpty else {
-            return MediaAdapterLine(media: nil, artworkId: nil, artwork: nil)
-        }
         var media = ShellMedia()
         media.title = title
         switch (object["mediaType"] as? NSNumber)?.intValue {
@@ -208,7 +205,7 @@ final class MediaAdapterReader: Sendable {
         media.repeatMode = (object["repeat"] as? NSNumber).flatMap { ShellMedia.Repeat(rawValue: $0.intValue) }
         let artworkId = object["artworkId"] as? String
         let artwork = (object["artwork"] as? String).flatMap { Data(base64Encoded: $0) }.flatMap(thumbnail)
-        return MediaAdapterLine(media: media, artworkId: artworkId, artwork: artwork)
+        return MediaAdapterLine(media: pid == 0 && title.isEmpty ? nil : media, artworkId: artworkId, artwork: artwork)
     }
 
     private static func thumbnail(_ data: Data) -> CGImage? {
@@ -252,7 +249,7 @@ final class MediaController {
     private let summarize: @MainActor (String) async -> String?
     private var summarySource: TitleKey?
     private var savedTitle: String?
-    private var artwork: (id: String, image: CGImage)?
+    private var artwork: (id: String, image: CGImage, track: TitleKey?)?
     private(set) var media: ShellMedia?
     var onChange: (@MainActor (ShellMedia?) -> Void)?
 
@@ -378,6 +375,10 @@ final class MediaController {
 
     private func received(_ line: MediaAdapterLine, generation: Int) {
         guard generation == self.generation else { return }
+        // The adapter may send the bytes before the title, then only the artwork ID on resume.
+        if let id = line.artworkId, let image = line.artwork {
+            artwork = (id, image, artwork?.id == id ? artwork?.track : nil)
+        }
         guard var media = line.media, !media.title.isEmpty else {
             // Coalesce a brief empty snapshot between a pause and its replacement metadata.
             if self.media != nil, pendingClear == nil {
@@ -385,7 +386,6 @@ final class MediaController {
                     try? await Task.sleep(for: .milliseconds(250))
                     guard !Task.isCancelled, let self else { return }
                     self.pendingClear = nil
-                    self.artwork = nil
                     self.publish(nil)
                 }
             }
@@ -396,19 +396,14 @@ final class MediaController {
         let application = NSRunningApplication(processIdentifier: media.pid)
         media.app = application?.localizedName ?? ""
         media.bundle = application?.bundleIdentifier ?? ""
-        if let id = line.artworkId {
-            if let image = line.artwork {
-                artwork = (id, image)
-            }
-            if let artwork, artwork.id == id {
-                media.artwork = Self.artworkPrefix + id
-                media.artworkAspectRatio = Double(artwork.image.width) / Double(artwork.image.height)
-            }
-        } else if let previous = self.media, TitleKey(previous) == TitleKey(media) {
-            media.artwork = previous.artwork
-            media.artworkAspectRatio = previous.artworkAspectRatio
+        let track = TitleKey(media)
+        if let cached = artwork,
+           line.artworkId.map({ $0 == cached.id }) ?? (cached.track == track) {
+            artwork?.track = track
+            media.artwork = Self.artworkPrefix + cached.id
+            media.artworkAspectRatio = Double(cached.image.width) / Double(cached.image.height)
         } else {
-            artwork = nil
+            artwork?.track = nil
         }
         publish(media)
     }

@@ -36,6 +36,8 @@ function render(ctx)
         end
         local slot = look.px(ctx, "barSymbol")
         props[#props + 1] = ui.stack{ key = "playback", w = slot, h = slot, animate = resize,
+            onClick = m.toggle, onRightClick = m.toggle, cursor = "pointer",
+            help = if m.playing then omniwm.l10n("Pause") else omniwm.l10n("Resume"),
             if m.playing then ui.shader{ key = "waveform", source = "media-waveform.metal",
                 fps = 24, w = slot, h = slot }
             else look.barGlyph(ctx, { name = "play.fill", size = slot, color = "secondaryForeground" }) }

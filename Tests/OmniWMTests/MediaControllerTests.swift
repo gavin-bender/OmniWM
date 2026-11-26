@@ -165,6 +165,33 @@ final class MediaControllerTests: XCTestCase {
         XCTAssertNil(controller.media)
     }
 
+    func testArtworkSurvivesTitlelessUpdatesAndResumesWithoutNewImageData() async {
+        let controller = controller(#"""
+        $| = 1;
+        print qq({"pid":0,"artworkId":"a1","artwork":"\#(Self.pixel)"}\n);
+        print qq({"pid":1,"title":"Song","artworkId":"a1","playing":true}\n);
+        while (<STDIN>) {
+            if (/pause/) { print qq({"pid":0}\n); }
+            if (/play/) { print qq({"pid":1,"title":"Song","playing":true}\n); }
+            if (/next/) { print qq({"pid":1,"title":"Other","playing":true}\n); }
+        }
+        """#)
+        let changes = record(controller)
+        controller.setListening(true)
+        defer { controller.setListening(false) }
+        await wait(in: changes) { $0.last??.title == "Song" }
+        XCTAssertEqual(controller.media?.artwork, "media/a1")
+        controller.perform(.pause)
+        await wait(in: changes) { $0.last.map { $0 == nil } ?? false }
+        controller.perform(.play)
+        await wait(in: changes) { $0.last??.title == "Song" }
+        XCTAssertEqual(controller.media?.artwork, "media/a1")
+        XCTAssertEqual(controller.bitmap("media/a1")?.width, 1)
+        controller.perform(.next)
+        await wait(in: changes) { $0.last??.title == "Other" }
+        XCTAssertNil(controller.media?.artwork)
+    }
+
     func testTheAdapterRunsOnlyWhileListenedToAndReceivesCommands() async throws {
         let controller = controller(#"""
         $| = 1;
