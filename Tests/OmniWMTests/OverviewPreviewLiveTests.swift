@@ -3,6 +3,7 @@
 
 import AppKit
 import IOSurface
+import OmniWMSystemGestures
 @testable import OmniWM
 import QuartzCore
 import ScreenCaptureKit
@@ -98,6 +99,47 @@ import XCTest
                 XCTAssertEqual(try dominantColor(first, x: 0.75, y: 0.75), .yellow)
             }
             XCTAssertFalse(panel.isKeyWindow)
+        }
+
+        func testNativePreviewShowsOrderedOutWindowWithoutRevealingIt() async throws {
+            guard CGPreflightScreenCaptureAccess() else {
+                throw MissingTestPrerequisite("Screen Recording permission is required")
+            }
+            _ = NSApplication.shared
+            let panel = NSPanel(
+                contentRect: CGRect(x: 100, y: 100, width: 320, height: 160),
+                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false
+            )
+            panel.isReleasedWhenClosed = false
+            defer { panel.close() }
+            panel.contentView = Quadrants(frame: CGRect(x: 0, y: 0, width: 320, height: 160))
+            panel.orderBack(nil)
+            panel.displayIfNeeded()
+            CATransaction.flush()
+            let content = try await SCShareableContent.currentProcess
+            let window = try XCTUnwrap(content.windows.first { Int($0.windowID) == panel.windowNumber })
+            guard omniwm_dock_slide_available() else {
+                throw MissingTestPrerequisite("The native parking helper is required")
+            }
+            XCTAssertTrue(omniwm_dock_order_parked_window(window.windowID, false))
+            defer { _ = omniwm_dock_order_parked_window(window.windowID, true) }
+
+            let ready = expectation(description: "parked window thumbnail")
+            ready.assertForOverFulfill = false
+            let output = OverviewPreviewStream(onReady: { ready.fulfill() }, onFailure: {})
+            let control = try OverviewNativePreviewStream(window: window, pixelWidth: 200, pixelHeight: 200, output: output)
+            defer {
+                output.invalidate()
+                control.stop()
+            }
+            try await control.start()
+            await fulfillment(of: [ready], timeout: failureBound)
+            let frame = try XCTUnwrap(output.take())
+            XCTAssertEqual(frame.surface.width, 200)
+            XCTAssertEqual(Double(frame.surface.height), 100, accuracy: 2)
+            XCTAssertEqual(try dominantColor(frame, x: 0.25, y: 0.25), .red)
+            XCTAssertEqual(try dominantColor(frame, x: 0.25, y: 0.75), .blue)
+            XCTAssertEqual(SkyLight.shared.isWindowOrderedIn(window.windowID), false)
         }
 
         func testRetainedDiscoveryServesReopensWithoutAnotherLookup() async throws {

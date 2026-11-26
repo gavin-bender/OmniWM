@@ -88,12 +88,20 @@ protocol OverviewPreviewStreamControl: AnyObject {
 @MainActor
 final class OverviewNativePreviewStream: OverviewPreviewStreamControl {
     private let stream: SCStream
+    private let window: SCWindow
+    private let filter: SCContentFilter
+    private let output: OverviewPreviewStream
+    private let thumbnailSize: CGSize
 
     convenience init(window: SCWindow, request: OverviewPreviewRequest, output: OverviewPreviewStream) throws {
         try self.init(window: window, pixelWidth: request.pixelWidth, pixelHeight: request.pixelHeight, output: output)
     }
 
     init(window: SCWindow, pixelWidth: Int, pixelHeight: Int, output: OverviewPreviewStream) throws {
+        self.window = window
+        self.output = output
+        thumbnailSize = CGSize(width: pixelWidth, height: pixelHeight)
+        filter = SCContentFilter(desktopIndependentWindow: window)
         let config = SCStreamConfiguration()
         config.width = pixelWidth
         config.height = pixelHeight
@@ -108,7 +116,7 @@ final class OverviewNativePreviewStream: OverviewPreviewStreamControl {
         config.preservesAspectRatio = true
         config.ignoreShadowsSingleWindow = true
         stream = SCStream(
-            filter: SCContentFilter(desktopIndependentWindow: window),
+            filter: filter,
             configuration: config,
             delegate: output
         )
@@ -120,11 +128,34 @@ final class OverviewNativePreviewStream: OverviewPreviewStreamControl {
     }
 
     func start() async throws {
+        // An ordered-out window can send only suspended stream events until it
+        // returns to the display. Seed the preview from its retained contents.
+        if !(SkyLight.shared.isWindowOrderedIn(window.windowID) ?? window.isOnScreen) {
+            await offerParkedFrame()
+            try Task.checkCancellation()
+        }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             stream.startCapture { error in
                 if let error { continuation.resume(throwing: error) } else { continuation.resume() }
             }
         }
+    }
+
+    private func offerParkedFrame() async {
+        let size = filter.contentRect.size
+        guard size.hasFinitePositiveDimensions() else { return }
+        let scale = min(thumbnailSize.width / size.width, thumbnailSize.height / size.height)
+        let config = SCStreamConfiguration()
+        config.width = max(1, Int((size.width * scale).rounded()))
+        config.height = max(1, Int((size.height * scale).rounded()))
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.showsCursor = false
+        config.ignoreShadowsSingleWindow = true
+        config.colorSpaceName = CGColorSpace.sRGB
+        guard let sample = try? await SCScreenshotManager.captureSampleBuffer(contentFilter: filter, configuration: config),
+              !Task.isCancelled, let buffer = sample.imageBuffer,
+              let frame = OverviewPreviewFrame(pixelBuffer: buffer) else { return }
+        output.offer(frame)
     }
 
     func stop() {
