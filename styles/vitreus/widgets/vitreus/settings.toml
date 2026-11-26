@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
+[options.controlsSymbol]
+type = "choice"
+title = "Symbol"
+default = "cogwheel"
+choices = ["cogwheel", "tiled-windows", "sliders", "apple-logo", "gb-signature", "gb-apple-cutout"]
+
 [options.layout]
 type = "choice"
 title = "Layout"

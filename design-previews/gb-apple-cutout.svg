@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">GB Apple — Cutout</title>
+  <desc id="desc">An ivory apple with Gavin Bender’s complete GB signature cut through its face.</desc>
+  <defs>
+    <mask id="gb" maskUnits="userSpaceOnUse" x="0" y="0" width="96" height="96">
+      <rect width="96" height="96" fill="white"/>
+      <g transform="translate(14 29) scale(.84)" fill="none" stroke="black" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 33c6-5 9-14 9-21 0-5-4-6-7-2-5 6-5 17 0 22 6 6 16 4 21-3 4-5 4-13 6-19L35 42c-5 8-14 12-20 7-6-5-2-12 5-12 9 0 14 9 14 20"/>
+        <path d="M35 45c3-10 12-15 17-9 6 7-1 12-16 10 13-1 21 4 20 10-1 7-12 9-21 3-6-4-11 2-4 4 11 3 22-2 28-8"/>
+      </g>
+    </mask>
+  </defs>
+  <g fill="#F4F1E8">
+    <path d="M46 24C46 14 54 5 66 4C65 15 57 23 46 24Z"/>
+    <path mask="url(#gb)" d="M46 31C40 31 36 26 28 26C15 26 7 37 7 51C7 65 15 80 23 88C28 93 32 94 39 91C44 89 50 88 57 91C63 94 68 92 73 86C79 79 83 72 86 65C77 62 72 56 72 48C72 41 76 35 82 31C78 27 73 25 66 25C58 25 51 31 46 31Z"/>
+  </g>
+</svg>

@@ -123,6 +123,7 @@ final class ShellVitreusBarTests: XCTestCase {
         let settings = try XCTUnwrap(ShellRootSettings.load("vitreus", directories: config.directories))
         let values = try settings.values(applying: [:])
         let expected: [String: ShellComponentValue] = [
+            "controlsSymbol": .string("cogwheel"),
             "layout": .string("island"), "size": .number(1),
             "pieces": .strings([
                 "apple", "app", "workspaces", "scratchpads", "title", "tray", "search", "stats", "omniwm", "controls",

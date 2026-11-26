@@ -23,6 +23,7 @@ In **Settings → Keyboard Shortcuts**, search for **Top Bar** to change the cyc
 
 ## Clicking the bar
 
+- Choose the OmniWM button icon under **Settings > Styles & Widgets > Bar > OmniWM > Symbol**. Options include GB Signature and GB Apple Cutout.
 - Click a workspace chip to switch to that workspace.
 - Click an app icon to focus that window directly.
 - When **Deduplicate App Icons** is enabled, multiple windows from one app share a single grouped icon with a count badge; click a grouped icon to open their window list, while a single-window icon focuses that window directly.

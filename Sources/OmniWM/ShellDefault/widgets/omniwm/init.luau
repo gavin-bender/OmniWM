@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: GPL-2.0-only
 -- Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
+local controlsSymbol = require("../lib/controls-symbol")
 local keyboardMode = require("../lib/keyboard-mode")
 local layoutMark = require("../lib/layout-mark")
 local look = require("../lib/look")
@@ -22,7 +23,7 @@ function render(ctx: Context)
     if look.omniwmButton then
         frame, size = look.omniwmButton(ctx, glyph, locked)
     end
-    glyph.name = locked and "lock.fill" or "gearshape.fill"
+    local choice = (ctx.data.settings or {}).controlsSymbol
     glyph.color = iconColor(ctx.data.settings or {})
     glyph.w, glyph.h = glyph.size, glyph.size
     local symbol, name = layoutMark(ctx.data.bar)
@@ -33,7 +34,7 @@ function render(ctx: Context)
             or omniwm.l10n("Window manager controls") }
     local button
     if frame then
-        frame[1] = ui.symbol(glyph)
+        frame[1] = controlsSymbol(choice, locked, glyph)
         if mark then
             local line = { pad = (size - glyph.size) / 2, gap = 5 * look.scale(ctx), center = true, frame[1], mark }
             if style.vertical then
@@ -57,7 +58,7 @@ function render(ctx: Context)
         else
             props.w = nil
         end
-        props[1] = ui.symbol(glyph)
+        props[1] = controlsSymbol(choice, locked, glyph)
         props[2] = mark
         button, size = look.bar(ctx, props), item
     end

@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: GPL-2.0-only
 -- Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
+local controlsSymbol = require("../../controls-symbol")
 local keyboardMode = require("../../keyboard-mode")
 local layoutMark = require("../../layout-mark")
 local palette = require("../palette")
@@ -144,8 +145,8 @@ local function content(ctx, g, slot, name: string)
     local help = if name == "stats" then omniwm.l10n("Show system stats") else nil
     if logo then
         local locked = ctx.data.bar.style.secureInput
-        icon[1] = ui.symbol({
-            name = if locked then "lock.fill" else "gearshape.fill", size = 15 * bu, w = 15 * bu, h = 15 * bu,
+        icon[1] = controlsSymbol((ctx.data.settings or {}).controlsSymbol, locked, {
+            size = 15 * bu, w = 15 * bu, h = 15 * bu,
             color = "#FFFFFFFF",
         })
         help = if locked then omniwm.l10n("Secure Input is on: Option shortcuts are paused")
