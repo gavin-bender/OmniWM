@@ -113,8 +113,9 @@ final class ParkingEdgeMaskWindow: NSPanel {
         )
 
         isFloatingPanel = true
-        isOpaque = true
-        backgroundColor = .black
+        isOpaque = false
+        // Keep a nonzero alpha for WindowServer hit testing at the screen edge.
+        backgroundColor = NSColor.black.withAlphaComponent(1 / 255)
         level = .statusBar
         ignoresMouseEvents = false
         acceptsMouseMovedEvents = true
@@ -130,8 +131,6 @@ final class ParkingEdgeMaskWindow: NSPanel {
         let maskView = ParkingEdgeMaskView(frame: .zero)
         maskView.onHoverChange = { [weak self] in self?.updateHover() }
         maskView.onActivate = { [weak self] in self?.activate(isHover: false) }
-        maskView.wantsLayer = true
-        maskView.layer?.backgroundColor = NSColor.black.cgColor
         contentView = maskView
 
         let maskWindowNumber = windowNumber

@@ -216,6 +216,10 @@ final class ParkingEdgeMaskTests: XCTestCase {
         XCTAssertEqual(firstInfo.frame, firstFrame)
         XCTAssertEqual(firstWindow.level, .statusBar)
         XCTAssertFalse(firstWindow.ignoresMouseEvents)
+        XCTAssertFalse(firstWindow.isOpaque)
+        XCTAssertGreaterThan(firstWindow.backgroundColor.alphaComponent, 0)
+        XCTAssertLessThanOrEqual(firstWindow.backgroundColor.alphaComponent, 1 / 255)
+        XCTAssertEqual(firstWindow.contentView?.layer?.backgroundColor?.alpha ?? 0, 0)
 
         manager.apply([DesiredParkingEdgeMask(key: key, frame: secondFrame)])
 
