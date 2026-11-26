@@ -33,10 +33,19 @@ final class NativeParkedWindows {
     }
 
     static func windowOwner(_ id: UInt32) -> Owner? {
-        guard let rows = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]],
-              let pid = rows.first?[kCGWindowOwnerPID as String] as? pid_t,
+        guard let pid = windowPID(id),
               let date = NSRunningApplication(processIdentifier: pid)?.launchDate else { return nil }
         return Owner(pid: pid, launchDate: date)
+    }
+
+    static func windowPID(_ id: UInt32) -> pid_t? {
+        // The relative window-list API omits ordered-out windows. Request the
+        // description by ID so a window we hid remains identifiable until reveal.
+        var rawID = UnsafeRawPointer(bitPattern: UInt(id))
+        guard let ids = CFArrayCreate(nil, &rawID, 1, nil),
+              let rows = CGWindowListCreateDescriptionFromArray(ids) as? [[String: Any]],
+              let row = rows.first, row[kCGWindowNumber as String] as? UInt32 == id else { return nil }
+        return row[kCGWindowOwnerPID as String] as? pid_t
     }
 
     func start() {
@@ -93,8 +102,15 @@ final class NativeParkedWindows {
 
     private func restore(_ id: UInt32) {
         guard let saved = records[id] else { return }
-        if owner(id) == saved, orderedIn(id) != true {
-            guard available(), order(id, true) else { return }
+        guard let current = owner(id) else {
+            // A failed read cannot establish that the saved owner was replaced.
+            if NSRunningApplication(processIdentifier: saved.pid)?.launchDate == saved.launchDate { return }
+            records[id] = nil
+            save()
+            return
+        }
+        if current == saved, orderedIn(id) != true {
+            guard available(), order(id, true), orderedIn(id) == true else { return }
         }
         records[id] = nil
         save()

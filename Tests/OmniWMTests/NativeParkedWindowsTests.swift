@@ -1,12 +1,44 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 
-import Foundation
+import AppKit
 @testable import OmniWM
 import XCTest
 
 @MainActor
 final class NativeParkedWindowsTests: XCTestCase {
+    func testOrderedOutWindowRemainsIdentifiableWithoutFocus() throws {
+        let window = NSWindow(contentRect: CGRect(x: -300, y: -300, width: 20, height: 20),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.orderBack(nil)
+        let id = try XCTUnwrap(UInt32(exactly: window.windowNumber))
+        window.orderOut(nil)
+        XCTAssertEqual(NativeParkedWindows.windowPID(id), ProcessInfo.processInfo.processIdentifier)
+    }
+
+    func testUnconfirmedRevealRetainsOwnershipForRetry() throws {
+        let suite = "NativeParkedWindowsTests-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let token = WindowToken(pid: 7, windowId: 8)
+        let identity = NativeParkedWindows.Owner(pid: 7, launchDate: Date())
+        var visible = true
+        var canReveal = false
+        let manager = NativeParkedWindows(defaults: defaults, owner: { _ in identity },
+                                          orderedIn: { _ in visible }, order: { _, show in
+                                              visible = show && canReveal
+                                              return true
+                                          }, available: { true })
+        manager.start()
+        manager.hide(token)
+        manager.reveal(token)
+        XCTAssertTrue(manager.owns(token))
+        canReveal = true
+        manager.reveal(token)
+        XCTAssertTrue(visible)
+        XCTAssertFalse(manager.owns(token))
+    }
+
     func testHideRevealAndRelaunchRestoreOnlyOwnedWindows() throws {
         let suite = "NativeParkedWindowsTests-\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
