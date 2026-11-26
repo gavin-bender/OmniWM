@@ -22,13 +22,28 @@ extension WMController {
         var topology = PointerEdgeTopology()
         topology.isEnabled = isEnabled && settings.pointer.enabled && monitors.count > 1
             && !mouseEventHandler.isInputSuppressed
+        topology.monitors = monitors
+        topology.flipY = NSScreen.screens.first?.frame.maxY ?? 0
+        if isEnabled, !mouseEventHandler.isInputSuppressed, let hold = workspaceBarManager.menuBarHold {
+            let desktopAutoHide = hold.nativeAutoHideEnabled
+            let fullscreenAutoHide = !UserDefaults.standard.bool(forKey: "AppleMenuBarVisibleInFullscreen")
+            for monitor in monitors {
+                let fullscreen = workspaceManager.spaceTopology.isDisplayShowingFullscreenSpace(on: monitor) == true
+                if fullscreen ? fullscreenAutoHide : desktopAutoHide {
+                    topology.menuBarPushDisplays.insert(monitor.id)
+                }
+            }
+        }
+        if hasStartedServices, topology.isEnabled || !topology.menuBarPushDisplays.isEmpty {
+            pointerEdgeBarrier.start()
+        } else {
+            pointerEdgeBarrier.stop()
+        }
         guard topology.isEnabled else {
             pointerEdgeBarrier.publish(topology)
             return
         }
         topology.margin = CGFloat(settings.pointer.margin)
-        topology.flipY = NSScreen.screens.first?.frame.maxY ?? 0
-        topology.monitors = monitors
         if settings.pointer.constrainToArrangement, settings.monitors.routingMode == .custom {
             topology.containment = MouseContainment(
                 layout: MonitorRouting.layout(for: monitors, in: settings.monitors.arrangements),

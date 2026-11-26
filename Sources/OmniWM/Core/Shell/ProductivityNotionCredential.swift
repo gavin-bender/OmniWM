@@ -3,9 +3,12 @@
 
 import Foundation
 import Security
+import os
 
 enum ProductivityNotionCredential {
     static let marker = "X-OmniWM-Notion-Connection"
+
+    private static let tokens = OSAllocatedUnfairLock(initialState: [String: String]())
 
     private static func item(_ source: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -14,6 +17,14 @@ enum ProductivityNotionCredential {
     }
 
     static func save(_ token: String?, source: String) -> OSStatus {
+        tokens.withLock { cache in
+            let status = write(token, source: source)
+            if status == errSecSuccess { cache[source] = token }
+            return status
+        }
+    }
+
+    private static func write(_ token: String?, source: String) -> OSStatus {
         let query = item(source)
         guard let token else {
             let status = SecItemDelete(query as CFDictionary)
@@ -48,13 +59,36 @@ enum ProductivityNotionCredential {
               permits(method: request.httpMethod, path: url.path)
         else { throw ShellHTTPFailure("invalid_notion_request") }
 
-        var query = item(principal.source)
-        query[kSecReturnData as String] = true
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data, let token = String(data: data, encoding: .utf8)
-        else { throw ShellHTTPFailure("notion_token_unavailable") }
+        let token = try tokens.withLock { cache in
+            if let token = cache[principal.source] { return token }
+            let token = try readSilently(source: principal.source)
+            cache[principal.source] = token
+            return token
+        }
         request.allHTTPHeaderFields = ["Authorization": "Bearer " + token, "Notion-Version": "2026-03-11",
                                        "Content-Type": "application/json"]
+    }
+
+    @diagnose(DeprecatedDeclaration, as: ignored, reason: "Existing tokens use the file-based login Keychain.")
+    private static func readSilently(source: String) throws -> String {
+        // The file-based login Keychain uses a process-wide interaction flag.
+        // Hold the same lock as Save and Remove until the previous flag is restored.
+        var previous: DarwinBoolean = false
+        guard SecKeychainGetUserInteractionAllowed(&previous) == errSecSuccess,
+              SecKeychainSetUserInteractionAllowed(false) == errSecSuccess
+        else { throw ShellHTTPFailure("notion_keychain_locked") }
+        defer { _ = SecKeychainSetUserInteractionAllowed(previous.boolValue) }
+
+        var query = item(source)
+        query[kSecReturnData as String] = true
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecInteractionNotAllowed || status == errSecAuthFailed {
+            throw ShellHTTPFailure("notion_keychain_locked")
+        }
+        guard status == errSecSuccess, let data = result as? Data,
+              let token = String(data: data, encoding: .utf8)
+        else { throw ShellHTTPFailure("notion_token_unavailable") }
+        return token
     }
 }

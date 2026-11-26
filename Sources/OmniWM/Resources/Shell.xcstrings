@@ -91,6 +91,9 @@
     "Resume" : {
       "extractionState" : "manual"
     },
+    "Unlock your login Keychain. If access is still blocked, remove and save the token in widget settings." : {
+      "extractionState" : "manual"
+    },
     "Save your connection token in widget settings." : {
       "extractionState" : "manual"
     },

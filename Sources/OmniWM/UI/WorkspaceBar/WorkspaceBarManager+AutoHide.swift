@@ -13,6 +13,7 @@ extension WorkspaceBarManager {
     }
 
     func handleAutoHideMouseMoved(at pointer: CGPoint) {
+        let pointer = controller?.pointerEdgeBarrier.workspaceBarPointer(pointer) ?? pointer
         handleShellEdgeHover(at: pointer)
         guard needsAutoHideMouseMoves || !autoHideState.revealed.isEmpty || !autoHideDelays.pendingIds.isEmpty
         else { return }
@@ -50,7 +51,8 @@ extension WorkspaceBarManager {
 
     private func completeAutoHideDelay(for id: Monitor.ID) {
         guard let controller else { return }
-        let reveals = autoHideState.desired(targets: autoHideTargets, pointer: controller.currentMouseLocation())
+        let pointer = controller.pointerEdgeBarrier.workspaceBarPointer(controller.currentMouseLocation())
+        let reveals = autoHideState.desired(targets: autoHideTargets, pointer: pointer)
             .contains(id)
         guard reveals != autoHideState.revealed.contains(id) else { return }
         autoHideState.setRevealed(reveals, for: id)

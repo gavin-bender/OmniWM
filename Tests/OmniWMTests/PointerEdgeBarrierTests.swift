@@ -94,6 +94,34 @@ final class PointerEdgeBarrierTests: XCTestCase {
         return event
     }
 
+    func testMenuBarRequiresContinuedUpwardMotionAfterArrival() {
+        var topology = PointerEdgeTopology()
+        topology.monitors = [main]
+        topology.menuBarPushDisplays = [main.id]
+        var push = MenuBarEdgePush()
+        let edge = CGPoint(x: 100, y: main.frame.maxY)
+        let held = CGPoint(x: edge.x, y: edge.y - 8)
+        func move(_ upward: CGFloat, after elapsed: UInt64 = 8_000_000) -> CGPoint? {
+            clock += elapsed
+            return push.clamp(edge, upward: upward, now: clock, topology: topology)
+        }
+
+        XCTAssertEqual(move(200), held)
+        XCTAssertEqual(move(600), held)
+        XCTAssertEqual(move(0, after: 500_000_000), held)
+        XCTAssertEqual(move(1), held)
+        for _ in 0 ..< 4 {
+            XCTAssertEqual(move(40, after: 100_000_000), held)
+        }
+        XCTAssertEqual(move(30), held)
+        XCTAssertNil(move(1))
+        XCTAssertNil(move(0))
+        XCTAssertNil(push.clamp(.zero, upward: -50, now: clock, topology: topology))
+        XCTAssertEqual(move(200), held)
+        topology.monitors.append(above)
+        XCTAssertNil(move(10))
+    }
+
     func testPinnedEdgeExcludesArrivalAndCrossesOnceAtNetPressure() throws {
         let topology = topology(staircase)
         var recognizer = PointerEdgeRecognizer()

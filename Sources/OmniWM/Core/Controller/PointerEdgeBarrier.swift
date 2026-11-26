@@ -14,6 +14,7 @@ final class PointerEdgeBarrier: Sendable {
 
     private struct State {
         var topology = PointerEdgeTopology()
+        var menuBarPush = MenuBarEdgePush()
         var recognizer = PointerEdgeRecognizer()
     }
 
@@ -51,17 +52,30 @@ final class PointerEdgeBarrier: Sendable {
         tapState.withLock { $0.installed && !$0.stopRequested }
     }
 
+    func workspaceBarPointer(_ point: CGPoint) -> CGPoint {
+        state.withLock { $0.menuBarPush.workspaceBarPointer(point, topology: $0.topology) }
+    }
+
     func publish(_ topology: PointerEdgeTopology) {
-        state.withLock { $0.topology = topology }
+        state.withLock {
+            if $0.topology.menuBarPushDisplays != topology.menuBarPushDisplays || $0.topology.monitors != topology.monitors {
+                $0.menuBarPush = MenuBarEdgePush()
+            }
+            $0.topology = topology
+        }
     }
 
     func reset() {
-        state.withLock { $0.recognizer.reset() }
+        state.withLock {
+            $0.recognizer.reset()
+            $0.menuBarPush = MenuBarEdgePush()
+        }
     }
 
     func noteProgrammaticMove(to location: CGPoint) {
         let now = clock()
         state.withLock { current in
+            current.menuBarPush = MenuBarEdgePush()
             let monitor = current.topology.monitor(containing: location)?.id
             current.recognizer.noteCursorMoved(to: location, monitor: monitor, at: now)
         }
@@ -84,6 +98,8 @@ final class PointerEdgeBarrier: Sendable {
 
     func stop() {
         state.withLock { current in
+            current.menuBarPush = MenuBarEdgePush()
+            current.topology.menuBarPushDisplays.removeAll()
             current.topology.isEnabled = false
             current.recognizer.reset()
         }
@@ -158,12 +174,19 @@ final class PointerEdgeBarrier: Sendable {
         let cgDeltaY = event.getDoubleValueField(.mouseEventDeltaY)
         let (decision, flipY) = state.withLock { current in
             let flipY = current.topology.flipY
+            let location = CGPoint(x: cgLocation.x, y: flipY - cgLocation.y)
             let decision = current.recognizer.handle(
-                location: CGPoint(x: cgLocation.x, y: flipY - cgLocation.y),
+                location: location,
                 motion: CGVector(dx: cgDeltaX, dy: -cgDeltaY),
                 timestamp: receivedAt,
                 topology: current.topology
             )
+            if decision == .pass, let point = current.menuBarPush.clamp(
+                location, upward: -cgDeltaY, now: receivedAt, topology: current.topology
+            ) {
+                return (PointerEdgeRecognizer.Decision.clamp(point), flipY)
+            }
+            if decision != .pass { current.menuBarPush = MenuBarEdgePush() }
             return (decision, flipY)
         }
         switch decision {

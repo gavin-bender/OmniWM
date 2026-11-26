@@ -47,6 +47,7 @@ local function pageID(ctx)
 end
 
 local function failure(result)
+    if result.error == "notion_keychain_locked" then return omniwm.l10n("Unlock your login Keychain. If access is still blocked, remove and save the token in widget settings.") end
     if result.error == "notion_token_unavailable" then return omniwm.l10n("Save your connection token in widget settings.") end
     if result.status == 401 then return omniwm.l10n("The Notion token was rejected.") end
     if result.status == 403 or result.status == 404 then return omniwm.l10n("Check page sharing and connection permissions.") end

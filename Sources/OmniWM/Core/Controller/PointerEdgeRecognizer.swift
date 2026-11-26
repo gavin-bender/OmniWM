@@ -19,6 +19,7 @@ struct PointerEdgeTopology: Sendable {
     static let warpCooldownNs: UInt64 = 50_000_000
     static let containmentFreshnessNs: UInt64 = 1_000_000_000
 
+    var menuBarPushDisplays: Set<Monitor.ID> = []
     var isEnabled = false
     var margin: CGFloat = 1
     var flipY: CGFloat = 0

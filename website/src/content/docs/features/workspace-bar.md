@@ -17,7 +17,7 @@ Open **Settings > Styles & Widgets > Bar** to arrange widgets, select a widget f
 
 ## Top bar shortcuts
 
-**Control–Option–Shift–B** cycles all displays through the native macOS menu bar, the OmniWM workspace bar, and hidden mode. Hidden mode hides the workspace bar and lets macOS reveal its menu bar at the screen edge. Quitting OmniWM restores the previous native menu-bar preference.
+**Control–Option–Shift–B** cycles all displays through the native macOS menu bar, the OmniWM workspace bar, and hidden mode. Hidden mode hides the workspace bar. When the native menu bar auto-hides, keep pushing upward for at least 0.4 seconds after reaching the top edge to reveal it. A quick flick followed by a pause keeps the native menu bar hidden. Where another display adjoins the top edge, the pointer can cross as usual. Quitting OmniWM restores the previous native menu-bar preference.
 
 In **Settings → Keyboard Shortcuts**, search for **Top Bar** to change the cycle shortcut or assign keys to **Hide Top Bar** and **Switch Native and OmniWM Top Bars**. The existing **Toggle Workspace Bar** action controls the workspace bar on the display you’re using. Existing shortcut configurations leave new actions unassigned until you bind them.
 

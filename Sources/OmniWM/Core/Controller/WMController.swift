@@ -474,11 +474,6 @@ extension WMController {
     func syncMouseWarpPolicy(for monitors: [Monitor]? = nil) -> Bool {
         let effectiveMonitors = monitors ?? workspaceManager.monitors
         let shouldEnable = shouldUseMouseWarp(for: effectiveMonitors)
-        if shouldEnable, hasStartedServices, settings.pointer.enabled {
-            pointerEdgeBarrier.start()
-        } else {
-            pointerEdgeBarrier.stop()
-        }
         publishPointerEdgeTopology()
         mouseEventHandler.reconcileMouseMoveSubscription()
         guard shouldEnable != isMouseWarpPolicyEnabled else {
