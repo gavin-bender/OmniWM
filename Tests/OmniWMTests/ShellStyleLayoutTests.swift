@@ -2086,7 +2086,7 @@ final class ShellStyleLayoutTests: XCTestCase {
                                 let frame = CGRect(widget.surface.layout.core.absoluteFrame(of: element))
                                 XCTAssertTrue(bounds.contains(frame), context + " \(frame) outside \(bounds)")
                                 if name == "omniwm",
-                                   widget.text.string(widget.surface.layout.core.content(of: element).text) == "omniwm"
+                                   widget.text.string(widget.surface.layout.core.content(of: element).text) == "gearshape.fill"
                                 {
                                     XCTAssertEqual(frame.midX, bounds.midX, context)
                                     XCTAssertEqual(frame.midY, bounds.midY, context)
@@ -4022,10 +4022,10 @@ final class ShellStyleLayoutTests: XCTestCase {
         let shell = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: shell) }
         XCTAssertEqual(try ShellStyleFixture.prepare(into: shell), [])
-        let terracotta: UInt32 = 0xB665_45FF
+        let white: UInt32 = 0xFFFF_FFFF
         let cases: [String: UInt32] = [
-            "\"#1E90FF\"": 0x1E90_FFFF, "\"#1E90FF80\"": 0x1E90_FF80, "\"#1E90F\"": terracotta,
-            "\"#1E90FX\"": terracotta, "\"#GG90FF\"": terracotta, "\"blue\"": terracotta, "3": terracotta
+            "\"#1E90FF\"": 0x1E90_FFFF, "\"#1E90FF80\"": 0x1E90_FF80, "\"#1E90F\"": white,
+            "\"#1E90FX\"": white, "\"#GG90FF\"": white, "\"blue\"": white, "3": white
         ]
         for (value, expected) in cases {
             try Data("[profiles.default.widgets.omniwm]\niconColor = \(value)\n".utf8)
@@ -4034,7 +4034,7 @@ final class ShellStyleLayoutTests: XCTestCase {
             let widget = try makeWidget("omniwm", config: config, shell: shell)
             widget.render(fixture(config, height: 32, vertical: false))
             let logo = try XCTUnwrap(widget.tree().first {
-                $0.kind == .symbol && widget.text.string($0.content.text) == "omniwm"
+                $0.kind == .symbol && widget.text.string($0.content.text) == "gearshape.fill"
             }, value)
             XCTAssertEqual(logo.content.color, Color(packed: expected), value)
         }
@@ -4429,15 +4429,15 @@ final class ShellStyleLayoutTests: XCTestCase {
                         let symbols = tree.filter { $0.kind == .symbol }.map { widget.text.string($0.content.text) }
                         let labels = tree.filter { $0.kind == .label }.map { widget.text.string($0.content.text) }
                         let logos = tree.filter {
-                            $0.kind == .symbol && ["omniwm", "omniwm.lock"]
+                            $0.kind == .symbol && ["gearshape.fill", "lock.fill"]
                                 .contains(widget.text.string($0.content.text))
                         }
                         XCTAssertEqual(
                             logos.map { widget.text.string($0.content.text) },
-                            [state.locked ? "omniwm.lock" : "omniwm"],
+                            [state.locked ? "lock.fill" : "gearshape.fill"],
                             context
                         )
-                        XCTAssertEqual(logos.first?.content.color, Color(packed: 0xB665_45FF), context)
+                        XCTAssertEqual(logos.first?.content.color, Color(packed: 0xFFFF_FFFF), context)
                         if ["default", "lake", "matrix", "sakura"].contains(profile) {
                             XCTAssertEqual(frame.width, height - 4, context)
                             XCTAssertEqual(frame.height, height - 4, context)

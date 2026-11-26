@@ -37,11 +37,11 @@ final class WorkspaceBarMenuButtonTests: XCTestCase {
         widget.render(ShellBarData(style: style))
         XCTAssertEqual(widget.strings(), [
             ShellLocalizer.string("Secure Input is on: Option shortcuts are paused", []),
-            "omniwm.lock"
+            "lock.fill"
         ])
 
         style.secureInput = false
         widget.render(ShellBarData(style: style))
-        XCTAssertEqual(widget.strings(), [ShellLocalizer.string("Window manager controls", []), "omniwm"])
+        XCTAssertEqual(widget.strings(), [ShellLocalizer.string("Window manager controls", []), "gearshape.fill"])
     }
 }

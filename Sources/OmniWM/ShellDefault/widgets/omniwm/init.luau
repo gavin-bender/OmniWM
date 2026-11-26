@@ -5,14 +5,12 @@ local keyboardMode = require("../lib/keyboard-mode")
 local layoutMark = require("../lib/layout-mark")
 local look = require("../lib/look")
 
-local TERRACOTTA = "#B66545FF"
-
 local function iconColor(settings): string
     local color = settings.iconColor
     if type(color) == "string" and (#color == 7 or #color == 9) and string.match(color, "^#%x+$") then
         return color
     end
-    return TERRACOTTA
+    return "#FFFFFFFF"
 end
 
 function render(ctx: Context)
@@ -24,7 +22,7 @@ function render(ctx: Context)
     if look.omniwmButton then
         frame, size = look.omniwmButton(ctx, glyph, locked)
     end
-    glyph.name = locked and "omniwm.lock" or "omniwm"
+    glyph.name = locked and "lock.fill" or "gearshape.fill"
     glyph.color = iconColor(ctx.data.settings or {})
     glyph.w, glyph.h = glyph.size, glyph.size
     local symbol, name = layoutMark(ctx.data.bar)

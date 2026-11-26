@@ -13,7 +13,7 @@ final class StatusBarLayoutTests: XCTestCase {
     ]
 
     func testDisabledLayoutPreservesTheExistingImageAndTitle() {
-        let icon = OmniWMBrandMark.statusItemImage(pointSize: StatusBarController.statusIconPointSize)
+        let icon = StatusBarController.menuIcon
         XCTAssertTrue(StatusBarController.statusButtonImage(icon: icon, layout: nil) === icon)
         XCTAssertEqual(
             StatusBarController.statusButtonTitle(workspaceLabel: "Code", focusedAppName: "Xcode"),
@@ -140,7 +140,7 @@ final class StatusBarLayoutTests: XCTestCase {
         XCTAssertFalse(controller.statusBarRefreshIsEnabled)
     }
 
-    func testMissingWorkspaceShowsTheBrandWithoutLosingTheMenuButton() throws {
+    func testMissingWorkspaceShowsTheMenuIconWithoutLosingTheMenuButton() throws {
         let controller = WindowAdmissionTestSupport.controller(prefix: "StatusBarMissingWorkspace")
         controller.workspaceManager.commitMonitorSessions([:])
         let (statusBar, button) = try makeStatusBar(for: controller, showIcon: false)
@@ -188,7 +188,7 @@ final class StatusBarLayoutTests: XCTestCase {
             let image = try XCTUnwrap(button.image)
             XCTAssertTrue(
                 image === (showIcon
-                    ? StatusBarController.brandedLayoutImage(layout)
+                    ? StatusBarController.menuLayoutImage(layout)
                     : StatusBarController.layoutGlyph(layout))
             )
             statusBar.refreshWorkspaces()

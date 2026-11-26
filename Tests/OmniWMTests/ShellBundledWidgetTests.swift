@@ -430,7 +430,7 @@ final class ShellBundledWidgetTests: XCTestCase {
                         try renderStyle(style, widget: "omniwm", data: data, inspect: { view, nodes, text in
                             guard view == OMNI_VIEW_BAR else { return }
                             let strings = nodes.map { text.string($0.text) }
-                            XCTAssertTrue(strings.contains(state.secure ? "omniwm.lock" : "omniwm"), label)
+                            XCTAssertTrue(strings.contains(state.secure ? "lock.fill" : "gearshape.fill"), label)
                             XCTAssertEqual(strings.contains("pause.fill"), state.mode == .paused, label)
                             for other in layouts where other != layout {
                                 XCTAssertFalse(strings.contains(StatusBarController.layoutSymbolName(other)), label)

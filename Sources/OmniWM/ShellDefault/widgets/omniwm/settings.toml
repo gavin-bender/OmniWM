@@ -4,5 +4,5 @@
 [options.iconColor]
 type = "string"
 title = "Icon color"
-default = "#B66545FF"
+default = "#FFFFFFFF"
 maxLength = 9

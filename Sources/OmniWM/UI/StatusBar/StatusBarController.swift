@@ -65,7 +65,7 @@ final class StatusBarController: NSObject {
         statusItem = ownedStatusItem
 
         guard let button = statusButton else { return }
-        button.image = OmniWMBrandMark.statusItemImage(pointSize: Self.statusIconPointSize)
+        button.image = Self.menuIcon
         button.target = self
         button.action = #selector(handleClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -200,20 +200,19 @@ final class StatusBarController: NSObject {
             button.image?.isTemplate = false
             button.toolTip = String(localized: "OmniWM — measuring performance (auto-stops in 10 min)")
         } else if controller?.isSecureInputIndicated == true {
-            button.image = OmniWMBrandMark.secureInputStatusImage(
-                pointSize: Self.statusIconPointSize,
-                tint: .labelColor
+            button.image = NSImage(
+                systemSymbolName: "lock.fill",
+                accessibilityDescription: String(localized: "OmniWM, Secure Input is on")
             )
-            button.image?.accessibilityDescription = String(localized: "OmniWM, Secure Input is on")
             button.toolTip = String(localized: "Secure Input is on: Option shortcuts are paused")
         } else if let kind = controller?.keyboardModeKind, kind != .normal {
             button.image = Self.keyboardModeStatusImage(kind)
             button.toolTip = Self.keyboardModeToolTip(kind)
         } else if let layout {
-            button.image = settings.statusBar.showIcon ? Self.brandedLayoutImage(layout) : Self.layoutGlyph(layout)
+            button.image = settings.statusBar.showIcon ? Self.menuLayoutImage(layout) : Self.layoutGlyph(layout)
             button.toolTip = Self.layoutDisplayName(layout)
         } else {
-            button.image = OmniWMBrandMark.statusItemImage(pointSize: Self.statusIconPointSize)
+            button.image = Self.menuIcon
             button.toolTip = nil
         }
         if hasStateIcon, let layout {

@@ -420,8 +420,8 @@ extension ShellVitreusBarTests {
             let children = layout.core.elements { _ in true }.filter { layout.core.parent(of: $0) == icon }
             XCTAssertEqual(children.map { layout.core.kind(of: $0) }, [.symbol])
             let symbol = layout.core.content(of: try XCTUnwrap(children.first))
-            XCTAssertEqual(widget.text.string(symbol.text), locked ? "omniwm.lock" : "omniwm")
-            XCTAssertEqual(symbol.color, Color(packed: 0xB665_45FF))
+            XCTAssertEqual(widget.text.string(symbol.text), locked ? "lock.fill" : "gearshape.fill")
+            XCTAssertEqual(symbol.color, Color(packed: 0xFFFF_FFFF))
             let zone = layout.core.content(of: try VitreusFixture.element(widget, key: "bar-omniwm"))
             XCTAssertEqual(widget.text.string(zone.secondaryAction), ShellRequest.statusMenuCommand)
             let help = locked ? "Secure Input is on: Option shortcuts are paused" : "Window manager controls"

@@ -145,8 +145,8 @@ local function content(ctx, g, slot, name: string)
     if logo then
         local locked = ctx.data.bar.style.secureInput
         icon[1] = ui.symbol({
-            name = if locked then "omniwm.lock" else "omniwm", size = 15 * bu, w = 15 * bu, h = 15 * bu,
-            color = "#B66545FF",
+            name = if locked then "lock.fill" else "gearshape.fill", size = 15 * bu, w = 15 * bu, h = 15 * bu,
+            color = "#FFFFFFFF",
         })
         help = if locked then omniwm.l10n("Secure Input is on: Option shortcuts are paused")
             else omniwm.l10n("Window manager controls")

@@ -4,17 +4,24 @@
 import AppKit
 
 extension StatusBarController {
-    static let statusIconPointSize: CGFloat = 18
+    static let menuIcon: NSImage? = {
+        let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+            .applying(.init(paletteColors: [.white]))
+        let image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: "OmniWM")?
+            .withSymbolConfiguration(configuration)
+        image?.isTemplate = false
+        return image
+    }()
     static let layoutSymbolPointSize: CGFloat = 14
     static let layoutIconSpacing: CGFloat = 5
 
     private static let niriLayoutGlyph = layoutGlyph(systemSymbolName: layoutSymbolName(.niri))
     private static let dwindleLayoutGlyph = layoutGlyph(systemSymbolName: layoutSymbolName(.dwindle))
-    private static let brandedNiriLayoutImage = statusButtonImage(
-        icon: OmniWMBrandMark.statusItemImage(pointSize: statusIconPointSize), layout: .niri
+    private static let menuNiriLayoutImage = statusButtonImage(
+        icon: menuIcon, layout: .niri
     )
-    private static let brandedDwindleLayoutImage = statusButtonImage(
-        icon: OmniWMBrandMark.statusItemImage(pointSize: statusIconPointSize), layout: .dwindle
+    private static let menuDwindleLayoutImage = statusButtonImage(
+        icon: menuIcon, layout: .dwindle
     )
 
     static func statusButtonTitle(
@@ -83,11 +90,11 @@ extension StatusBarController {
         }
     }
 
-    static func brandedLayoutImage(_ layout: ActiveLayoutKind) -> NSImage? {
+    static func menuLayoutImage(_ layout: ActiveLayoutKind) -> NSImage? {
         switch layout {
-        case .niri: brandedNiriLayoutImage
-        case .dwindle: brandedDwindleLayoutImage
-        case .tabbed: statusButtonImage(icon: OmniWMBrandMark.statusItemImage(pointSize: statusIconPointSize), layout: .tabbed)
+        case .niri: menuNiriLayoutImage
+        case .dwindle: menuDwindleLayoutImage
+        case .tabbed: statusButtonImage(icon: menuIcon, layout: .tabbed)
         }
     }
 
