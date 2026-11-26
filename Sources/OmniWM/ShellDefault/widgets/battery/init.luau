@@ -4,8 +4,7 @@
 local look = require("../lib/look")
 local battery = require("../lib/battery")
 
-function render(ctx)
-    local state = battery.state(ctx)
+local function bar(ctx, state)
     if not state then
         return ui.box{ w = 0, h = 0 }
     end
@@ -20,4 +19,17 @@ function render(ctx)
         return look.bar(ctx, { gap = scale, pad = 2 * scale, glyph, look.text{ text = state.text, size = 10 * scale } })
     end
     return look.bar(ctx, { glyph, look.text{ text = state.percent, size = 13 * scale, reserve = state.reserve } })
+end
+
+function render(ctx)
+    local state = battery.state(ctx)
+    local button = bar(ctx, state)
+    if state then
+        button.onClick = ui.popout
+    end
+    return button
+end
+
+function popout(ctx)
+    return battery.popout(ctx)
 end

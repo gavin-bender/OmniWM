@@ -33,6 +33,7 @@ let package = Package(
         .package(url: "https://github.com/mattt/swift-toml.git", from: "2.0.0")
     ],
     targets: [
+        .target(name: "OmniWMPowerMode"),
         .binaryTarget(
             name: "GhosttyKit",
             path: "Frameworks/GhosttyKit.xcframework"
@@ -127,6 +128,7 @@ let package = Package(
             name: "OmniWM",
             dependencies: [
                 "GhosttyKit",
+                "OmniWMPowerMode",
                 "OmniWMIPC",
                 "OmniWMAudioTap",
                 "OmniWMLayerCorners",

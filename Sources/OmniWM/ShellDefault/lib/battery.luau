@@ -54,7 +54,9 @@ function battery.model(ctx)
     elseif m.charging and power.full then
         m.details[#m.details + 1] = { label = omniwm.l10n("Time to Full"), value = duration(power.full) }
     end
-    if power.lowPower ~= nil then
+    m.powerMode = power.mode
+    m.supportsHighPower = power.supportsHighPower
+    if not m.powerMode and power.lowPower ~= nil then
         m.details[#m.details + 1] = { label = omniwm.l10n("Low Power Mode"),
             value = if power.lowPower then omniwm.l10n("On") else omniwm.l10n("Off") }
     end
@@ -75,6 +77,23 @@ function battery.cell(state, w: number, h: number, inside: string?)
     return ui.row{ gap = 1,
         ui.stack(body),
         ui.box{ w = math.max(1.5, h * 0.14), h = h * 0.4, radius = h * 0.07, fill = "foreground/0.45" } }
+end
+
+function battery.modeSelector(m, width)
+    local options = { { "automatic", omniwm.l10n("Automatic") }, { "low", omniwm.l10n("Low") } }
+    if m.supportsHighPower then
+        table.insert(options, { "high", omniwm.l10n("High") })
+    end
+    local row = { w = width, gap = 4 }
+    for _, option in options do
+        local selected = m.powerMode == option[1]
+        row[#row + 1] = ui.row{ grow = 1, pad = 5, radius = look.radius(6),
+            fill = if selected then "accent" else "surface", hover = look.hover,
+            onClick = "battery mode " .. option[1],
+            look.text{ text = option[2], size = 12, color = if selected then "accentForeground" else "foreground" } }
+    end
+    return ui.column{ w = width, gap = 5, center = false,
+        look.text{ text = omniwm.l10n("Power Mode"), size = 13, weight = "medium" }, ui.row(row) }
 end
 
 function battery.content(ctx, width: number?, m)
@@ -98,6 +117,9 @@ function battery.content(ctx, width: number?, m)
                 look.text{ text = detail.value, size = 13, weight = "medium", maxWidth = 118 } }
         end
         rows[#rows + 1] = look.group(details)
+    end
+    if m.powerMode then
+        rows[#rows + 1] = battery.modeSelector(m, width)
     end
     rows[#rows + 1] = actions.row("gearshape", omniwm.l10n("Battery Settings…"), m.settings, width)
     return ui.column(rows)

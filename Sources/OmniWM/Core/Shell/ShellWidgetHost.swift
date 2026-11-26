@@ -93,6 +93,7 @@ enum ShellSettingsPane: String, Sendable {
 
 enum ShellAction: Equatable, Sendable {
     case wm(ShellRequest)
+    case powerMode(ShellPowerMode)
     case volume(ShellVolumeCommand)
     case microphone(ShellMicrophoneCommand)
     case brightness(ShellBrightnessCommand)
@@ -111,6 +112,10 @@ enum ShellAction: Equatable, Sendable {
     case trigger(widget: String, name: String, value: String?)
 
     private static let domains: [String: @Sendable ([String]) -> ShellAction?] = [
+        "battery": { words in
+            guard words.count == 2, words[0] == "mode" else { return nil }
+            return ShellPowerMode(rawValue: words[1]).map(ShellAction.powerMode)
+        },
         "volume": { ShellVolumeCommand(words: $0).map(ShellAction.volume) },
         "microphone": { ShellMicrophoneCommand(words: $0).map(ShellAction.microphone) },
         "brightness": { ShellBrightnessCommand(words: $0).map(ShellAction.brightness) },
@@ -335,6 +340,7 @@ final class ShellWidgetHost {
     static var sealedTraceCapture: UInt64 = 0
     var traceCaptureContext: ShellFrameTraceContext?
     var traceImagesBegin: Task<Void, Never>?
+    var changingPowerMode = false
     var feed: ShellDataFeed?
     var observation: ShellDirectoryObservation?
     var wallpaperPalette: ShellWallpaperPaletteWriter?

@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Power Mode" : {
+      "extractionState" : "manual"
+    },
+    "High" : {
+      "extractionState" : "manual"
+    },
+    "Low" : {
+      "extractionState" : "manual"
+    },
+    "Automatic" : {
+      "extractionState" : "manual"
+    },
     "Browse modes" : {
       "extractionState" : "manual",
       "localizations" : {

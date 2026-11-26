@@ -147,6 +147,9 @@ local function batteryPanel(ctx: Context, m)
     for _, detail in m.details do
         rows[#rows + 1] = line(detail.label, detail.value, inner, true)
     end
+    if m.powerMode then
+        rows[#rows + 1] = require("./battery").modeSelector(m, inner)
+    end
     rows[#rows + 1] = action(omniwm.l10n("Battery Settings…"), m.settings, inner)
     return panel(width, rows)
 end

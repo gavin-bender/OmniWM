@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "macOS could not apply this power mode." : {
+
+    },
+    "This installation is missing the signed power mode helper." : {
+
+    },
+    "Open System Settings" : {
+
+    },
+    "Approve the power mode helper" : {
+
+    },
+    "Allow OmniWM in Login Items & Extensions, then select the power mode again." : {
+
+    },
+    "Couldn’t change power mode" : {
+
+    },
     "Drag to move live windows. Quick or repeated swipes switch on release. With a compatible yabai-sb Dock service, vertical swipes and horizontal column drags use the compositor." : {
 
     },

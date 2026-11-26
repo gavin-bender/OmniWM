@@ -122,6 +122,37 @@ extension ShellWidgetHost {
     func run(_ action: ShellAction, origin: ShellCommandOrigin, for state: WidgetState) {
         switch action {
         case let .wm(request): onCommand(request, origin)
+        case let .powerMode(mode):
+            guard !changingPowerMode, let power = feed?.data.power, let current = power.mode,
+                  current != mode, mode != .high || power.supportsHighPower else { return }
+            changingPowerMode = true
+            Task {
+                defer {
+                    changingPowerMode = false
+                    feed?.powerSourcesChanged()
+                }
+                let alert = NSAlert()
+                alert.messageText = String(localized: "Couldn’t change power mode")
+                do {
+                    switch try await mode.apply(onBattery: power.source == "battery") {
+                    case .applied: return
+                    case .requiresApproval:
+                        alert.messageText = String(localized: "Approve the power mode helper")
+                        alert.informativeText = String(localized: "Allow OmniWM in Login Items & Extensions, then select the power mode again.")
+                        alert.addButton(withTitle: String(localized: "Open System Settings"))
+                        alert.addButton(withTitle: String(localized: "Cancel"))
+                        if alert.runModal() == .alertFirstButtonReturn { LoginItemManager.openLoginItemsSettings() }
+                        return
+                    case .unavailable:
+                        alert.informativeText = String(localized: "This installation is missing the signed power mode helper.")
+                    case .rejected:
+                        alert.informativeText = String(localized: "macOS could not apply this power mode.")
+                    }
+                } catch {
+                    alert.informativeText = error.localizedDescription
+                }
+                alert.runModal()
+            }
         case let .volume(command): ShellAudio.perform(command, appVolumes: resources.appVolumes)
         case let .microphone(command): ShellAudio.perform(command)
         case let .brightness(command): resources.devices.brightness.perform(command)

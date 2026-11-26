@@ -11,6 +11,15 @@ struct OmniWMApp: App {
     @State private var bootstrap: AppBootstrapState
 
     init() {
+        if CommandLine.arguments.dropFirst().elementsEqual(["--setup-power-helper"]) {
+            do {
+                try PowerModeHelperSetup.run()
+                exit(EXIT_SUCCESS)
+            } catch {
+                FileHandle.standardError.write(Data(("Power mode helper: " + String(describing: error) + "\n").utf8))
+                exit(EXIT_FAILURE)
+            }
+        }
         AppRelaunch.awaitPredecessor()
         AppLanguagePreference.applyConfiguredLanguage()
         let bootstrap = AppBootstrapState()

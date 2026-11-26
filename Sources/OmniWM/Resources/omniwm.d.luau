@@ -530,6 +530,8 @@ export type Power = {
     full: number?,
     charged: boolean,
     lowPower: boolean,
+    mode: ("automatic" | "low" | "high")?,
+    supportsHighPower: boolean,
     cycles: number?,
     health: number?,
     temperature: number?,

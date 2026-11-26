@@ -11,6 +11,8 @@ struct ShellPower: Equatable, Sendable {
     var full: Double?
     var charged = false
     var lowPower = false
+    var mode: ShellPowerMode?
+    var supportsHighPower = false
     var cycles: Double?
     var health: Double?
     var temperature: Double?
@@ -22,7 +24,11 @@ struct ShellPower: Equatable, Sendable {
             ("cycles", cycles), ("health", health), ("temperature", temperature), ("watts", watts),
             ("adapter", adapter)
         ]
-        writer.map(5 + details.count)
+        writer.map(7 + details.count)
+        writer.key("mode")
+        mode.map { writer.string($0.rawValue) } ?? writer.null()
+        writer.key("supportsHighPower")
+        writer.bool(supportsHighPower)
         for (key, value) in details {
             writer.key(key)
             value.map { writer.number($0) } ?? writer.null()
@@ -103,6 +109,10 @@ extension ShellDataFeed {
             data.power?.remaining = ShellPower.minutes(description[kIOPSTimeToEmptyKey])
             data.power?.full = charging ? ShellPower.minutes(description[kIOPSTimeToFullChargeKey]) : nil
             data.power?.charged = description[kIOPSIsChargedKey] as? Bool ?? false
+            if var power = data.power {
+                ShellPowerMode.sample(into: &power)
+                data.power = power
+            }
             if data.power != nil, let registry = ShellPower.batteryRegistry() {
                 data.power?.describe(registry)
             }

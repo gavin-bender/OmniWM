@@ -734,6 +734,26 @@ final class ShellBundledWidgetTests: XCTestCase {
         }
     }
 
+    func testBatteryWidgetsOfferModesSupportedByTheActiveProfile() throws {
+        let base = try fullData().filter { $0.0 != "power" }
+        for highPower in [false, true] {
+            let power = ShellPower(source: "battery", mode: .low, supportsHighPower: highPower)
+            let data = base + [("power", value { power.write(into: &$0) })]
+            for widget in ["battery", "battery-details"] {
+                try renderStyle("default", widget: widget, data: data, inspect: { view, nodes, text in
+                    guard view == OMNI_VIEW_POPOUT else { return }
+                    let commands = nodes.map { text.string($0.action) }
+                    XCTAssertTrue(commands.contains("battery mode automatic"))
+                    XCTAssertTrue(commands.contains("battery mode low"))
+                    XCTAssertEqual(commands.contains("battery mode high"), highPower)
+                    for mode in commands where mode.hasPrefix("battery mode ") {
+                        XCTAssertNotNil(ShellAction(mode))
+                    }
+                })
+            }
+        }
+    }
+
     func testDefaultPopoutsUseOneNativeGlassSurfaceWithFullAndMissingData() throws {
         let full = try fullData { $0.style.height = 32 }
         let variants = [full, full.filter { (Self.essentials + ["hiddenBar"]).contains($0.0) }]

@@ -286,7 +286,7 @@ final class ShellDataFeed {
         Unmanaged.passUnretained(self).release()
     }
 
-    private func powerSourcesChanged() {
+    func powerSourcesChanged() {
         let previous = (data.battery, data.charging, data.power)
         sampleBattery()
         if previous != (data.battery, data.charging, data.power) {

@@ -79,7 +79,8 @@ if [ "$SIGN_AND_NOTARIZE" = "true" ]; then
   echo "Signing $APP_DIR with hardened runtime..."
   codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp "$APP_DIR/Contents/Frameworks/libOmniWMNowPlaying.dylib"
   codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp "$APP_DIR/Contents/MacOS/omniwmctl"
-  codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$SIGNING_IDENTITY" --timestamp "$APP_DIR/Contents/MacOS/OmniWM"
+  codesign --force --options runtime --identifier "$BUNDLE_ID" --entitlements "$ENTITLEMENTS" --sign "$SIGNING_IDENTITY" --timestamp "$APP_DIR/Contents/MacOS/OmniWM"
+  bash "$ROOT_DIR/Scripts/package-power-helper.sh" "$APP_DIR" "$BUNDLE_ID" "$SIGNING_IDENTITY" --timestamp
   codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$SIGNING_IDENTITY" --timestamp "$APP_DIR"
 
   echo "Verifying signature..."
@@ -114,7 +115,10 @@ elif [ "$SIGN_AND_NOTARIZE" = "dev" ]; then
   echo "Signing $APP_DIR for development (identity: $IDENTITY)..."
   codesign --force --sign "$IDENTITY" "$APP_DIR/Contents/Frameworks/libOmniWMNowPlaying.dylib"
   codesign --force --sign "$IDENTITY" "$APP_DIR/Contents/MacOS/omniwmctl"
-  codesign --force --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_DIR/Contents/MacOS/OmniWM"
+  codesign --force --identifier "$BUNDLE_ID" --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_DIR/Contents/MacOS/OmniWM"
+  if [ "$IDENTITY" != "-" ]; then
+    bash "$ROOT_DIR/Scripts/package-power-helper.sh" "$APP_DIR" "$BUNDLE_ID" "$IDENTITY"
+  fi
   codesign --force --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_DIR"
   codesign --verify --verbose "$APP_DIR"
   echo "Done. Launch with 'open $APP_DIR' so LaunchServices assigns the app identity."

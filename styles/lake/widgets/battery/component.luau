@@ -15,6 +15,12 @@ end, expanded = function(ctx)
         ui.text{ text = status, color = view.secondary } }
     local minutes = power and (if battery.charging then power.full else power.remaining)
     if minutes then rows[#rows + 1] = ui.text{ text = string.format("%.0f min %s", minutes, if battery.charging then "to full" else "remaining"), size = 12, color = view.secondary } end
-    if power and power.lowPower then rows[#rows + 1] = ui.text{ text = "Low Power Mode", size = 12, color = view.secondary } end
+    if power and power.mode then
+        rows[#rows + 1] = require("../lib/battery").modeSelector(
+            { powerMode = power.mode, supportsHighPower = power.supportsHighPower },
+            math.max(1, math.min(ctx.view.w or 300, 300) - 24))
+    elseif power and power.lowPower then
+        rows[#rows + 1] = ui.text{ text = "Low Power Mode", size = 12, color = view.secondary }
+    end
     return ui.column(rows)
 end }, activity = service.activity }
