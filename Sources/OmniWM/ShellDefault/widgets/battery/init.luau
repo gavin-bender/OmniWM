@@ -15,6 +15,7 @@ local function bar(ctx, state)
     local scale = look.scale(ctx)
     local glyph = look.barGlyph(ctx, { name = state.symbol, size = 14 * scale,
         color = if state.low then "error" else "foreground" })
+    glyph = battery.withMode(ctx, state, glyph)
     if ctx.data.bar.style.vertical then
         return look.bar(ctx, { gap = scale, pad = 2 * scale, glyph, look.text{ text = state.text, size = 10 * scale } })
     end
@@ -26,6 +27,8 @@ function render(ctx)
     local button = bar(ctx, state)
     if state then
         button.onClick = ui.popout
+        button.help = state.help
+        battery.animateBar(button)
     end
     return button
 end

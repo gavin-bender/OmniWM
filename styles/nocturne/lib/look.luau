@@ -535,6 +535,9 @@ local function batteryChip(ctx, state, details)
     local size = 32 * scale
     local mode = details and state.mode or "beside"
     local glyph = batteryCell(state, scale, mode == "inside" and state.text or nil)
+    if not details then
+        glyph = require("./battery").withMode(ctx, state, glyph)
+    end
     local props = { radius = size / 2 - 1, fill = style.backgrounds and "surface" or nil,
         border = style.backgrounds and "border/0.6" or nil, borderWidth = 1,
         hover = details and "focus/0.14" or nil }

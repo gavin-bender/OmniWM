@@ -123,11 +123,13 @@ private struct WorkspaceBarContentView: View {
     private var slots: some View {
         ForEach(ShellLane.allCases, id: \.self) { lane in
             ForEach(slice.shellWidgets(in: snapshot, lane: lane)) { widget in
+                let vertical = snapshot.orientation.isVertical
+                let resizes = widget.id == "battery" || widget.id == "battery-wifi"
+                    || (!vertical && (widget.id == "media" || widget.id == "productivity"))
                 ShellWidgetSlot(
                     widget: widget, view: shellSurface?(widget.id), cuttable: zones != nil,
-                    resizeDuration: animationsEnabled && !snapshot.orientation.isVertical
-                        && (widget.id == "media" || widget.id == "productivity")
-                        ? 0.24 / animationSpeed : nil
+                    resizeDuration: animationsEnabled && resizes ? 0.24 / animationSpeed : nil,
+                    vertical: vertical
                 )
                     .layoutValue(key: WorkspaceBarZoneLayout.Lane.self, value: lane)
                     .layoutValue(key: WorkspaceBarZoneLayout.Priority.self, value: widget.priority)

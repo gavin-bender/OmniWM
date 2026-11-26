@@ -100,6 +100,9 @@ local function batteryChip(ctx, m, mode)
     local glyph = mode == "inside" and require("./battery").cell(m, 30 * scale, 15 * scale, m.text)
         or surface.icon(icons.battery(m.level / 100, m.charging), { size = tokens.icon.medium * scale,
             color = tint, filled = true, animate = "effects" })
+    if mode == nil then
+        glyph = require("./battery").withMode(ctx, m, glyph)
+    end
     local items = { glyph }
     if mode == nil or mode == "beside" then
         items[#items + 1] = ui.text{ text = style.vertical and m.text or m.percent, font = "Google Sans Flex",

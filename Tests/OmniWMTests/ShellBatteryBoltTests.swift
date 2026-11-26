@@ -154,6 +154,37 @@ final class ShellBatteryBoltTests: XCTestCase {
         }
     }
 
+    func testPowerModeIndicatorsAndTooltipsFollowTheActiveMode() throws {
+        let cases: [(ShellPowerMode?, Bool, String?, String?)] = [
+            (.low, false, "Low Power Mode", "leaf.fill"),
+            (.high, true, "High Power Mode", "chevron.up.2"),
+            (.automatic, true, "Automatic Power Mode", nil),
+            (nil, true, "Low Power Mode", "leaf.fill"),
+            (nil, false, nil, nil)
+        ]
+        for name in ["battery", "battery-wifi"] {
+            let widget = try ShellRenderedWidget(name)
+            for (mode, lowPower, label, symbol) in cases {
+                let power = ShellPower(lowPower: lowPower, mode: mode, supportsHighPower: true)
+                for layout in [Layout.beside, .vertical] {
+                    let bar = render(widget, level: 76, charging: true, power: power, layout: layout)
+                    let help = try XCTUnwrap(bar.first.map { widget.text.string($0.content.help) })
+                    XCTAssertTrue(help.contains("76"), name)
+                    if let label {
+                        XCTAssertTrue(help.contains(label), help)
+                    } else {
+                        XCTAssertFalse(help.contains("Power Mode"), help)
+                    }
+                    for tree in [bar, widget.renderPopout()] {
+                        let badges = tree.filter { $0.kind == .symbol }.map { widget.text.string($0.content.text) }
+                            .filter { ["leaf.fill", "chevron.up.2"].contains($0) }
+                        XCTAssertEqual(badges, symbol.map { [$0] } ?? [], name)
+                    }
+                }
+            }
+        }
+    }
+
     private func render(
         _ widget: ShellRenderedWidget,
         level: Double,

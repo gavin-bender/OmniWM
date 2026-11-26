@@ -1645,7 +1645,7 @@ final class ShellStyleLayoutTests: XCTestCase {
                                 XCTAssertEqual(widget.actions.count, count + 1, context)
                                 XCTAssertEqual(widget.actions.last, OMNI_ACTION_POPOUT, context)
                             } else {
-                                XCTAssertTrue(tree.allSatisfy { $0.content.action == 0 }, context)
+                                XCTAssertEqual(tree.first?.content.action, OMNI_ACTION_POPOUT, context)
                             }
                             var stats = omni_render_stats()
                             var error = [CChar](repeating: 0, count: 256)

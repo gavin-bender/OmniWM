@@ -10,11 +10,13 @@ struct ShellWidgetSlot: View {
     let view: NSView?
     var cuttable = false
     var resizeDuration: Double?
+    var vertical = false
 
     var body: some View {
         if let resizeDuration {
-            ResizingShellWidgetSlot(widget: widget, view: view, cuttable: cuttable, width: widget.size.width)
-                .animation(.easeInOut(duration: resizeDuration), value: widget.size.width)
+            let length = vertical ? widget.size.height : widget.size.width
+            ResizingShellWidgetSlot(widget: widget, view: view, cuttable: cuttable, vertical: vertical, length: length)
+                .animation(.easeInOut(duration: resizeDuration), value: length)
                 .id(view.map(ObjectIdentifier.init))
         } else {
             ShellWidgetSlotHost(widget: widget, view: view, cuttable: cuttable, size: widget.size)
@@ -28,17 +30,19 @@ private struct ResizingShellWidgetSlot: View, Animatable {
     let widget: WorkspaceBarShellWidget
     let view: NSView?
     let cuttable: Bool
-    nonisolated var width: CGFloat
+    let vertical: Bool
+    nonisolated var length: CGFloat
 
     nonisolated var animatableData: CGFloat {
-        get { width }
-        set { width = newValue }
+        get { length }
+        set { length = newValue }
     }
 
     var body: some View {
         ShellWidgetSlotHost(
             widget: widget, view: view, cuttable: cuttable,
-            size: CGSize(width: max(0, width), height: widget.size.height)
+            size: vertical ? CGSize(width: widget.size.width, height: max(0, length))
+                : CGSize(width: max(0, length), height: widget.size.height)
         )
     }
 }

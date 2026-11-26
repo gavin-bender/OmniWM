@@ -4,7 +4,41 @@
 local look = require("./look")
 local actions = require("./actions")
 
+local effects = require("./effects")
+local resize = { duration = 0.24, curve = "easeInOut" }
+
 local battery = { boltContrastLevel = 55 }
+
+local modeSymbols = { low = "leaf.fill", high = "chevron.up.2" }
+
+local function modeLabel(mode)
+    if mode == "low" then return omniwm.l10n("Low Power Mode") end
+    if mode == "high" then return omniwm.l10n("High Power Mode") end
+    if mode == "automatic" then return omniwm.l10n("Automatic Power Mode") end
+    return nil
+end
+
+function battery.modeGlyph(symbol, size, color)
+    return ui.symbol(effects.motion("pop", { key = symbol, name = symbol, size = size, color = color, weight = "semibold" }))
+end
+
+function battery.withMode(ctx, state, glyph)
+    local scale = look.scale(ctx)
+    local items = { key = "battery-gauge", gap = 2 * scale, animate = resize, glyph }
+    local symbol = state and modeSymbols[state.activeMode]
+    if symbol then
+        items[2] = battery.modeGlyph(symbol, 11 * scale, if state.activeMode == "low" then "yellow" else "purple")
+    end
+    return if ctx.data.bar.style.vertical then ui.column(items) else ui.row(items)
+end
+
+function battery.animateBar(button)
+    button.animate = resize
+    for _, child in ipairs(button) do
+        child.animate = child.animate or resize
+    end
+    return button
+end
 
 local function tint(level: number, charging: boolean): string
     if charging then
@@ -26,11 +60,16 @@ function battery.state(ctx)
         return nil
     end
     local charging = ctx.data.charging == true
-    local power = ctx.data.power
-    local plugged = power ~= nil and power.source == "ac"
+    local power = ctx.data.power or {}
+    local activeMode = power.mode or (if power.lowPower then "low" else nil)
+    local percent = ctx.format.percent(level / 100)
+    local label = modeLabel(activeMode)
+    local help = omniwm.l10n("Battery") .. " " .. percent
+    local plugged = power.source == "ac"
     return { level = level, charging = charging, plugged = plugged, low = level <= 20 and not charging,
         tint = tint(level, charging), symbol = look.batterySymbol(level, charging or plugged), text = tostring(level),
-        percent = ctx.format.percent(level / 100), reserve = ctx.format.percent(1),
+        percent = percent, activeMode = activeMode, help = if label then help .. " · " .. label else help,
+        reserve = ctx.format.percent(1),
         mode = (ctx.data.settings or {}).percent or "beside" }
 end
 
@@ -58,7 +97,7 @@ function battery.model(ctx)
     m.supportsHighPower = power.supportsHighPower
     if not m.powerMode and power.lowPower ~= nil then
         m.details[#m.details + 1] = { label = omniwm.l10n("Low Power Mode"),
-            value = if power.lowPower then omniwm.l10n("On") else omniwm.l10n("Off") }
+            symbol = modeSymbols[m.activeMode], value = if power.lowPower then omniwm.l10n("On") else omniwm.l10n("Off") }
     end
     m.settings = "battery settings"
     return m
@@ -87,10 +126,14 @@ function battery.modeSelector(m, width)
     local row = { w = width, gap = 4 }
     for _, option in options do
         local selected = m.powerMode == option[1]
-        row[#row + 1] = ui.row{ grow = 1, pad = 5, radius = look.radius(6),
+        local props = { key = option[1], animate = resize, grow = 1, pad = 5, gap = 3, radius = look.radius(6),
             fill = if selected then "accent" else "surface", hover = look.hover,
-            onClick = "battery mode " .. option[1],
-            look.text{ text = option[2], size = 12, color = if selected then "accentForeground" else "foreground" } }
+            onClick = "battery mode " .. option[1] }
+        if selected and modeSymbols[m.powerMode] then
+            props[#props + 1] = battery.modeGlyph(modeSymbols[m.powerMode], 11, "accentForeground")
+        end
+        props[#props + 1] = look.text{ key = "label", animate = resize, text = option[2], size = 12, color = if selected then "accentForeground" else "foreground" }
+        row[#row + 1] = ui.row(props)
     end
     return ui.column{ w = width, gap = 5, center = false,
         look.text{ text = omniwm.l10n("Power Mode"), size = 13, weight = "medium" }, ui.row(row) }
@@ -112,9 +155,10 @@ function battery.content(ctx, width: number?, m)
     if #m.details > 0 then
         local details = { w = width }
         for _, detail in m.details do
-            details[#details + 1] = ui.row{ w = width - 24, gap = 8,
+            details[#details + 1] = ui.row{ w = width - 24, gap = 8, animate = resize,
                 look.text{ text = detail.label, size = 13, color = "secondaryForeground", grow = 1, maxWidth = 170 },
-                look.text{ text = detail.value, size = 13, weight = "medium", maxWidth = 118 } }
+                look.text{ text = detail.value, size = 13, weight = "medium", maxWidth = 118, animate = resize },
+                if detail.symbol then battery.modeGlyph(detail.symbol, 11, "yellow") else nil }
         end
         rows[#rows + 1] = look.group(details)
     end

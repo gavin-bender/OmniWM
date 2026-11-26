@@ -145,7 +145,11 @@ local function batteryPanel(ctx: Context, m)
                 ui.text{ text = m.status, font = "Google Sans Flex", size = tokens.body.small, color = "secondaryForeground" } } },
     }
     for _, detail in m.details do
-        rows[#rows + 1] = line(detail.label, detail.value, inner, true)
+        local row = line(detail.label, detail.value, inner, true)
+        if detail.symbol then
+            row[#row + 1] = require("./battery").modeGlyph(detail.symbol, 11, "yellow")
+        end
+        rows[#rows + 1] = row
     end
     if m.powerMode then
         rows[#rows + 1] = require("./battery").modeSelector(m, inner)

@@ -52,13 +52,14 @@ function render(ctx)
     end
     local labels = {}
     if charge then
-        table.insert(labels, omniwm.l10n("Battery") .. " " .. charge.percent)
+        table.insert(labels, charge.help)
     end
     if network then
         table.insert(labels, network.help)
     end
-    return look.bar(ctx, { onClick = ui.popout, help = table.concat(labels, " · "),
-        gauge(22 * look.scale(ctx), charge, network) })
+    local glyph = gauge(22 * look.scale(ctx), charge, network)
+    return battery.animateBar(look.bar(ctx, { onClick = ui.popout, help = table.concat(labels, " · "),
+        battery.withMode(ctx, charge, glyph) }))
 end
 
 function popout(ctx)

@@ -290,6 +290,9 @@ local function batteryChip(ctx, state, details)
         glyph = chip(size, style.vertical, hue, { name = state.symbol, size = math.floor(size * 0.52),
             weight = "semibold", color = "accentForeground" }, mode ~= "beside")
     end
+    if not details then
+        glyph = require("./battery").withMode(ctx, state, glyph)
+    end
     local props = { gap = 0, radius = radius,
         fill = (not details or style.backgrounds) and "elevatedSurface" or nil,
         hoverOpacity = details and 0.9 or nil, glyph }
