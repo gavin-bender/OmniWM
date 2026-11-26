@@ -26,6 +26,11 @@ extension ShellWidgetPackage {
         if changed & ShellDataKey.clock.bit != 0 {
             setString(instance, .clock, next.clock)
         }
+        if changed & ShellDataKey.focusSymbol.bit != 0 {
+            setValue(instance, .focusSymbol) { writer in
+                next.focusSymbol.map { writer.string($0) } ?? writer.null()
+            }
+        }
         if changed & ShellDataKey.date.bit != 0 {
             setString(instance, .date, next.date)
         }

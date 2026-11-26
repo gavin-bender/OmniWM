@@ -620,6 +620,7 @@ export type Island = {
 export type Data = {
     clock: string,
     date: string,
+    focusSymbol: string?,
     seconds: number,
     cpu: number?,
     memory: number,

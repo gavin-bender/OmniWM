@@ -63,6 +63,8 @@ final class ShellDataFeed {
     private var lowPowerObserver: (any NSObjectProtocol)?
     var cpuMeter = CPUMeter()
     var data = ShellWidgetData()
+    var focusObservation: ShellProviderObservation.Subscription?
+    var focusRead: Task<Void, Never>?
     var tick = 0
     private var sampledTick = 0
     private var demand: UInt64 = 0
@@ -174,6 +176,7 @@ final class ShellDataFeed {
     func start() {
         guard !started else { return }
         started = true
+        listenToFocus(!paused && demands(.focusSymbol))
         listenToThermalPressure(!paused && demands(.thermalPressure))
         listenToAwake(!paused && demands(.awake))
         listenToMicrophone(!paused && demands(.microphone))
@@ -187,6 +190,7 @@ final class ShellDataFeed {
 
     func stop() {
         started = false
+        listenToFocus(false)
         listenToBadges()
         cancelTimer()
         removeAudioListeners()

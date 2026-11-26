@@ -82,6 +82,7 @@ extension ShellDataFeed {
         if !paused {
             sampleSystem()
         }
+        listenToFocus(started && !paused && demands(.focusSymbol))
         listenToThermalPressure(started && !paused && demands(.thermalPressure))
         updateAudio()
         listenToAwake(started && !paused && demands(.awake))

@@ -2674,6 +2674,38 @@ final class ShellStyleLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(frame.width + 1, (title as NSString).size(withAttributes: [.font: font]).width)
     }
 
+    func testClockShowsConfiguredFocusSymbolBesideTimeOnlyWhileActive() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let assertions = directory.appending(path: "Assertions.json")
+        try Data(#"{"data":[{"storeAssertionRecords":[{"assertionDetails":{"assertionDetailsModeIdentifier":"work"}}]}]}"#.utf8)
+            .write(to: assertions)
+        try Data(#"{"data":[{"modeConfigurations":{"work":{"mode":{"symbolImageName":"briefcase.fill"}}}}]}"#.utf8)
+            .write(to: directory.appending(path: "ModeConfigurations.json"))
+        let read = await ShellDataFeed.focusSymbol(in: directory)
+        let symbol = try XCTUnwrap(read)
+        XCTAssertEqual(symbol, "briefcase.fill")
+        let widget = try ShellRenderedWidget("clock")
+        calendarFixture(widget)
+        widget.set("focusSymbol") { $0.string(symbol) }
+        widget.render(ShellBarData())
+        func frame(_ text: String) throws -> CGRect {
+            let element = try XCTUnwrap(widget.surface.layout.core.elements { widget.text.string($0.text) == text }.first)
+            return CGRect(widget.surface.layout.core.absoluteFrame(of: element))
+        }
+        let icon = try frame(symbol)
+        let time = try frame("9:41 AM")
+        XCTAssertLessThan(icon.maxX, time.minX)
+        XCTAssertEqual(icon.midY, time.midY, accuracy: 1)
+        try Data(#"{"data":[{"storeInvalidationRecords":[{}]}]}"#.utf8).write(to: assertions)
+        let inactive = await ShellDataFeed.focusSymbol(in: directory)
+        XCTAssertNil(inactive)
+        widget.set("focusSymbol") { $0.null() }
+        widget.render(ShellBarData())
+        XCTAssertFalse(widget.strings().contains(symbol))
+    }
+
     func testClockRequestsOneLabelForOverflowAndKeepsFullTitleInAgenda() throws {
         let widget = try ShellRenderedWidget("clock")
         var snapshot = calendarFixture(widget)

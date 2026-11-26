@@ -172,8 +172,11 @@ function render(ctx)
                 clock[#clock + 1] = look.text{ key = "date", text = m.date, size = (if events then 10 else 13) * scale,
                     color = "secondaryForeground" }
             end
-            clock[#clock + 1] = look.text{ key = "time", text = m.time, size = 13 * scale,
+            local time = look.text{ key = "time", text = m.time, size = 13 * scale,
                 weight = if events then "semibold" else "medium", reserve = "00:00 PM" }
+            local focus = ctx.data.focusSymbol
+            clock[#clock + 1] = if focus then ui.row{ key = "focus-time", gap = 3 * scale,
+                look.glyph{ key = "focus-mode", name = focus, size = 11 * scale }, time } else time
             if events then
                 props.pad = 0
                 props.gap = 5 * scale

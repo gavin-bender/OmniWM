@@ -57,6 +57,7 @@ enum ShellDataKey: String, CaseIterable, Sendable {
     case connection
     case commandPalette
     case thermalPressure
+    case focusSymbol
 
     private static let order = allCases
     static let table = order.map(\.rawValue).joined(separator: "\n")
@@ -135,6 +136,7 @@ struct ShellNetworkHistory: Equatable, Sendable, ShellValueWritable {
 
 struct ShellWidgetData: Equatable, Sendable {
     var clock = ""
+    var focusSymbol: String?
     var date = ""
     var seconds = 0.0
     var cpu: Double?
@@ -180,6 +182,7 @@ struct ShellWidgetData: Equatable, Sendable {
 extension ShellWidgetData {
     func changedKeys(from previous: borrowing Self) -> UInt64 {
         Self.changed(.clock, when: clock != previous.clock)
+            | Self.changed(.focusSymbol, when: focusSymbol != previous.focusSymbol)
             | Self.changed(.date, when: date != previous.date)
             | Self.changed(.seconds, when: seconds != previous.seconds)
             | Self.changed(.cpu, when: cpu != previous.cpu)
