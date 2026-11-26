@@ -445,6 +445,40 @@ final class WorkspaceBarViewLayoutTests: XCTestCase {
         XCTAssertEqual(sizes[2], sizes[0])
     }
 
+    func testCommandDragTargetsTheVisibleEdgesOfHorizontalAndVerticalWidgets() throws {
+        for orientation in [WorkspaceBarOrientation.horizontal, .vertical] {
+            let anchor = NSView()
+            let snapshot = WorkspaceBarSnapshot(
+                projection: WorkspaceBarProjection(items: [], scratchpads: []),
+                backgroundOpacity: 1, barHeight: 24, orientation: orientation,
+                shellWidgets: [
+                    .init(id: "anchor", size: CGSize(width: 20, height: 20), lane: .leading),
+                    .init(id: "moving", size: CGSize(width: 20, height: 20), lane: .trailing)
+                ]
+            )
+            let host = WorkspaceBarHostingView(rootView: WorkspaceBarView(
+                model: WorkspaceBarModel(snapshot: snapshot), motionPolicy: MotionPolicy(animationsEnabled: false),
+                shellSurface: { $0 == "anchor" ? anchor : nil }
+            ))
+            let panel = WorkspaceBarPanel.defaultPanel()
+            panel.contentView = host
+            panel.setContentSize(orientation.isVertical ? CGSize(width: 24, height: 60) : CGSize(width: 60, height: 24))
+            host.layoutSubtreeIfNeeded()
+            XCTAssertTrue(anchor.window === panel)
+            let frame = host.convert(anchor.bounds, from: anchor)
+            for after in [false, true] {
+                let offset = CGFloat(after ? 5 : -5)
+                let point = orientation.isVertical
+                    ? CGPoint(x: frame.midX, y: frame.midY + (host.isFlipped ? offset : -offset))
+                    : CGPoint(x: frame.midX + offset, y: frame.midY)
+                let target = try XCTUnwrap(host.destination(at: point, moving: "moving"))
+                XCTAssertEqual(target.name, "anchor")
+                XCTAssertEqual(target.after, after, "Drop at \(point) beside \(frame) on a \(orientation) bar")
+                XCTAssertNil(host.destination(at: point, moving: "anchor"))
+            }
+        }
+    }
+
     func testShellSlotsKeepTheirWidthUnderANarrowProposal() {
         var cases = [CGFloat(60), 120, 240].map { width in
             (WorkspaceBarSnapshot(

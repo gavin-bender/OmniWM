@@ -212,6 +212,19 @@ final class WorkspaceBarManager {
     private func makePanel(screen: NSScreen?) -> WorkspaceBarPanel {
         let panel = panelFactory()
         panel.targetScreen = screen
+        panel.widgetProfile = { [weak self] in self?.shellHost?.config.profile }
+        panel.moveWidget = { [weak self] profile, name, anchor, after in
+            guard let self else { return }
+            Task {
+                do {
+                    try await shellConfiguration.editBar(profile: profile) { layout in
+                        layout.move(name, relativeTo: anchor, after: after)
+                    }
+                } catch {
+                    Log.shell.error("Failed to save the bar widget layout: \(error.localizedDescription)")
+                }
+            }
+        }
         panel.onPress = { [weak self] in
             guard let self else { return }
             dragController.cancel()

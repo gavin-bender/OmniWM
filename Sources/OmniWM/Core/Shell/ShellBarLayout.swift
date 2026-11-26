@@ -228,6 +228,13 @@ struct ShellBarLayout: Equatable, Sendable {
         set(names, in: lane)
     }
 
+    mutating func move(_ name: String, relativeTo anchor: String, after: Bool) {
+        guard name != anchor, lane(of: name) != nil, let lane = lane(of: anchor) else { return }
+        let others = names(in: lane).filter { $0 != name }
+        guard let index = others.firstIndex(of: anchor) else { return }
+        add(name, to: lane, at: index + (after ? 1 : 0))
+    }
+
     mutating func shift(_ name: String, by delta: Int) {
         for lane in ShellLane.allCases {
             var names = names(in: lane)

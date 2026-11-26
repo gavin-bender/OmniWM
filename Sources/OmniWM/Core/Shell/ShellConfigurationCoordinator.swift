@@ -234,10 +234,12 @@ final class ShellConfigurationCoordinator {
         let profile = try await targetProfile(profile)
         try await ordered { [self] in
             let snapshot = try await load(profile: profile)
-            var layout = try await persistence().perform {
+            let current = try await persistence().perform {
                 ShellBarLayout(config: snapshot, shellDirectory: $0)
             }
+            var layout = current
             change(&layout)
+            guard layout != current else { return }
             let next = layout
             _ = try await persistence().perform { directory in
                 try next.save(shellDirectory: directory)

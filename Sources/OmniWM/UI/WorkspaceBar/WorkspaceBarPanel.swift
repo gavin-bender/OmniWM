@@ -6,6 +6,8 @@ import AppKit
 @MainActor
 final class WorkspaceBarPanel: ShellFocusPanel {
     var targetScreen: NSScreen?
+    var widgetProfile: (() -> String?)?
+    var moveWidget: ((_ profile: String, _ name: String, _ anchor: String, _ after: Bool) -> Void)?
     var onPress: (() -> Void)?
 
     override func sendEvent(_ event: NSEvent) {

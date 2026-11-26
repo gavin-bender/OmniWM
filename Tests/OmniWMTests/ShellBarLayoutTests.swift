@@ -131,6 +131,23 @@ final class ShellBarLayoutTests: XCTestCase {
         XCTAssertEqual(ShellBarLayout.title(of: "omniwm"), "OmniWM")
     }
 
+    func testMovingRelativeToAWidgetUsesItsLaneAndFinalPosition() throws {
+        var layout = try ShellBarLayout.load(shellDirectory: shell).get()
+        layout.trailing = ["clock", "weather", "mine"]
+        layout.move("clock", relativeTo: "weather", after: true)
+        XCTAssertEqual(layout.trailing, ["weather", "clock", "mine"])
+        layout.move("mine", relativeTo: "weather", after: false)
+        XCTAssertEqual(layout.trailing, ["mine", "weather", "clock"])
+        layout.move("weather", relativeTo: "workspaces", after: false)
+        XCTAssertEqual(layout.leading, ["weather", "workspaces"])
+        XCTAssertEqual(layout.trailing, ["mine", "clock"])
+        let saved = layout
+        layout.move("missing", relativeTo: "mine", after: false)
+        layout.move("mine", relativeTo: "missing", after: true)
+        layout.move("mine", relativeTo: "mine", after: true)
+        XCTAssertEqual(layout, saved)
+    }
+
     func testEditsMoveAddAndRemoveWidgets() throws {
         var layout = try ShellBarLayout.load(shellDirectory: shell).get()
         layout.add("mine", to: .trailing)

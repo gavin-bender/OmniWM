@@ -93,6 +93,7 @@ private struct ShellWidgetSlotHost: NSViewRepresentable {
     }
 
     private func update(_ clip: ShellWidgetClipView) {
+        clip.widgetName = widget.id
         clip.update(
             surface: size,
             badge: widget.failure.map { ShellWidgetFailureBadge(name: widget.id, failure: $0) },
@@ -104,6 +105,7 @@ private struct ShellWidgetSlotHost: NSViewRepresentable {
 final class ShellWidgetClipView: NSView {
     static let badgeGap: CGFloat = 4
 
+    var widgetName = ""
     let content: NSView?
     private var badge: NSHostingView<ShellWidgetFailureBadge>?
     private var surface = CGSize.zero
