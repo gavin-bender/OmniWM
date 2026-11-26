@@ -20,6 +20,7 @@ final class DwindleGroupRevealTransactions {
         var workspaceId: WorkspaceDescriptor.ID
         let tileId: DwindleTileId
         let targetFrame: CGRect
+        var needsPresentationCheck: Bool
         let targetMonitorId: Monitor.ID
         var hides: [LayoutDeferredHide]
         let preserveWorkspaceInactive: Bool
@@ -62,6 +63,7 @@ final class DwindleGroupRevealTransactions {
             workspaceId: entry.workspaceId,
             tileId: tile.id,
             targetFrame: targetFrame,
+            needsPresentationCheck: controller.axManager.nativeParks.owns(entry.token) || existingTransaction?.needsPresentationCheck == true,
             targetMonitorId: monitor.id,
             hides: hides,
             preserveWorkspaceInactive: preserveWorkspaceInactive,
@@ -130,7 +132,6 @@ final class DwindleGroupRevealTransactions {
 
     func resetPendingGroupReveals() {
         pendingGroupRevealTransactionsByWindowId.removeAll()
-        nextPendingGroupRevealTransactionId = 1
     }
 
     func cancelPendingGroupReveals(pid: pid_t) {
@@ -245,6 +246,20 @@ extension DwindleGroupRevealTransactions {
             return
         }
 
+        if transaction.needsPresentationCheck {
+            let nativeParks = controller.axManager.nativeParks
+            nativeParks.reveal(transaction.token)
+            guard !nativeParks.owns(transaction.token) else {
+                rollbackPendingGroupReveal(transaction)
+                return
+            }
+            pendingGroupRevealTransactionsByWindowId[transaction.windowId] = transaction
+            Task { [weak self] in
+                await self?.waitForPresentation(transaction)
+            }
+            return
+        }
+
         let shouldFocusAfterReveal = transaction.focusOriginOnSuccess != nil
             && transaction.focusPlannedSeq.map {
                 controller.workspaceManager.isSeqCurrent(
@@ -274,6 +289,34 @@ extension DwindleGroupRevealTransactions {
         }
         controller.axManager.clearParkPending(for: transaction.windowId, pid: transaction.pid)
         publishRevealSuccess(transaction, controller: controller, shouldFocusAfterReveal: shouldFocusAfterReveal)
+    }
+
+    private func waitForPresentation(_ original: PendingGroupRevealTransaction) async {
+        // The Dock can acknowledge order-in before the compositor displays the
+        // new frame. Leave the outgoing tab up while the incoming one settles.
+        for _ in 0 ..< 20 {
+            try? await Task.sleep(for: .milliseconds(8))
+            guard let key = pendingGroupRevealTransactionKey(for: original.windowId, transactionId: original.id),
+                  var current = pendingGroupRevealTransactionsByWindowId[key] else { return }
+            let id = UInt32(current.windowId)
+            let rows = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]]
+            guard let row = rows?.first,
+                  row[kCGWindowNumber as String] as? UInt32 == id,
+                  row[kCGWindowOwnerPID as String] as? pid_t == current.pid,
+                  row[kCGWindowIsOnscreen as String] as? Bool == true,
+                  let bounds = row[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds),
+                  ScreenCoordinateSpace.toAppKit(rect: frame).approximatelyEqual(to: current.targetFrame, tolerance: FrameTolerance.frameWrite)
+            else { continue }
+            pendingGroupRevealTransactionsByWindowId[key] = nil
+            current.needsPresentationCheck = false
+            finalizePendingGroupReveal(current)
+            return
+        }
+        if let key = pendingGroupRevealTransactionKey(for: original.windowId, transactionId: original.id),
+           let current = pendingGroupRevealTransactionsByWindowId.removeValue(forKey: key) {
+            rollbackPendingGroupReveal(current)
+        }
     }
 
     private func publishRevealSuccess(
