@@ -26,11 +26,9 @@ extension MouseEventHandler {
 
         if controller.workspaceManager.activeLayoutKind(for: wsId) == .tabbed {
             if button == .left, modifiers.isDisjoint(with: Self.relevantModifierFlags),
-               let token = tabbedWindow(at: location, in: wsId),
-               let entry = controller.workspaceManager.entry(for: token),
-               let frame = fastNativeWindowFrame(for: entry),
-               location.y >= frame.maxY - 32
-            {
+               let (token, visibleFrame) = frontTiledWindow(at: location, in: wsId) {
+                let frame = windowServerFramesAtMouseDown?[token].map(ScreenCoordinateSpace.toAppKit(rect:)) ?? visibleFrame
+                guard Self.tabDropTitleRegion(in: frame).contains(location) else { return false }
                 state.tabbedTitleDrag = (token, location, frame)
                 controller.axEventHandler.noteMouseFocusIntent(token: token)
             }
@@ -232,11 +230,11 @@ extension MouseEventHandler {
         return controller.surfaceReconciler.ringWindowId(orderedAbove: id).map(Int.init)
     }
 
-    func tabbedWindow(at point: CGPoint, in workspaceId: WorkspaceDescriptor.ID) -> WindowToken? {
+    func frontTiledWindow(at point: CGPoint, in workspaceId: WorkspaceDescriptor.ID) -> (WindowToken, CGRect)? {
         let border = tabWindowBorderId()
         guard let controller, let window = tabWindowStackAtPoint(point).first(where: { $0.id != border }),
               let entry = controller.workspaceManager.entry(forWindowId: window.id), entry.workspaceId == workspaceId,
               entry.hiddenState == nil, entry.mode == .tiling, entry.layoutReason == .standard else { return nil }
-        return entry.token
+        return (entry.token, window.frame)
     }
 }

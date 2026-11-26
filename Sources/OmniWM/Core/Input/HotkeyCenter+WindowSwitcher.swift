@@ -26,9 +26,10 @@ extension HotkeyCenter {
             suppressedHotkeyKeyCodes.insert(UInt32(keyCode))
             return true
         }
+        let modifiers = event.flags.intersection(WindowSwitcherInput.releaseModifiers)
         if type == .keyDown, keyCode == kVK_Tab, isRunning, !commandHotkeysSuspended,
            keyboardModeInput.kind == .normal, !windowSwitcherInput.holdsKeyboard,
-           event.flags.intersection([.maskCommand, .maskControl, .maskAlternate]) == .maskAlternate {
+           modifiers == .maskControl || modifiers == .maskAlternate {
             if suppressedHotkeyKeyCodes.contains(UInt32(keyCode)) { return true }
             if cycleFocusedTabGroup?(event.flags.contains(.maskShift)) == true {
                 suppressedHotkeyKeyCodes.insert(UInt32(keyCode))

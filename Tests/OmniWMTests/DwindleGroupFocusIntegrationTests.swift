@@ -474,7 +474,7 @@ final class DwindleGroupFocusIntegrationTests: XCTestCase {
     }
 
     func testPreferredKeyboardFocusFrameUsesGroupedContentFrame() throws {
-        let fixture = try makeFixture { _, _ in }
+        let fixture = try makeFixture(withIconRail: true) { _, _ in }
         let contentFrame = try XCTUnwrap(
             fixture.engine.contentFrame(for: fixture.inactiveToken, in: fixture.workspaceId)
         )
@@ -1195,9 +1195,11 @@ final class DwindleGroupFocusIntegrationTests: XCTestCase {
     }
 
     private func makeFixture(
+        withIconRail: Bool = false,
         onFront: @escaping (pid_t, UInt32) -> Void
     ) throws -> Fixture {
         let controller = makeController(onFront: onFront)
+        controller.settings.tabRailAppIcons = withIconRail
         let workspaceName = "97"
         controller.settings.workspaces.configurations.append(
             WorkspaceConfiguration(name: workspaceName, layoutType: .dwindle)

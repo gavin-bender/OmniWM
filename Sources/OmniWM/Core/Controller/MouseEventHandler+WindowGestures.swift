@@ -45,7 +45,14 @@ extension MouseEventHandler {
         case .niri,
              .defaultLayout:
             return controller.niriEngine?.hitTestTiled(point: location, in: wsId)?.token
-        case .dwindle, .tabbed:
+        case .tabbed:
+            let border = tabWindowBorderId()
+            guard let front = tabWindowStackAtPoint(location).first(where: { $0.id != border }) else { return nil }
+            if let rail = controller.tabRailManager.dropRail(windowId: front.id, at: location, in: wsId) { return rail.target }
+            guard let entry = controller.workspaceManager.entry(forWindowId: front.id), entry.workspaceId == wsId,
+                  entry.mode == .tiling, entry.hiddenState == nil, entry.layoutReason == .standard else { return nil }
+            return entry.token
+        case .dwindle:
             return controller.dwindleEngine?.hitTestFocusableWindow(
                 point: location,
                 in: wsId,
@@ -86,7 +93,23 @@ extension MouseEventHandler {
         let wsId = workspace.id
         switch (controller.settings.workspaces.layoutType(for: workspace.name), mode) {
         case (.tabbed, .windowMove), (.tabbed, .windowResize):
-            return false
+            guard let snapshot = controller.dwindleEngine?.tileSnapshot(for: token, in: wsId),
+                  snapshot.activeToken == token, !snapshot.members[snapshot.activeIndex].isFullscreen,
+                  let frame = snapshot.contentFrame else { return false }
+            let handle: TabChromeHandle
+            if mode == .windowMove {
+                handle = .grip
+                state.isMoving = true
+                state.moveLayout = .tabbed
+            } else {
+                let left = location.x < frame.midX
+                handle = location.y >= frame.midY ? (left ? .topLeft : .topRight) : (left ? .bottomLeft : .bottomRight)
+                state.isResizing = true
+                state.resizeLayout = .tabbed
+            }
+            state.activeInteractionSource = source
+            state.tabbedGesture = (token, wsId, TabFrameDrag(start: location, frame: frame, handle: handle), location)
+            return true
         case (.dwindle, .windowMove):
             guard let engine = controller.dwindleEngine else { return false }
             return beginDwindleMove(token: token, engine: engine, wsId: wsId, at: location, source: source)
@@ -115,6 +138,12 @@ extension MouseEventHandler {
              (_, .workspaceSwitch):
             return false
         }
+    }
+
+    func updateTabbedGesture(at point: CGPoint, released: Bool = false) {
+        guard let session = state.tabbedGesture else { return }
+        state.tabbedGesture?.point = point
+        updateTabbedFrame(session.drag, at: point, token: session.token, workspace: session.workspace, released: released)
     }
 
     func gestureWindowLocation(for lockedContext: MouseInputState.LockedGestureContext) -> CGPoint {

@@ -20,8 +20,10 @@ struct TabbedBarOptions: Equatable, Codable, Sendable {
         }
     }
 
+    static let closeButtonWidth: CGFloat = 22
+
     var thickness: CGFloat {
-        position == .left && content != .icons ? rowHeight * 4 : rowHeight
+        position == .left ? (content == .icons ? rowHeight + Self.closeButtonWidth : rowHeight * 4) : rowHeight
     }
 
     func contentFrame(fitting frame: CGRect, in screen: CGRect, grouped: Bool) -> CGRect {
@@ -54,6 +56,7 @@ extension TabbedBarOptions {
 }
 
 enum TabRailStyle: Equatable {
+    case hidden
     case compact
     case appIcons
     case windowTabs(TabbedBarOptions)
@@ -67,11 +70,12 @@ enum TabRailStyle: Equatable {
     static let iconRowHeight: CGFloat = 28
 
     init(appIcons: Bool) {
-        self = appIcons ? .appIcons : .compact
+        self = appIcons ? .appIcons : .hidden
     }
 
     var reservedWidth: CGFloat {
         switch self {
+        case .hidden: 0
         case .compact: TabRailMetrics.totalWidth
         case .appIcons: 28
         case let .windowTabs(options): options.thickness
@@ -84,6 +88,7 @@ enum TabRailStyle: Equatable {
 
     func fittedHeight(tabCount: Int, availableHeight: CGFloat) -> CGFloat {
         switch self {
+        case .hidden: 0
         case .compact:
             TabRailLayout.fittedHeight(tabCount: tabCount, availableHeight: availableHeight)
         case let .windowTabs(options):

@@ -27,6 +27,10 @@ final class LiveWorkspaceSlide {
     private weak var hostedManager: ShellAppWindowManager?
     private var hostedMembers: [HostedMember]
 
+    weak var railManager: TabRailManager?
+    var outgoingRails: [TabRailInfo] = []
+    var incomingRails: [TabRailInfo] = []
+
     typealias PositionWriter = @MainActor (Member, CGRect, Bool) -> Bool
 
     let members: [Member]
@@ -90,6 +94,8 @@ final class LiveWorkspaceSlide {
     }
 
     func update(source: CGVector, destination: CGVector) -> Bool {
+        railManager?.presentSwipeRails(outgoingRails, offset: source, viewport: viewport)
+        railManager?.presentSwipeRails(incomingRails, offset: destination, viewport: viewport)
         if let manager = hostedManager {
             for member in hostedMembers {
                 let offset = member.incoming ? destination : source
@@ -246,6 +252,9 @@ extension WorkspaceSwipePresentation {
             members: members, viewport: flight.preparation.frame, dockDisplay: flight.axis == .vertical ? monitor.frame : nil,
             hostedManager: controller.shellAppWindowManager, hostedMembers: hosted
         )
+        flight.liveSlide?.railManager = controller.tabRailManager
+        flight.liveSlide?.outgoingRails = flight.preparation.source.items.compactMap(\.tabRail)
+        flight.liveSlide?.incomingRails = flight.destination.items.compactMap(\.tabRail)
         install(flight, after: nil, tracksGesture: tracksGesture)
         if (flight.isKeyboard || flight.liveSlide?.followsDisplayLink == true || flight.motion.target != nil),
            !activateDisplayLink(for: flight) {

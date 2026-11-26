@@ -403,6 +403,15 @@ extension WorkspaceSwipePresentation {
         auditRetiredSlides()
     }
 
+    // A renderer can release its window transforms before the workspace switch commits.
+    // Transfer the bars only once the active workspace is known, before uncovering it.
+    private func settleTabRails(for flight: Flight) {
+        guard let controller else { return }
+        let rails = flight.preparation.source.items.compactMap(\.tabRail) + flight.destination.items.compactMap(\.tabRail)
+        guard !rails.isEmpty else { return }
+        controller.surfaceReconciler.finishSwipeRails(rails)
+    }
+
     func cancel(_ flight: Flight, reason: String, keepingPreview: Bool = false, settlingFocus: Bool = true) {
         let monitorId = flight.preparation.monitor.id
         guard flights[monitorId] === flight else { return }
@@ -418,7 +427,10 @@ extension WorkspaceSwipePresentation {
         flight.handoff?.cancel()
         flight.settlement?.onChange = nil
         controller?.axManager.workspaceFrameSettlements.removeAll { $0 === flight.settlement }
-        if !keepingPreview { previews[monitorId]?.stop() }
+        if !keepingPreview {
+            settleTabRails(for: flight)
+            previews[monitorId]?.stop()
+        }
         if preparation?.monitor.id == monitorId { preparation = nil }
         trace(reason, progress: flight.progress)
         controller?.surfaceReconciler.noteWorldChanged()
@@ -497,6 +509,7 @@ extension WorkspaceSwipePresentation {
             cancel(flight, reason: "commit-failed")
             return
         }
+        if flight.captureFree { settleTabRails(for: flight) }
         flight.liveSlide?.finishHostedWindows(committed: true)
         if let slide = flight.liveSlide, !slide.followsDisplayLink {
             slide.adoptPlacedWindows(in: controller, destination: flight.destination)

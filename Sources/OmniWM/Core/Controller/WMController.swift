@@ -94,7 +94,9 @@ final class WMController {
     let windowRuleEngine = WindowRuleEngine()
 
     @ObservationIgnored
-    private(set) lazy var tabRailManager = TabRailManager(motionPolicy: motionPolicy, appInfoCache: appInfoCache)
+    private(set) lazy var tabRailManager = TabRailManager(
+        motionPolicy: motionPolicy, appInfoCache: appInfoCache, ownedWindowRegistry: ownedWindowRegistry
+    )
     @ObservationIgnored
     lazy var nativeFullscreenPlaceholderManager: NativeFullscreenPlaceholderManager = {
         let manager = NativeFullscreenPlaceholderManager()

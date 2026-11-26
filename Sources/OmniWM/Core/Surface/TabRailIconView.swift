@@ -15,6 +15,7 @@ final class TabRailIconView: NSVisualEffectView {
     private(set) var rows: [TabRailIconRowView] = []
     private var activeVisualIndex = 0
     private var hoveredVisualIndex: Int?
+    var onClose: ((WindowToken) -> Void)?
     var onWillScroll: (() -> Void)?
     var onDidScroll: (() -> Void)?
 
@@ -63,8 +64,8 @@ final class TabRailIconView: NSVisualEffectView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func hitTest(_: NSPoint) -> NSView? {
-        nil
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) as? NSButton
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -247,6 +248,7 @@ final class TabRailIconView: NSVisualEffectView {
                     image: tab.icon ?? tab.token.flatMap { appInfoCache.info(for: $0.pid)?.icon },
                     motionPolicy: motionPolicy
                 )
+            row.onClose = onClose
             document.addSubview(row)
             return row
         }
@@ -256,7 +258,7 @@ final class TabRailIconView: NSVisualEffectView {
     private func layoutRows() {
         let rowHeight = options?.rowHeight ?? TabRailStyle.iconRowHeight
         if isHorizontal {
-            let rowWidth = options?.content == .icons ? rowHeight
+            let rowWidth = options?.content == .icons ? rowHeight + TabbedBarOptions.closeButtonWidth
                 : max(rowHeight * 2.5, scrollView.frame.width / CGFloat(max(1, rows.count)))
             document.setFrameSize(CGSize(width: max(scrollView.frame.width, CGFloat(rows.count) * rowWidth), height: bounds.height))
             for (index, row) in rows.enumerated() {

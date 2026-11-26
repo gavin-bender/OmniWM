@@ -192,13 +192,13 @@ final class TabRailStyleLayoutTests: XCTestCase {
             hasNotch: false,
             name: "Display"
         )
-        XCTAssertEqual(niri.renderStyle.tabIndicatorWidth, 10)
-        XCTAssertEqual(dwindle.tabRailWidth, 10)
+        XCTAssertEqual(niri.renderStyle.tabIndicatorWidth, 0)
+        XCTAssertEqual(dwindle.tabRailWidth, 0)
 
         for enabled in [true, false] {
             controller.layoutRefreshController.resetState()
             controller.setTabRailAppIcons(enabled)
-            let expectedWidth: CGFloat = enabled ? 28 : 10
+            let expectedWidth: CGFloat = enabled ? 28 : 0
             XCTAssertEqual(settings.tabRailAppIcons, enabled)
             XCTAssertEqual(controller.tabRailStyle.reservedWidth, expectedWidth)
             XCTAssertEqual(niri.renderStyle.tabIndicatorWidth, expectedWidth)
@@ -221,8 +221,8 @@ final class TabRailStyleLayoutTests: XCTestCase {
             settings.applyExport(exported)
             controller.layoutRefreshController.resetState()
             controller.applyPersistedSettings(settings, startServices: false)
-            XCTAssertEqual(niri.renderStyle.tabIndicatorWidth, enabled ? 28 : 10)
-            XCTAssertEqual(dwindle.tabRailWidth, enabled ? 28 : 10)
+            XCTAssertEqual(niri.renderStyle.tabIndicatorWidth, enabled ? 28 : 0)
+            XCTAssertEqual(dwindle.tabRailWidth, enabled ? 28 : 0)
             XCTAssertNotNil(controller.layoutRefreshController.layoutState.pendingRefresh)
         }
     }

@@ -59,6 +59,17 @@ extension DwindleLayoutHandler {
         return infos
     }
 
+    func swipeTabRail(for token: WindowToken, frame: CGRect, in workspace: WorkspaceDescriptor.ID) -> TabRailInfo? {
+        guard let controller, controller.workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
+              let tile = controller.dwindleEngine?.tileSnapshot(for: token, in: workspace), tile.isGrouped,
+              tile.activeToken == token, !tile.members[tile.activeIndex].isFullscreen else { return nil }
+        let options = controller.settings.tabbedBar
+        return TabRailInfo(workspaceId: workspace, owner: .dwindleTile(tile.id), plannedSeq: controller.workspaceManager.worldSeq,
+                           tileFrame: options.tileFrame(around: frame, grouped: true), tabCount: tile.members.count,
+                           activeVisualIndex: tile.activeIndex, activeWindowId: token.windowId,
+                           tabs: tabInfos(for: tile, controller: controller), styleOverride: .windowTabs(options))
+    }
+
     private func tabInfos(for snapshot: DwindleTileSnapshot, controller: WMController) -> [TabRailTabInfo] {
         var tabs: [TabRailTabInfo] = []
         tabs.reserveCapacity(snapshot.members.count)

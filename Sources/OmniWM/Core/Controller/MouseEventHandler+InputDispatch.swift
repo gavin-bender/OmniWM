@@ -108,20 +108,7 @@ extension MouseEventHandler {
     }
 
     func dispatchMouseDragged(at location: CGPoint, button: MouseButton = .left) {
-        guard !isInputSuppressed else {
-            handleInputSuppressionBegan()
-            return
-        }
-        guard state.activeInteractionSource != .touchDisplay else { return }
-        if button == .left { updateTabbedTitleDrag(at: location, released: false) }
-        warpDraggedPointer(at: location)
-        controller?.workspaceBarManager.handleAutoHideMouseMoved(at: location)
-        confirmNativeMouseDrag(at: location, button: button)
-        if !isCapturedInteraction(button), shouldBlockOwnWindowInput(at: location) {
-            cancelActiveMouseInteraction()
-            return
-        }
-        handleMouseDraggedFromTap(at: location, button: button)
+        dispatchMouseDragged(at: location, button: button, requirePressedButtonCheck: true)
     }
 
     func dispatchMouseUp(at location: CGPoint, button: MouseButton = .left) {
@@ -455,18 +442,27 @@ extension MouseEventHandler {
     }
 
     func dispatchQueuedMouseDragged(at location: CGPoint, button: MouseButton) {
+        dispatchMouseDragged(at: location, button: button, requirePressedButtonCheck: false)
+    }
+
+    private func dispatchMouseDragged(at location: CGPoint, button: MouseButton, requirePressedButtonCheck: Bool) {
         guard !isInputSuppressed else {
             handleInputSuppressionBegan()
             return
         }
+        guard state.activeInteractionSource != .touchDisplay else { return }
         warpDraggedPointer(at: location)
         controller?.workspaceBarManager.handleAutoHideMouseMoved(at: location)
+        if button == .left, state.tabbedTitleDrag != nil {
+            updateTabbedTitleDrag(at: location, released: false)
+            return
+        }
         confirmNativeMouseDrag(at: location, button: button)
         if !isCapturedInteraction(button), shouldBlockOwnWindowInput(at: location) {
             cancelActiveMouseInteraction()
             return
         }
-        handleMouseDraggedFromTap(at: location, button: button, requirePressedButtonCheck: false)
+        handleMouseDraggedFromTap(at: location, button: button, requirePressedButtonCheck: requirePressedButtonCheck)
     }
 
     private func warpDraggedPointer(at location: CGPoint) {

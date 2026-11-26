@@ -4,7 +4,7 @@ import AppKit
 
 enum TabBarAction {
     case drag(CGPoint, released: Bool)
-    case geometry(CGRect, released: Bool, resizing: Bool)
+    case geometry(TabFrameDrag, point: CGPoint, released: Bool)
     case ungroupAll
     case detach
     case close
@@ -72,26 +72,57 @@ final class TabDropFeedback {
     }
 }
 
-enum TabChromeHandle {
-    case grip, left, right, top, topLeft, topRight
+struct TabFrameDrag {
+    let start: CGPoint
+    let frame: CGRect
+    let handle: TabChromeHandle
 
-    static func hit(_ point: CGPoint, bounds: CGRect, gripWidth: CGFloat) -> Self? {
-        let rim = point.y < bounds.minY + 3 || point.y >= bounds.maxY - 3
-        if point.x < bounds.minX + (rim ? 9 : 4) { return rim ? .topLeft : .left }
-        if point.x >= bounds.maxX - (rim ? 9 : 4) { return rim ? .topRight : .right }
-        if rim { return .top }
-        return point.x < gripWidth ? .grip : nil
+    func frame(at point: CGPoint, minimum: CGSize) -> CGRect {
+        let dx = point.x - start.x
+        let dy = point.y - start.y
+        if handle == .grip { return frame.offsetBy(dx: dx, dy: dy) }
+        var result = frame
+        switch handle {
+        case .left, .topLeft, .bottomLeft:
+            result.size.width = max(minimum.width, frame.width - dx)
+            result.origin.x = frame.maxX - result.width
+        case .right, .topRight, .bottomRight:
+            result.size.width = max(minimum.width, frame.width + dx)
+        default: break
+        }
+        switch handle {
+        case .top, .topLeft, .topRight:
+            result.size.height = max(minimum.height, frame.height + dy)
+        case .bottomLeft, .bottomRight:
+            result.size.height = max(minimum.height, frame.height - dy)
+            result.origin.y = frame.maxY - result.height
+        default: break
+        }
+        return result
+    }
+}
+
+enum TabChromeHandle {
+    case grip, left, right, top, topLeft, topRight, bottomLeft, bottomRight
+
+    static func corners(in bounds: CGRect, position: TabbedBarOptions.Position) -> [(CGRect, Self)] {
+        let side = min(10, bounds.width / 2, bounds.height / 2)
+        return [false, true].flatMap { right in
+            [false, true].map { top in
+                let rect = CGRect(x: right ? bounds.maxX - side : bounds.minX,
+                                  y: top ? bounds.maxY - side : bounds.minY, width: side, height: side)
+                let handle: Self = position == .left ? (top ? .topLeft : .bottomLeft) : (right ? .topRight : .topLeft)
+                return (rect, handle)
+            }
+        }
     }
 
-    func frame(from frame: CGRect, dx: CGFloat, dy: CGFloat) -> CGRect {
-        if self == .grip { return frame.offsetBy(dx: dx, dy: dy) }
-        var result = frame
-        if self == .left || self == .topLeft {
-            result.size.width = max(1, frame.width - dx)
-            result.origin.x = frame.maxX - result.width
-        }
-        if self == .right || self == .topRight { result.size.width = max(1, frame.width + dx) }
-        if self == .top || self == .topLeft || self == .topRight { result.size.height = max(1, frame.height + dy) }
-        return result
+    static func hit(_ point: CGPoint, bounds: CGRect, gripWidth: CGFloat, position: TabbedBarOptions.Position) -> Self? {
+        if let corner = corners(in: bounds, position: position).first(where: { $0.0.contains(point) }) { return corner.1 }
+        guard position == .top else { return nil }
+        if point.x < bounds.minX + 4 { return .left }
+        if point.x >= bounds.maxX - 4 { return .right }
+        if point.y < bounds.minY + 3 || point.y >= bounds.maxY - 3 { return .top }
+        return point.x < gripWidth ? .grip : nil
     }
 }

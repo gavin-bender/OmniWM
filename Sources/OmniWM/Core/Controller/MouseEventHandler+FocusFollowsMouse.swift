@@ -104,7 +104,10 @@ extension MouseEventHandler {
     }
 
     func shouldBlockOwnWindowGestureInput(at location: CGPoint) -> Bool {
-        controller?.ownedWindowRegistry.contains(point: location, excluding: SurfaceKind.gestureTransparent) == true
+        guard let controller else { return false }
+        var excluded = SurfaceKind.gestureTransparent
+        if controller.tabRailManager.containsWindowTabBar(at: location) { excluded.append(.tabRail) }
+        return controller.ownedWindowRegistry.contains(point: location, excluding: excluded)
     }
 
     private func handleFocusFollowsMouse(at location: CGPoint, windowIdUnderPointer: Int?) {

@@ -49,11 +49,11 @@ extension DwindleLayoutHandler {
         return didMove
     }
 
-    func wrapGroupFocus(direction: Direction, in workspaceId: WorkspaceDescriptor.ID? = nil) -> Bool {
+    func wrapGroupFocus(direction: Direction, in workspaceId: WorkspaceDescriptor.ID? = nil, startingAt token: WindowToken? = nil) -> Bool {
         var didMove = false
         withDwindleContext(in: workspaceId) { engine, workspaceId in
             didMove = focusGroupMember(
-                direction: direction,
+                startingAt: token, direction: direction,
                 wraps: true,
                 engine: engine,
                 workspaceId: workspaceId

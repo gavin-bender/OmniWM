@@ -43,12 +43,13 @@ extension WMController {
             return cancelled && !native
         }
         hotkeys.cycleFocusedTabGroup = { [weak self] reverse in
-            guard let self, isEnabled, !isOverviewOpen(), let workspace = activeWorkspace()?.id,
+            guard let self, isEnabled, !isOverviewOpen(), let token = focusedManagedTokenForCommand(),
+                  let workspace = workspaceManager.workspace(for: token),
+                  workspaceManager.visibleWorkspaceIds().contains(workspace),
                   workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
-                  let token = focusedManagedTokenForCommand(),
                   let tile = dwindleEngine?.tileSnapshot(for: token, in: workspace), tile.isGrouped,
                   tile.activeToken == token else { return false }
-            return dwindleLayoutHandler.wrapGroupFocus(direction: reverse ? .up : .down, in: workspace)
+            return dwindleLayoutHandler.wrapGroupFocus(direction: reverse ? .up : .down, in: workspace, startingAt: token)
         }
         hotkeys.onWindowSwitcherAction = { [weak self] action, generation in
             DispatchQueue.main.async { [weak self] in
@@ -91,6 +92,7 @@ extension WMController {
         secureInputIndicator.openHotkeysSettings = { [weak self] in
             self?.statusBarController?.openSettings(section: .hotkeys)
         }
+        tabRailManager.resolvePreviewHandle = { [weak self] token in self?.workspaceManager.handle(for: token) }
         tabRailManager.ringOrderedAbove = { [weak self] in self?.surfaceReconciler.ringWindowId(orderedAbove: $0) }
         tabRailManager.onTabAction = { [weak self] info, token, action in
             self?.mouseEventHandler.performTabBarAction(action, token: token, info: info)

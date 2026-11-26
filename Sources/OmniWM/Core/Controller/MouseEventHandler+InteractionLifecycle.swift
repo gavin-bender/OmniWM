@@ -100,6 +100,13 @@ extension MouseEventHandler {
     func cancelActiveMouseInteraction() {
         state.tabbedTitleDrag = nil
         guard let controller else { return }
+        if let session = state.tabbedGesture {
+            updateTabbedGesture(at: session.drag.start)
+            state.tabbedGesture = nil
+            clearMoveInteractionState()
+            clearResizeInteractionState()
+            return
+        }
         let wasActive = state.isMoving || state.isResizing
 
         if state.isMoving {
@@ -228,6 +235,12 @@ extension MouseEventHandler {
     }
 
     func completeActiveMove(at location: CGPoint) {
+        if state.tabbedGesture != nil {
+            updateTabbedGesture(at: location, released: true)
+            state.tabbedGesture = nil
+            clearMoveInteractionState()
+            return
+        }
         switch classifyMoveLocation(location) {
         case .sourceDisplay:
             if state.moveLayout == .dwindle {
@@ -246,7 +259,12 @@ extension MouseEventHandler {
     }
 
     func completeActiveResize() {
-        finishActiveResize()
+        if let session = state.tabbedGesture {
+            updateTabbedGesture(at: session.point, released: true)
+            state.tabbedGesture = nil
+        } else {
+            finishActiveResize()
+        }
         clearResizeInteractionState()
         NSCursor.arrow.set()
     }

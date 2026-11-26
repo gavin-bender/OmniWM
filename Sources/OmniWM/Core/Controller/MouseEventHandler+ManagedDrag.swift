@@ -138,6 +138,7 @@ extension MouseEventHandler {
     }
 
     func updateActiveMove(at location: CGPoint) {
+        if state.tabbedGesture != nil { updateTabbedGesture(at: location); return }
         if state.moveLayout == .dwindle {
             handleDwindleMoveDrag(at: location)
         } else {
@@ -164,6 +165,7 @@ extension MouseEventHandler {
     }
 
     func updateManagedResize(at location: CGPoint) {
+        if state.tabbedGesture != nil { updateTabbedGesture(at: location); return }
         guard let controller else { return }
         if state.resizeLayout == .dwindle {
             guard let engine = controller.dwindleEngine,

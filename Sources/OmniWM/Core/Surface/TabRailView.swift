@@ -43,7 +43,7 @@ final class TabRailView: NSView {
     private var pressedTab: (token: WindowToken, start: CGPoint)?
     private var isDraggingTab = false
     var groupContentFrame: CGRect?
-    private var chromePress: (token: WindowToken, start: CGPoint, frame: CGRect, edge: TabChromeHandle)?
+    private var chromePress: (token: WindowToken, drag: TabFrameDrag)?
     private var menuToken: WindowToken?
 
     var onSelect: ((Int) -> Void)?
@@ -177,7 +177,7 @@ final class TabRailView: NSView {
         let point = convert(event.locationInWindow, from: nil)
         if let handle = chromeHandle(at: point), let frame = groupContentFrame,
            let active = tabs.first(where: { $0.visualIndex == activeVisualIndex })?.token {
-            chromePress = (active, screenPoint(event), frame, handle)
+            chromePress = (active, TabFrameDrag(start: screenPoint(event), frame: frame, handle: handle))
             invalidateHover()
             return
         }
@@ -230,13 +230,24 @@ final class TabRailView: NSView {
     }
 
     private func chromeHandle(at point: CGPoint) -> TabChromeHandle? {
-        guard style.options?.position == .top else { return nil }
-        return TabChromeHandle.hit(point, bounds: bounds, gripWidth: iconView?.gripWidth ?? 0)
+        guard let position = style.options?.position else { return nil }
+        return TabChromeHandle.hit(point, bounds: bounds, gripWidth: iconView?.gripWidth ?? 0, position: position)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        if bounds.contains(local), chromeHandle(at: local) != nil { return self }
+        return super.hitTest(point)
     }
 
     override func resetCursorRects() {
         super.resetCursorRects()
-        guard style.options?.position == .top else { return }
+        guard let position = style.options?.position else { return }
+        for (rect, handle) in TabChromeHandle.corners(in: bounds, position: position) {
+            let corner: NSCursor.FrameResizePosition = handle == .bottomLeft ? .bottomLeft : (handle == .topRight ? .topRight : .topLeft)
+            addCursorRect(rect, cursor: .frameResize(position: corner, directions: .all))
+        }
+        guard position == .top else { return }
         let grip = CGRect(x: 4, y: 3, width: max(0, (iconView?.gripWidth ?? 0) - 4), height: max(0, bounds.height - 6))
         addCursorRect(grip, cursor: .openHand)
         for y in [bounds.minY, bounds.maxY - 3] {
@@ -251,8 +262,7 @@ final class TabRailView: NSView {
         guard let press = chromePress else { return false }
         if released { chromePress = nil }
         let point = screenPoint(event)
-        let frame = press.edge.frame(from: press.frame, dx: point.x - press.start.x, dy: point.y - press.start.y)
-        onTabAction?(press.token, .geometry(frame, released: released, resizing: press.edge != .grip))
+        onTabAction?(press.token, .geometry(press.drag, point: point, released: released))
         return true
     }
 
@@ -350,7 +360,7 @@ final class TabRailView: NSView {
         hoveredVisualIndex = item?.visualIndex
         guard changed else { return }
         let tab = tabs.first { $0.visualIndex == item?.visualIndex }
-        onHoverChange?(tab, item?.pillRect)
+        onHoverChange?(tab, style.options == nil ? item?.pillRect : item?.hitRect)
     }
 
     private func updateTrackView(rebuildLayout: Bool = false) {
@@ -384,7 +394,7 @@ final class TabRailView: NSView {
             onHoverChange?(nil, nil)
             return
         }
-        onHoverChange?(tab, item.pillRect)
+        onHoverChange?(tab, style.options == nil ? item.pillRect : item.hitRect)
     }
 
     private func currentLayout() -> TabRailLayout {
@@ -396,6 +406,7 @@ final class TabRailView: NSView {
         trackView.isHidden = style != .compact
         if style != .compact {
             let icons = TabRailIconView(motionPolicy: motionPolicy, appInfoCache: appInfoCache)
+            icons.onClose = { [weak self] token in self?.onTabAction?(token, .close) }
             icons.options = style.options
             icons.frame = bounds
             icons.onWillScroll = { [weak self] in self?.invalidateHover() }
@@ -425,11 +436,7 @@ extension TabRailView {
                 return nil
             }
             let screenFrame = screenFrame(for: item.hitRect)
-            if let element = existingElements[item.visualIndex] {
-                element.update(tab: tab, screenFrame: screenFrame)
-                return element
-            }
-            let element = TabRailAccessibilityElement(
+            let element = existingElements[item.visualIndex] ?? TabRailAccessibilityElement(
                 parent: self,
                 tab: tab,
                 screenFrame: screenFrame,
@@ -440,6 +447,16 @@ extension TabRailView {
                     self?.iconView?.reveal(visualIndex)
                 }
             )
+            element.update(tab: tab, screenFrame: screenFrame)
+            if style.options != nil, let token = tab.token {
+                element.setAccessibilityCustomActions([NSAccessibilityCustomAction(name: String(localized: "Close Tab")) { [weak self] in
+                    guard let self, tabs.contains(where: { $0.token == token }) else { return false }
+                    onTabAction?(token, .close)
+                    return true
+                }])
+            } else {
+                element.setAccessibilityCustomActions(nil)
+            }
             return element
         }
         updateAccessibilitySelection(postNotification: false)

@@ -597,6 +597,37 @@ final class TrackpadWindowGestureTests: XCTestCase {
         XCTAssertFalse(handler.isInteractiveGestureActive)
     }
 
+    func testFourFingerMoveTranslatesWholeTabGroup() throws {
+        let fixture = try makeDwindleFixture(pid: 9_206)
+        let controller = fixture.controller
+        let engine = fixture.engine
+        let workspace = fixture.workspaceId
+        controller.settings.workspaces.configurations[0].layoutType = .tabbed
+        controller.workspaceManager.applySettings()
+        let start = fixture.screen.insetBy(dx: 250, dy: 150)
+        controller.workspaceManager.withEngineMutationScope(in: workspace) {
+            engine.selectWorkspaceStyle(tabbed: true, in: workspace)
+            _ = engine.syncWindows([fixture.first, fixture.second], in: workspace, focusedToken: fixture.first)
+            engine.synchronizeTabbedGroups(tokens: [fixture.first, fixture.second], preferred: fixture.first,
+                                           previousSelection: nil, in: workspace) { _ in start }
+        }
+        fixture.relayout()
+        fixture.handler.tabWindowStackAtPoint = { _ in [(fixture.first.windowId, start)] }
+        var gesture = fixture.driver(at: start.center)
+        gesture.begin(fingers: 4, x: 0.2)
+        gesture.drag(fingers: 4, fromX: 0.2, toX: 0.3)
+        let group = try XCTUnwrap(engine.tile(containing: fixture.first, in: workspace))
+        let moved = try XCTUnwrap(group.freeFrame)
+        XCTAssertGreaterThan(moved.minX, start.minX)
+        XCTAssertEqual(moved.size, start.size)
+        gesture.end()
+        fixture.relayout()
+        let snapshot = try XCTUnwrap(engine.tileSnapshot(for: fixture.first, in: workspace))
+        XCTAssertEqual(snapshot.members.count, 2)
+        XCTAssertEqual(snapshot.tileFrame, engine.tabbedBar.tileFrame(around: moved, grouped: true))
+        XCTAssertNil(fixture.handler.state.tabbedGesture)
+    }
+
     func testFourFingerDragSwapsDwindleTilesOnRelease() throws {
         let fixture = try makeDwindleFixture(pid: 9_201)
         let handler = fixture.handler

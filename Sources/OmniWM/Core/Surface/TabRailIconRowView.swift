@@ -6,6 +6,9 @@ import AppKit
 final class TabRailIconRowView: NSView {
     let imageView = NSImageView()
     private let titleField = NSTextField(labelWithString: "")
+    let closeButton = NSButton()
+    var onClose: ((WindowToken) -> Void)?
+    private var token: WindowToken?
     private var options: TabbedBarOptions?
     let selectionLayer = CAShapeLayer()
     private let motionPolicy: MotionPolicy
@@ -31,6 +34,15 @@ final class TabRailIconRowView: NSView {
         titleField.setAccessibilityElement(false)
         titleField.isHidden = true
         addSubview(titleField)
+        closeButton.isBordered = false
+        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
+        closeButton.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
+        closeButton.toolTip = String(localized: "Close Tab")
+        closeButton.setAccessibilityLabel(String(localized: "Close Tab"))
+        closeButton.target = self
+        closeButton.action = #selector(closePressed)
+        closeButton.isHidden = true
+        addSubview(closeButton)
     }
 
     @available(*, unavailable)
@@ -45,6 +57,8 @@ final class TabRailIconRowView: NSView {
 
     func configure(tab: TabRailTabInfo, options: TabbedBarOptions?, appInfoCache: AppInfoCache) {
         self.options = options
+        token = tab.token
+        closeButton.isHidden = options == nil || token == nil
         titleField.isHidden = options == nil || options?.content == .icons
         imageView.isHidden = options?.content == .titles
         titleField.stringValue = tab.title?.nilIfEmpty ?? tab.appName?.nilIfEmpty ?? String(localized: "Tab \(tab.visualIndex + 1)")
@@ -54,14 +68,21 @@ final class TabRailIconRowView: NSView {
         layoutContents()
     }
 
+    @objc private func closePressed() {
+        if let token { onClose?(token) }
+    }
+
     private func layoutContents() {
-        let size = min(bounds.height, options.map { $0.rowHeight - 10 } ?? TabRailStyle.iconSize)
-        imageView.frame = CGRect(x: titleField.isHidden ? (bounds.width - size) / 2 : 5, y: (bounds.height - size) / 2, width: size, height: size)
+        let trailing = closeButton.isHidden ? 0 : TabbedBarOptions.closeButtonWidth
+        let available = max(0, bounds.width - trailing)
+        closeButton.frame = CGRect(x: available, y: (bounds.height - 20) / 2, width: trailing, height: 20)
+        let size = min(available, bounds.height, options.map { $0.rowHeight - 10 } ?? TabRailStyle.iconSize)
+        imageView.frame = CGRect(x: titleField.isHidden ? (available - size) / 2 : 5, y: (bounds.height - size) / 2, width: size, height: size)
         if !titleField.isHidden {
             titleField.font = .systemFont(ofSize: options?.size == .large ? 15 : 13)
             let start = imageView.isHidden ? 7 : imageView.frame.maxX + 5
             let height = titleField.intrinsicContentSize.height
-            titleField.frame = CGRect(x: start, y: (bounds.height - height) / 2, width: max(0, bounds.width - start - 5), height: height)
+            titleField.frame = CGRect(x: start, y: (bounds.height - height) / 2, width: max(0, available - start - 5), height: height)
         }
         selectionLayer.frame = bounds
         selectionLayer.path = CGPath(

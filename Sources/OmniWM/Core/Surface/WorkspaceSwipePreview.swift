@@ -12,7 +12,10 @@ final class WorkspaceSwipePreview {
         let token: WindowToken
         let frame: CGRect
 
-        init(handle: WindowHandle, frame: CGRect) {
+        let tabRail: TabRailInfo?
+
+        init(handle: WindowHandle, frame: CGRect, tabRail: TabRailInfo? = nil) {
+            self.tabRail = tabRail
             self.handle = handle
             token = handle.token
             self.frame = frame
@@ -340,6 +343,20 @@ extension WorkspaceSwipePreview {
             )
             contents[item.handle, default: []].append(content)
             layer.addSublayer(content.layer)
+            if let info = item.tabRail, let style = info.styleOverride {
+                let rect = TabRailPlacement.frame(for: info.tileFrame, tabCount: info.tabCount, style: style)
+                let bar = TabRailView(frame: CGRect(origin: .zero, size: rect.size), motionPolicy: MotionPolicy(animationsEnabled: false))
+                bar.update(tabs: info.tabs, activeVisualIndex: info.activeVisualIndex, style: style)
+                bar.layoutSubtreeIfNeeded()
+                if let bitmap = bar.bitmapImageRepForCachingDisplay(in: bar.bounds) {
+                    bar.cacheDisplay(in: bar.bounds, to: bitmap)
+                    let chrome = CALayer()
+                    chrome.frame = rect.offsetBy(dx: -frame.minX, dy: -frame.minY)
+                    chrome.backgroundColor = NSColor.windowBackgroundColor.cgColor
+                    chrome.contents = bitmap.cgImage
+                    layer.addSublayer(chrome)
+                }
+            }
         }
         return layer
     }

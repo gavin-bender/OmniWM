@@ -106,7 +106,10 @@ extension WorkspaceSwipePresentation {
                 continue
             }
             guard let frame, !frame.isNull, !frame.isInfinite, frame.width > 0, frame.height > 0 else { return nil }
-            if frame.intersects(monitor.visibleFrame) { items.append(.init(handle: handle, frame: frame)) }
+            if frame.intersects(monitor.visibleFrame) {
+                let rail = controller.dwindleLayoutHandler.swipeTabRail(for: entry.token, frame: frame, in: id)
+                items.append(.init(handle: handle, frame: frame, tabRail: rail))
+            }
         }
         return Workspace(id: id, items: items)
     }

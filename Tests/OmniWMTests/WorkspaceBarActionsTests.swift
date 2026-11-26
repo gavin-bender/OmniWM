@@ -536,16 +536,21 @@ final class WorkspaceBarActionsTests: XCTestCase {
             XCTAssertTrue(engine.detachTab(tokens[1], to: nativeFrame, in: ws))
         }
         layout()
-        mouse.nativeWindowFrameProvider = { _ in nativeFrame }
-        let mouseUp = CGPoint(x: 700, y: 390)
+        let initial = nativeFrame.offsetBy(dx: -250, dy: 0)
+        // AX can still report the original position after WindowServer has moved the window.
+        mouse.nativeWindowFrameProvider = { _ in initial }
+        let press = CGPoint(x: 450, y: 355)
+        let mouseUp = CGPoint(x: 700, y: 355)
         func dragWindow(blocked: Bool) {
-            mouse.state.tabbedTitleDrag = (tokens[0], CGPoint(x: 450, y: 390), nativeFrame.offsetBy(dx: -250, dy: 0))
+            mouse.tabWindowStackAtPoint = { _ in [(tokens[0].windowId, initial)] }
+            XCTAssertFalse(mouse.dispatchMouseDown(at: press, modifiers: []))
+            XCTAssertEqual(mouse.state.tabbedTitleDrag?.token, tokens[0])
             mouse.tabWindowStackAtPoint = { _ in
                 let ids = blocked ? [tokens[0].windowId, 999, tokens[1].windowId] : [tokens[0].windowId, tokens[1].windowId]
                 return ids.map { ($0, nativeFrame) }
             }
-            mouse.updateTabbedTitleDrag(at: mouseUp, released: false)
-            mouse.updateTabbedTitleDrag(at: mouseUp, released: true)
+            mouse.dispatchQueuedMouseDragged(at: mouseUp, button: .left)
+            mouse.dispatchMouseUp(at: mouseUp)
         }
         dragWindow(blocked: true)
         XCTAssertEqual(engine.tileCount(in: ws), 3)
@@ -561,6 +566,15 @@ final class WorkspaceBarActionsTests: XCTestCase {
         mouse.tabWindowStackAtPoint = { _ in [(rail.windowNumber, rail.appliedFrame)] }
         mouse.performTabBarAction(.drag(point, released: true), token: tokens[2], info: source)
         XCTAssertEqual(engine.tile(containing: tokens[0], in: ws)?.members.first?.token, tokens[2])
+        // Crossing an interactive rail mid-drag must keep the native session alive through mouse-up.
+        let movedToken = tokens[3]
+        mouse.state.tabbedTitleDrag = (movedToken, press, initial)
+        mouse.tabWindowStackAtPoint = { _ in [(movedToken.windowId, nativeFrame), (rail.windowNumber, rail.appliedFrame)] }
+        mouse.dispatchQueuedMouseDragged(at: point, button: .left)
+        XCTAssertEqual(mouse.state.tabbedTitleDrag?.token, movedToken)
+        mouse.dispatchMouseUp(at: point)
+        XCTAssertEqual(engine.tileCount(in: ws), 1)
+        layout()
         mouse.ungroupTabbedWorkspace(ws)
         XCTAssertEqual(engine.tileCount(in: ws), 4)
     }

@@ -6,7 +6,7 @@ import QuartzCore
 
 @MainActor
 final class WorkspaceBarPreviewPanel: NSPanel {
-    private static let surfaceId = "workspace-bar-hover-preview"
+    private let surfaceId: String
     private static let padding: CGFloat = 8
     private static let textHeight: CGFloat = 34
 
@@ -17,7 +17,8 @@ final class WorkspaceBarPreviewPanel: NSPanel {
     var onSelect: (WindowHandle) -> Void = { _ in }
     var onPointerInside: (Bool) -> Void = { _ in }
 
-    init(ownedWindowRegistry: OwnedWindowRegistry) {
+    init(ownedWindowRegistry: OwnedWindowRegistry, surfaceId: String = "workspace-bar-hover-preview") {
+        self.surfaceId = surfaceId
         self.ownedWindowRegistry = ownedWindowRegistry
         super.init(
             contentRect: CGRect(x: 0, y: 0, width: 200, height: 120),
@@ -79,7 +80,7 @@ final class WorkspaceBarPreviewPanel: NSPanel {
         updateTrackingArea()
         ownedWindowRegistry.register(
             self,
-            surfaceId: Self.surfaceId,
+            surfaceId: surfaceId,
             policy: SurfacePolicy(
                 kind: .workspaceBar,
                 hitTestPolicy: windows.count > 1 ? .interactive : .passthrough,
@@ -155,7 +156,7 @@ final class WorkspaceBarPreviewPanel: NSPanel {
     func hide() {
         guard isVisible else { return }
         orderOut(nil)
-        ownedWindowRegistry.unregister(surfaceId: Self.surfaceId)
+        ownedWindowRegistry.unregister(surfaceId: surfaceId)
         tiles.forEach { $0.updatePreview(nil) }
     }
 

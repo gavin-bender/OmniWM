@@ -15,21 +15,26 @@ extension MouseEventHandler {
         }
     }
 
+    static func tabDropTitleRegion(in frame: CGRect) -> CGRect {
+        let height = min(56, frame.height)
+        return CGRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)
+    }
+
     private func resolveTabDrop(at point: CGPoint, token: WindowToken, workspace: WorkspaceDescriptor.ID,
-                                frame: CGRect, native: Bool) -> Drop? {
+                                frame: CGRect, native: Bool, stack: [(id: Int, frame: CGRect)]? = nil) -> Drop? {
         guard let controller, let destination = workspaceIdForPointer(at: point),
               controller.workspaceManager.activeLayoutKind(for: destination) == .tabbed else { return nil }
         let border = tabWindowBorderId()
-        for (id, window) in tabWindowStackAtPoint(point) where id != border {
+        for (id, window) in stack ?? tabWindowStackAtPoint(point) where id != border {
             if let bar = controller.tabRailManager.dropRail(windowId: id, at: point, in: destination) {
                 if native, controller.dwindleEngine?.tile(containing: token, in: workspace)?.memberIndex(for: bar.target) != nil { continue }
                 return .bar(bar.target, before: bar.before, caret: bar.marker)
             }
             if native && id == token.windowId { continue }
             if let entry = controller.workspaceManager.entry(forWindowId: id), entry.workspaceId == destination,
-               entry.hiddenState == nil, entry.token != token, point.y >= window.maxY - 32,
+               entry.hiddenState == nil, entry.token != token, Self.tabDropTitleRegion(in: window).contains(point),
                controller.dwindleLayoutHandler.groupMemberActivationIsAllowed(entry.token, workspaceId: destination) {
-                return .title(entry.token, CGRect(x: window.minX, y: window.maxY - 32, width: window.width, height: 32))
+                return .title(entry.token, Self.tabDropTitleRegion(in: window))
             }
             break
         }
@@ -49,21 +54,8 @@ extension MouseEventHandler {
               controller.dwindleLayoutHandler.groupMembershipMutationIsAllowed(for: token, engine: engine, workspaceId: info.workspaceId)
         else { tabDropFeedback.hide(); return }
         switch action {
-        case let .geometry(proposed, released, resizing):
-            guard tile.activeToken == token, let target = engine.tile(containing: token, in: info.workspaceId) else { return }
-            let minimum = engine.minimumSize(for: target, excluding: [])
-            var constrained = proposed
-            if resizing {
-                constrained.size.width = max(proposed.width, minimum.width)
-                constrained.size.height = max(proposed.height, minimum.height)
-                if proposed.minX != frame.minX { constrained.origin.x = proposed.maxX - constrained.width }
-            }
-            controller.workspaceManager.withEngineMutationScope { target.freeFrame = constrained }
-            if released {
-                controller.dwindleLayoutHandler.recordLayoutOperation(resizing ? .interactiveResizeEnded(token: token) : .interactiveMoveEnded(token: token),
-                                                                     in: info.workspaceId, source: .mouse)
-            }
-            controller.layoutRefreshController.requestLayoutCommandRelayout(affectedWorkspaceIds: [info.workspaceId])
+        case let .geometry(drag, point, released):
+            updateTabbedFrame(drag, at: point, token: token, workspace: info.workspaceId, released: released)
         case .ungroupAll:
             ungroupTabbedWorkspace(info.workspaceId)
         case .cancel:
@@ -76,6 +68,21 @@ extension MouseEventHandler {
             let drop = resolveTabDrop(at: point, token: token, workspace: info.workspaceId, frame: frame, native: false)
             presentTabDrop(drop, token: token, workspace: workspaceIdForPointer(at: point) ?? info.workspaceId, released: released)
         }
+    }
+
+    func updateTabbedFrame(_ drag: TabFrameDrag, at point: CGPoint, token: WindowToken,
+                           workspace: WorkspaceDescriptor.ID, released: Bool) {
+        guard let controller, let engine = controller.dwindleEngine,
+              controller.workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
+              let tile = engine.tile(containing: token, in: workspace),
+              tile.activeToken == token, !tile.activeMember.isFullscreen else { return }
+        let frame = drag.frame(at: point, minimum: engine.minimumSize(for: tile, excluding: []))
+        controller.workspaceManager.withEngineMutationScope { tile.freeFrame = frame }
+        if released {
+            let operation: LayoutOperation = drag.handle == .grip ? .interactiveMoveEnded(token: token) : .interactiveResizeEnded(token: token)
+            controller.dwindleLayoutHandler.recordLayoutOperation(operation, in: workspace, source: .mouse)
+        }
+        controller.layoutRefreshController.requestLayoutCommandRelayout(affectedWorkspaceIds: [workspace])
     }
 
     func ungroupTabbedWorkspace(_ workspace: WorkspaceDescriptor.ID) {
@@ -108,13 +115,20 @@ extension MouseEventHandler {
         defer { if released { state.tabbedTitleDrag = nil; tabDropFeedback.hide() } }
         guard hypot(point.x - drag.start.x, point.y - drag.start.y) > 8, let controller,
               let source = controller.workspaceManager.entry(for: drag.token),
-              controller.workspaceManager.activeLayoutKind(for: source.workspaceId) == .tabbed,
-              let moved = fastNativeWindowFrame(for: source),
+              controller.workspaceManager.activeLayoutKind(for: source.workspaceId) == .tabbed else {
+            tabDropFeedback.hide()
+            return
+        }
+        // Read the dragged window and its receiver from the same WindowServer sample.
+        let stack = tabWindowStackAtPoint(point)
+        guard let moved = stack.first(where: { $0.id == source.windowId })?.frame ?? fastNativeWindowFrame(for: source),
+              moved.size.isWithinFrameTolerance(of: drag.frame.size),
               hypot(moved.minX - drag.frame.minX, moved.minY - drag.frame.minY) > 4 else {
             tabDropFeedback.hide()
             return
         }
-        let drop = resolveTabDrop(at: point, token: source.token, workspace: source.workspaceId, frame: moved, native: true)
+        let drop = resolveTabDrop(at: point, token: source.token, workspace: source.workspaceId,
+                                  frame: moved, native: true, stack: stack)
         presentTabDrop(drop, token: source.token, workspace: workspaceIdForPointer(at: point) ?? source.workspaceId, released: released)
     }
 

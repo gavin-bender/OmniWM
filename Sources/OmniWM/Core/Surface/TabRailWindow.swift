@@ -20,6 +20,8 @@ class TabRailWindow: NSPanel {
     private var registeredSurfaceWindowNumber: Int?
     private var accessibilityDisplayObserver: NSObjectProtocol?
 
+    var resolvePreviewHandle: ((WindowToken) -> WindowHandle?)?
+    var onHoverPreview: ((WorkspaceBarHoverTarget?) -> Void)?
     var onTabAction: ((TabRailInfo, WindowToken, TabBarAction) -> Void)?
     func insertion(atScreen point: CGPoint) -> (before: WindowToken?, marker: CGRect)? {
         railView.insertion(at: CGPoint(x: point.x - appliedFrame.minX, y: point.y - appliedFrame.minY))
@@ -51,6 +53,7 @@ class TabRailWindow: NSPanel {
         ignoresMouseEvents = false
         hasShadow = false
         hidesOnDeactivate = false
+        animationBehavior = .none
         collectionBehavior = [.managed, .fullScreenAuxiliary]
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
@@ -136,12 +139,7 @@ class TabRailWindow: NSPanel {
         }
         self.style = style
         currentInfo = info
-        if let options = style.options {
-            var content = info.tileFrame
-            if options.position == .top { content.size.height -= options.thickness }
-            else { content.origin.x += options.thickness; content.size.width -= options.thickness }
-            railView.groupContentFrame = content
-        }
+        updateGroupContentFrame(info.tileFrame)
         let clampedActiveVisualIndex = min(max(0, info.activeVisualIndex), max(0, info.tabCount - 1))
         guard frame.width > 1, frame.height > 1 else {
             railView.update(tabs: info.normalizedTabs, activeVisualIndex: clampedActiveVisualIndex, style: style)
@@ -181,8 +179,17 @@ class TabRailWindow: NSPanel {
         lastOrderingWindowId = orderingWindowId
     }
 
+    private func updateGroupContentFrame(_ frame: CGRect) {
+        guard let options = style.options else { railView.groupContentFrame = nil; return }
+        var content = frame
+        if options.position == .top { content.size.height -= options.thickness }
+        else { content.origin.x += options.thickness; content.size.width -= options.thickness }
+        railView.groupContentFrame = content
+    }
+
     func updateAnimationGeometry(_ command: TabRailGeometryCommand) {
         guard let currentInfo, currentInfo.key == command.key else { return }
+        updateGroupContentFrame(command.tileFrame)
         let frame = TabRailPlacement.frame(
             for: command.visibleTileFrame, tabCount: currentInfo.tabCount, style: style,
             displayFrame: command.displayFrame
@@ -282,12 +289,14 @@ class TabRailWindow: NSPanel {
     }
 
     private func dismissHover() {
+        onHoverPreview?(nil)
         railView.invalidateHover()
         hoverCard.hide()
     }
 
     private func updateHoverCard(tab: TabRailTabInfo?, itemRect: CGRect?) {
         guard let tab, let itemRect, let currentInfo, isOrderedIn else {
+            onHoverPreview?(nil)
             hoverCard.hide()
             return
         }
@@ -295,9 +304,30 @@ class TabRailWindow: NSPanel {
             ?? NSScreen.screens.first(where: { $0.frame.intersects(appliedFrame) })?.visibleFrame
             ?? NSScreen.main?.visibleFrame
         guard let screenFrame else {
+            onHoverPreview?(nil)
             hoverCard.hide()
             return
         }
+        if let token = tab.token, let handle = resolvePreviewHandle?(token) {
+            let item = convertToScreen(itemRect)
+            let preferred: PopupAttachment.Edge = style.options?.position == .top ? .below : .right
+            var attachment = PopupAttachment(sourceFrame: item, edge: preferred)
+            let available = attachment.availableSize(in: screenFrame)
+            if (preferred == .below && available.height < 200) || (preferred == .right && available.width < 256) {
+                let other = PopupAttachment(sourceFrame: item, edge: preferred == .below ? .above : .left)
+                let alternate = other.availableSize(in: screenFrame)
+                if preferred == .below ? alternate.height > available.height : alternate.width > available.width {
+                    attachment = other
+                }
+            }
+            let title = tab.title?.nilIfEmpty ?? tab.appName?.nilIfEmpty ?? String(localized: "Untitled window")
+            onHoverPreview?(.init(key: .window(currentInfo.workspaceId, token),
+                                  windows: [.init(handle: handle, title: title, appName: tab.appName ?? "", icon: tab.icon)],
+                                  attachment: attachment, visibleFrame: screenFrame, level: .floating))
+            return
+        }
+        onHoverPreview?(nil)
+        guard style.options == nil else { return }
         let cardFrame = TabRailHoverCardPlacement.frame(
             railFrame: lastFrame ?? appliedFrame,
             itemRect: itemRect,

@@ -1,11 +1,148 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
-import CoreGraphics
+import AppKit
+import Carbon
 @testable import OmniWM
 import XCTest
 
 @MainActor
 final class TabbedWorkspaceTests: XCTestCase {
+    func testControlTabCyclesOnlyWhenTheFocusedGroupHandlesIt() throws {
+        let center = HotkeyCenter()
+        center.start()
+        defer { center.stop() }
+        var directions: [Bool] = []
+        center.cycleFocusedTabGroup = { directions.append($0); return true }
+        let event = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Tab), keyDown: true))
+        for flags: CGEventFlags in [.maskControl, [.maskControl, .maskShift]] {
+            event.flags = flags
+            XCTAssertNil(center.handleHyperTriggerEvent(type: .keyDown, event: event))
+            XCTAssertNil(center.handleHyperTriggerEvent(type: .keyUp, event: event))
+        }
+        XCTAssertEqual(directions, [false, true])
+        center.cycleFocusedTabGroup = { _ in false }
+        XCTAssertFalse(center.handleWindowSwitcherEvent(type: .keyDown, event: event))
+    }
+
+    func testCloseButtonTargetsInactiveTabWithoutSelectingIt() throws {
+        let window = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 400, height: 36),
+                             styleMask: [.borderless], backing: .buffered, defer: false)
+        let view = TabRailView(frame: window.frame, motionPolicy: MotionPolicy(animationsEnabled: false))
+        window.contentView = view
+        let tabs = (0 ..< 2).map { index in
+            TabRailTabInfo(visualIndex: index, token: WindowToken(pid: 1, windowId: index + 1),
+                           windowId: index + 1, appName: nil, title: "Window", isActive: index == 0)
+        }
+        view.update(tabs: tabs, activeVisualIndex: 0, style: .windowTabs(.init()))
+        var closed: WindowToken?
+        view.onTabAction = { token, action in
+            if case .close = action { closed = token }
+        }
+        view.onSelect = { _ in XCTFail("Closing an inactive tab selected it") }
+        let icons = try XCTUnwrap(view.subviews.compactMap { $0 as? TabRailIconView }.first)
+        let button = icons.rows[1].closeButton
+        let center = button.convert(CGPoint(x: button.bounds.midX, y: button.bounds.midY), to: view)
+        XCTAssertTrue(view.hitTest(center) === button)
+        button.performClick(nil)
+        XCTAssertEqual(closed, tabs[1].token)
+    }
+
+    func testCornerDragsPreserveOppositeCornerAtMinimumSize() {
+        let frame = CGRect(x: 100, y: 200, width: 400, height: 300)
+        let minimum = CGSize(width: 100, height: 80)
+        let bounds = CGRect(x: 0, y: 0, width: 400, height: 36)
+        XCTAssertEqual(TabChromeHandle.hit(CGPoint(x: 8, y: 8), bounds: bounds, gripWidth: 24, position: .top), .topLeft)
+        XCTAssertEqual(TabChromeHandle.hit(CGPoint(x: 392, y: 28), bounds: bounds, gripWidth: 24, position: .top), .topRight)
+        let drag = TabFrameDrag(start: .zero, frame: frame, handle: .topLeft)
+        XCTAssertEqual(drag.frame(at: CGPoint(x: 500, y: -500), minimum: minimum),
+                       CGRect(x: 400, y: 200, width: 100, height: 80))
+        let sideDrag = TabFrameDrag(start: .zero, frame: frame, handle: .bottomLeft)
+        XCTAssertEqual(sideDrag.frame(at: CGPoint(x: 500, y: 500), minimum: minimum),
+                       CGRect(x: 400, y: 420, width: 100, height: 80))
+    }
+
+    func testWindowTabsUseOneBarAndAnchorPreviewToHoveredTab() throws {
+        let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
+        defer { manager.removeAll() }
+        let handle = WindowHandle(id: WindowToken(pid: 1, windowId: 7))
+        let tile = try XCTUnwrap(NSScreen.main?.visibleFrame).insetBy(dx: 100, dy: 120).integral
+        let tabs = [TabRailTabInfo(visualIndex: 0, token: handle.token, windowId: handle.windowId,
+                                   appName: "Editor", title: "Document", isActive: true)]
+        let legacy = TabRailInfo(workspaceId: UUID(), owner: .niriColumn(NodeId()), plannedSeq: 1,
+                                 tileFrame: tile, tabCount: 2, activeVisualIndex: 0, activeWindowId: nil)
+        let bar = TabRailInfo(workspaceId: UUID(), owner: .dwindleTile(UUID()), plannedSeq: 1,
+                              tileFrame: tile, tabCount: 2, activeVisualIndex: 0, activeWindowId: nil,
+                              tabs: tabs, styleOverride: .windowTabs(.init()))
+        manager.updateRails([legacy, bar], style: .hidden)
+        manager.applyAnimationGeometry([.init(key: legacy.key, tileFrame: tile, visibleTileFrame: tile)])
+        XCTAssertNil(manager.existingWindow(for: legacy.key))
+        let window = try XCTUnwrap(manager.existingWindow(for: bar.key) as? TabRailWindow)
+        let view = try XCTUnwrap(window.contentView as? TabRailView)
+        var target: WorkspaceBarHoverTarget?
+        manager.resolvePreviewHandle = { $0 == handle.token ? handle : nil }
+        window.onHoverPreview = { target = $0 }
+        let point = CGPoint(x: view.bounds.width / 4, y: view.bounds.midY)
+        let event = try XCTUnwrap(NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [],
+                                                      timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                      eventNumber: 1, clickCount: 0, pressure: 0))
+        view.mouseMoved(with: event)
+        XCTAssertTrue(target?.windows.first?.handle === handle)
+        XCTAssertEqual(target?.attachment.edge, .below)
+        XCTAssertEqual(target?.attachment.anchor.y, window.appliedFrame.minY)
+        XCTAssertFalse(window.hoverCard.isVisible)
+        view.mouseExited(with: event)
+        XCTAssertNil(target)
+    }
+
+    func testLiveSwipeMovesRailUntilWorkspacePlacementResumes() throws {
+        let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
+        defer { manager.removeAll() }
+        let viewport = try XCTUnwrap(NSScreen.main?.visibleFrame)
+        let info = TabRailInfo(workspaceId: UUID(), owner: .dwindleTile(UUID()), plannedSeq: 1,
+                               tileFrame: viewport.insetBy(dx: 100, dy: 100).integral, tabCount: 2,
+                               activeVisualIndex: 0, activeWindowId: nil, styleOverride: .windowTabs(.init()))
+        manager.updateRails([info])
+        let rail = try XCTUnwrap(manager.existingWindow(for: info.key) as? TabRailWindow)
+        let original = rail.appliedFrame
+        manager.presentSwipeRails([info], offset: CGVector(dx: 30, dy: -20), viewport: viewport)
+        manager.updateRails([info])
+        XCTAssertEqual(rail.appliedFrame, original.offsetBy(dx: 30, dy: -20))
+        XCTAssertTrue(rail.ignoresMouseEvents)
+        manager.releaseSwipeRails([info])
+        manager.updateRails([info])
+        XCTAssertEqual(rail.appliedFrame, original)
+        XCTAssertFalse(rail.ignoresMouseEvents)
+    }
+
+    func testCommittedSwipeKeepsIncomingPanelThroughLayoutHandoff() throws {
+        let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
+        defer { manager.removeAll() }
+        let viewport = try XCTUnwrap(NSScreen.main?.visibleFrame)
+        let tile = viewport.insetBy(dx: 100, dy: 100).integral
+        func group() -> TabRailInfo {
+            TabRailInfo(workspaceId: UUID(), owner: .dwindleTile(UUID()), plannedSeq: 1,
+                        tileFrame: tile, tabCount: 2, activeVisualIndex: 0, activeWindowId: nil,
+                        styleOverride: .windowTabs(.init()))
+        }
+        let source = group(), destination = group(), otherDisplay = group()
+        manager.updateRails([source, otherDisplay])
+        let otherWindow = try XCTUnwrap(manager.existingWindow(for: otherDisplay.key))
+        manager.presentSwipeRails([source], offset: CGVector(dx: -viewport.width, dy: 0), viewport: viewport)
+        manager.presentSwipeRails([destination], offset: CGVector(dx: 2, dy: 0), viewport: viewport)
+        let incoming = try XCTUnwrap(manager.existingWindow(for: destination.key) as? TabRailWindow)
+        XCTAssertTrue(incoming.isOrderedIn)
+
+        manager.releaseSwipeRails([source, destination])
+        manager.updateRails([destination, otherDisplay])
+        XCTAssertNil(manager.existingWindow(for: source.key))
+        XCTAssertTrue(manager.existingWindow(for: destination.key) === incoming)
+        XCTAssertTrue(incoming.isOrderedIn)
+        XCTAssertFalse(incoming.ignoresMouseEvents)
+        manager.updateRails([destination, otherDisplay])
+        XCTAssertTrue(manager.existingWindow(for: destination.key) === incoming)
+        XCTAssertTrue(manager.existingWindow(for: otherDisplay.key) === otherWindow)
+    }
+
     func testEveryBarSizeFitsAnOversizedWindowOnAnOffsetDisplay() {
         let screen = CGRect(x: -1400, y: 120, width: 1280, height: 750)
         for position in [TabbedBarOptions.Position.top, .left] {

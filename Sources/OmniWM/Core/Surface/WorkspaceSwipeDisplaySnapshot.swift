@@ -13,8 +13,10 @@ enum WorkspaceSwipeDisplaySnapshot {
                 return nil
             }
             let iconLayer = Int(CGWindowLevelForKey(.desktopIconWindow))
+            let rails = Set(registry.visibleSurfaceInfos().filter { $0.kind == .tabRail }.compactMap(\.windowNumber))
             let included = content.windows.filter {
-                $0.windowLayer != iconLayer && registry.isCaptureEligible(windowNumber: Int($0.windowID))
+                let id = Int($0.windowID)
+                return $0.windowLayer != iconLayer && (rails.contains(id) || registry.isCaptureEligible(windowNumber: id))
             }
             let rect = ScreenCoordinateSpace.toWindowServer(rect: frame)
             let config = SCStreamConfiguration()

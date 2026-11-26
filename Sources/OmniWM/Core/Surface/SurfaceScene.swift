@@ -352,6 +352,7 @@ final class SurfaceScene {
         let suppressesManagedFocusRecovery: Bool
         let frame: CGRect?
         let window: NSWindow?
+        let windowNumber: Int?
     }
 
     func visibleSurfaceInfos() -> [VisibleSurfaceInfo] {
@@ -363,7 +364,7 @@ final class SurfaceScene {
                 capturePolicy: node.policy.capturePolicy,
                 suppressesManagedFocusRecovery: node.policy.suppressesManagedFocusRecovery,
                 frame: resolvedFrame(for: node),
-                window: node.window
+                window: node.window, windowNumber: node.windowNumber
             )
         }
     }

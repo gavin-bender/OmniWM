@@ -138,13 +138,14 @@ extension DwindleLayoutHandler {
     }
 
     func focusGroupMember(
+        startingAt token: WindowToken? = nil,
         direction: Direction,
         wraps: Bool,
         engine: DwindleLayoutEngine,
         workspaceId: WorkspaceDescriptor.ID
     ) -> Bool {
         guard let offset = groupMemberOffset(for: direction),
-              let activeToken = engine.projectedActiveToken(in: workspaceId),
+              let activeToken = token ?? engine.projectedActiveToken(in: workspaceId),
               let snapshot = engine.tileSnapshot(for: activeToken, in: workspaceId),
               let activeIndex = snapshot.members.firstIndex(where: { $0.token == activeToken }),
               snapshot.members.count > 1

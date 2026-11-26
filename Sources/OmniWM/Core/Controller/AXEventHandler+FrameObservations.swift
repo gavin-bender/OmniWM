@@ -145,6 +145,7 @@ extension AXEventHandler {
                let monitor = controller.workspaceManager.monitor(for: entry.workspaceId), monitor.frame.intersects(frame)
             {
                 tile.freeFrame = frame
+                leaf.clearAnimations()
                 leaf.cachedContentFrame = frame
                 leaf.cachedFrame = engine.tabbedBar.tileFrame(around: frame, grouped: tile.isGrouped)
                 controller.surfaceReconciler.noteWorldChanged()

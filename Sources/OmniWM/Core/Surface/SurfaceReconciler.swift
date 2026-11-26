@@ -183,6 +183,16 @@ final class SurfaceReconciler {
         }
     }
 
+    func finishSwipeRails(_ rails: [TabRailInfo]) {
+        guard let controller else { return }
+        let world = WorldView(controller: controller)
+        let infos = world.hasStartedServices ? world.tabRailInfos() : []
+        controller.tabRailManager.releaseSwipeRails(rails)
+        applyTabRails(controller, infos, false)
+        appliedScene.tabRails = infos
+        appliedScene.tabRailStyle = world.tabRailStyle
+    }
+
     func applyAcceptedTabRailGeometry(
         _ commands: [TabRailGeometryCommand],
         workspaceId: WorkspaceDescriptor.ID,
