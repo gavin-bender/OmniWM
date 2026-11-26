@@ -280,6 +280,11 @@ extension DwindleGroupRevealTransactions {
             ?? Monitor.fallback()
         controller.withRuntimeFrameJobCancellationSuppressed {
             controller.workspaceManager.setHiddenState(nil, for: transaction.token)
+            // Hiding the key window first makes macOS deactivate its title bar
+            // before the incoming tab can take focus.
+            if shouldFocusAfterReveal, let focusOrigin = transaction.focusOriginOnSuccess {
+                controller.focusWindow(transaction.token, origin: focusOrigin)
+            }
             controller.layoutRefreshController.applyLayoutTransientHides(
                 hiddenEntries,
                 monitor: monitor,
@@ -288,7 +293,7 @@ extension DwindleGroupRevealTransactions {
             )
         }
         controller.axManager.clearParkPending(for: transaction.windowId, pid: transaction.pid)
-        publishRevealSuccess(transaction, controller: controller, shouldFocusAfterReveal: shouldFocusAfterReveal)
+        publishRevealSuccess(transaction, controller: controller)
     }
 
     private func waitForPresentation(_ original: PendingGroupRevealTransaction) async {
@@ -321,8 +326,7 @@ extension DwindleGroupRevealTransactions {
 
     private func publishRevealSuccess(
         _ transaction: PendingGroupRevealTransaction,
-        controller: WMController,
-        shouldFocusAfterReveal: Bool
+        controller: WMController
     ) {
         controller.surfaceReconciler.noteWorldChanged()
         if transaction.refreshOverviewOnSuccess {
@@ -330,9 +334,6 @@ extension DwindleGroupRevealTransactions {
                 affectedWorkspaceIds: [transaction.workspaceId],
                 selectedToken: transaction.token
             )
-        }
-        if shouldFocusAfterReveal, let focusOrigin = transaction.focusOriginOnSuccess {
-            controller.focusWindow(transaction.token, origin: focusOrigin)
         }
     }
 

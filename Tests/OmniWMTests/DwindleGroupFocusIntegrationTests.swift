@@ -771,6 +771,29 @@ final class DwindleGroupFocusIntegrationTests: XCTestCase {
         )
     }
 
+    func testGroupSelectionRequestsFocusBeforeParkingTheOutgoingKeyWindow() throws {
+        var checkFocusOrder: () -> Void = {}
+        let fixture = try makeFixture { _, _ in checkFocusOrder() }
+        let pending = try beginPendingReveal(fixture)
+        fixture.controller.axManager.confirmFrameWrite(for: fixture.activeToken.windowId, frame: pending.frame)
+        var focused = false
+        checkFocusOrder = {
+            focused = true
+            XCTAssertNil(fixture.controller.workspaceManager.hiddenState(for: fixture.activeToken))
+        }
+        defer { checkFocusOrder = {} }
+        let reveals = fixture.controller.dwindleLayoutHandler.groupReveals
+        XCTAssertTrue(reveals.deferGroupSelectionCompletion(
+            fixture.inactiveToken, workspaceId: fixture.workspaceId,
+            focusAfterReveal: true, focusOrigin: .keyboardOrProgrammatic
+        ))
+        reveals.completePendingGroupRevealTransaction(
+            with: frameResult(token: fixture.inactiveToken, frame: pending.frame), transactionId: pending.transactionId
+        )
+        XCTAssertTrue(focused)
+        XCTAssertNotNil(fixture.controller.workspaceManager.hiddenState(for: fixture.activeToken))
+    }
+
     func testPointerHoverFocusWaitsForVerifiedGroupReveal() throws {
         try assertFocusWaitsForVerifiedGroupReveal(origin: .pointerHover)
     }
