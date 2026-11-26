@@ -192,6 +192,34 @@ final class MediaControllerTests: XCTestCase {
         XCTAssertNil(controller.media?.artwork)
     }
 
+    func testStoppedTrackClearsEvenWhenPlayerKeepsItsTitle() async {
+        let controller = controller(#"""
+        $| = 1;
+        my $item = '"title":"Song","pid":1,"duration":100';
+        print qq({$item,"playing":true}\n);
+        while (<STDIN>) {
+            if (/pause/) { print qq({$item,"elapsed":50,"playing":false}\n); }
+            if (/next/) { print qq({$item,"elapsed":50,"playing":false,"stopped":true}\n); }
+            if (/play/) { print qq({$item,"elapsed":0,"playing":true}\n); }
+            if (/previous/) { print qq({$item,"elapsed":100,"playing":false}\n); }
+        }
+        """#)
+        let changes = record(controller)
+        controller.setListening(true)
+        defer { controller.setListening(false) }
+        await wait(in: changes) { $0.last??.playing == true }
+        controller.perform(.pause)
+        await wait(in: changes) { $0.last??.playing == false }
+        XCTAssertEqual(controller.media?.title, "Song")
+        controller.perform(.next)
+        await wait(in: changes) { $0.last.map { $0 == nil } ?? false }
+        controller.perform(.play)
+        await wait(in: changes) { $0.last??.playing == true }
+        controller.perform(.previous)
+        await wait(in: changes) { $0.last.map { $0 == nil } ?? false }
+        XCTAssertNil(controller.media)
+    }
+
     func testTheAdapterRunsOnlyWhileListenedToAndReceivesCommands() async throws {
         let controller = controller(#"""
         $| = 1;

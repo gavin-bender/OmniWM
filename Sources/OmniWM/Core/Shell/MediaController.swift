@@ -205,7 +205,11 @@ final class MediaAdapterReader: Sendable {
         media.repeatMode = (object["repeat"] as? NSNumber).flatMap { ShellMedia.Repeat(rawValue: $0.intValue) }
         let artworkId = object["artworkId"] as? String
         let artwork = (object["artwork"] as? String).flatMap { Data(base64Encoded: $0) }.flatMap(thumbnail)
-        return MediaAdapterLine(media: pid == 0 && title.isEmpty ? nil : media, artworkId: artworkId, artwork: artwork)
+        // Players can retain a title and cover after stopping or reaching the end of a track.
+        let ended = !media.playing && media.duration.map { $0 > 0 && (media.elapsed ?? 0) >= $0 } == true
+        let noPlayer = pid == 0 && (title.isEmpty || (object["pid"] != nil && !media.playing))
+        let inactive = object["stopped"] as? Bool == true || ended || noPlayer
+        return MediaAdapterLine(media: inactive ? nil : media, artworkId: artworkId, artwork: artwork)
     }
 
     private static func thumbnail(_ data: Data) -> CGImage? {

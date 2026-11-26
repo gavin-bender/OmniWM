@@ -12,6 +12,14 @@
 typedef void (*OmniRegister)(dispatch_queue_t);
 typedef void (*OmniGetInfo)(dispatch_queue_t, void (^)(CFDictionaryRef));
 typedef void (*OmniGetPlaying)(dispatch_queue_t, void (^)(Boolean));
+typedef NS_ENUM(uint32_t, OmniPlaybackState) {
+    OmniPlaybackUnknown = 0,
+    OmniPlaybackPlaying = 1,
+    OmniPlaybackPaused = 2,
+    OmniPlaybackStopped = 3,
+    OmniPlaybackInterrupted = 4
+};
+typedef void (*OmniGetPlaybackState)(dispatch_queue_t, void (^)(OmniPlaybackState));
 typedef void (*OmniGetPID)(dispatch_queue_t, void (^)(int));
 typedef Boolean (*OmniSendCommand)(int, CFDictionaryRef);
 typedef void (*OmniSetElapsed)(double);
@@ -19,6 +27,8 @@ typedef void (*OmniSetElapsed)(double);
 static OmniGetInfo getInfo;
 static OmniGetPlaying getPlaying;
 static OmniGetPID getPID;
+static OmniGetPlaybackState getPlaybackState;
+static uint64_t snapshotGeneration;
 static OmniSendCommand sendCommand;
 static OmniSetElapsed setElapsed;
 static dispatch_queue_t queue;
@@ -59,14 +69,34 @@ static void write_line(NSDictionary *payload) {
     fflush(stdout);
 }
 
+static void read_playback(void (^receive)(Boolean playing, Boolean stopped)) {
+    if (getPlaybackState == NULL) {
+        getPlaying(queue, ^(Boolean playing) { receive(playing, false); });
+        return;
+    }
+    getPlaybackState(queue, ^(OmniPlaybackState state) {
+        switch (state) {
+            case OmniPlaybackPlaying: receive(true, false); break;
+            case OmniPlaybackStopped: receive(false, true); break;
+            case OmniPlaybackPaused:
+            case OmniPlaybackInterrupted: receive(false, false); break;
+            default: getPlaying(queue, ^(Boolean playing) { receive(playing, false); }); break;
+        }
+    });
+}
+
 static void emit(void) {
+    uint64_t generation = ++snapshotGeneration;
     getInfo(queue, ^(CFDictionaryRef raw) {
         NSDictionary *info = (__bridge NSDictionary *)raw;
-        getPlaying(queue, ^(Boolean playing) {
+        read_playback(^(Boolean playing, Boolean stopped) {
             getPID(queue, ^(int pid) {
+                // Notifications can overlap while the three asynchronous queries complete.
+                if (generation != snapshotGeneration) { return; }
                 NSMutableDictionary *payload = [NSMutableDictionary dictionary];
                 payload[@"playing"] = @((BOOL)(playing != 0));
                 payload[@"pid"] = @(pid);
+                payload[@"stopped"] = @((BOOL)(stopped != 0));
                 NSDictionary<NSString *, NSString *> *fields = @{
                     @"kMRMediaRemoteNowPlayingInfoMediaType" : @"mediaType",
                     @"kMRMediaRemoteNowPlayingInfoTitle" : @"title",
@@ -147,6 +177,7 @@ void omni_now_playing_run(void *interpreter, void *code) {
     OmniRegister registerForNotifications = symbol(library, "MRMediaRemoteRegisterForNowPlayingNotifications");
     getInfo = symbol(library, "MRMediaRemoteGetNowPlayingInfo");
     getPlaying = symbol(library, "MRMediaRemoteGetNowPlayingApplicationIsPlaying");
+    getPlaybackState = symbol(library, "MRMediaRemoteGetNowPlayingApplicationPlaybackState");
     getPID = symbol(library, "MRMediaRemoteGetNowPlayingApplicationPID");
     sendCommand = symbol(library, "MRMediaRemoteSendCommand");
     setElapsed = symbol(library, "MRMediaRemoteSetElapsedTime");
@@ -162,6 +193,7 @@ void omni_now_playing_run(void *interpreter, void *code) {
     const char *names[] = {
         "kMRMediaRemoteNowPlayingInfoDidChangeNotification",
         "kMRMediaRemoteNowPlayingApplicationIsPlayingDidChangeNotification",
+        "kMRMediaRemoteNowPlayingApplicationPlaybackStateDidChangeNotification",
         "kMRMediaRemoteNowPlayingApplicationDidChangeNotification"
     };
     for (size_t index = 0; index < sizeof names / sizeof names[0]; index++) {
