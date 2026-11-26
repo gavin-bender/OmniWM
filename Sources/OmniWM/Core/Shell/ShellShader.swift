@@ -89,6 +89,7 @@ struct ShellShaderInput: Sendable {
     var values: SIMD4<Float>
     var rate: Int
     var colors: Colors
+    var playFor: Double = 0
     var audio = false
     var image: CGImage?
 }

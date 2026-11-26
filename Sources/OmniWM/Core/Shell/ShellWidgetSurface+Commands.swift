@@ -260,6 +260,7 @@ extension ShellWidgetSurface {
             values: content.params,
             rate: motionPolicy.animationsEnabled ? min(rate, limit) : 0,
             colors: palette.shaderColors,
+            playFor: Double(content.shaderDurationMS) / 1000,
             audio: content.audio,
             image: content.textureRef == 0 ? nil : text.flatMap {
                 resources.images.image($0.string(content.textureRef), folders: directories, packages: assetFolders)?

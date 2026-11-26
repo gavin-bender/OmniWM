@@ -898,7 +898,7 @@ final class ShellBundledWidgetTests: XCTestCase {
         }
     }
 
-    func testBatteryHyperspaceSitsBehindThePowerControlsAcrossStyles() throws {
+    func testBatteryPowerCurvesSitBehindThePowerControlsAcrossStyles() throws {
         let power = ShellPower(mode: .high, supportsHighPower: true)
         let data = try fullData().filter { $0.0 != "power" } + [("power", value { power.write(into: &$0) })]
         for style in [ShellDefaults.profile] + (try ShellStyleFixture.names()) {
@@ -906,9 +906,9 @@ final class ShellBundledWidgetTests: XCTestCase {
                 try renderStyle(style, widget: widget, data: data, inspect: { view, nodes, text in
                     guard view == OMNI_VIEW_POPOUT else { return }
                     let label = style + "/" + widget
-                    let stars = try XCTUnwrap(nodes.firstIndex { text.string($0.text) == "battery-hyperspace.metal" }, label)
+                    let curves = try XCTUnwrap(nodes.firstIndex { text.string($0.text) == "battery-power-curves.metal" }, label)
                     let controls = try XCTUnwrap(nodes.firstIndex { text.string($0.action) == "battery mode high" }, label)
-                    XCTAssertLessThan(stars, controls, label)
+                    XCTAssertLessThan(curves, controls, label)
                 })
             }
         }

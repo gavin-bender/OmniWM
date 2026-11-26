@@ -27,7 +27,7 @@ function battery.withMode(ctx, state, glyph)
     local items = { key = "battery-gauge", gap = 2 * scale, animate = resize, glyph }
     local symbol = state and modeSymbols[state.activeMode]
     if symbol then
-        items[2] = battery.modeGlyph(symbol, 11 * scale, if state.activeMode == "low" then "yellow" else "purple")
+        items[2] = battery.modeGlyph(symbol, 11 * scale, if state.activeMode == "low" then "yellow" else "accent")
     end
     return if ctx.data.bar.style.vertical then ui.column(items) else ui.row(items)
 end
@@ -172,8 +172,8 @@ end
 function battery.background(m)
     if not m or not modeSymbols[m.activeMode] then return nil end
     local low = m.activeMode == "low"
-    return ui.shader{ key = "hyperspace", source = "battery-hyperspace.metal", decorative = true,
-        values = { if low then 1 else 0 }, fps = if low then 8 else 30, animateInLowPower = low }
+    return ui.shader{ key = m.activeMode, source = "battery-power-curves.metal", decorative = true,
+        values = { if low then 1 else 0 }, fps = if low then 8 else 60, playFor = if low then 3 else nil, animateInLowPower = low }
 end
 
 function battery.popout(ctx)

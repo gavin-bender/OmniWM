@@ -177,13 +177,20 @@ final class ShellBatteryBoltTests: XCTestCase {
                         XCTAssertFalse(help.contains("Power Mode"), help)
                     }
                     let popout = widget.renderPopout()
+                    if mode == .high {
+                        let chevron = try XCTUnwrap(bar.first {
+                            $0.kind == .symbol && widget.text.string($0.content.text) == "chevron.up.2"
+                        })
+                        XCTAssertEqual(role(chevron.content.color), .accent, name)
+                    }
                     let shaders = popout.filter { $0.kind == .shader }.map { widget.text.string($0.content.text) }
-                    XCTAssertEqual(shaders, symbol == nil ? [] : ["battery-hyperspace.metal"], name)
+                    XCTAssertEqual(shaders, symbol == nil ? [] : ["battery-power-curves.metal"], name)
                     if let content = popout.first(where: { $0.kind == .shader })?.content {
                         let low = symbol == "leaf.fill"
                         XCTAssertEqual(content.params.x, low ? 1 : 0)
+                        XCTAssertEqual(content.shaderDurationMS, low ? 3000 : 0)
                         XCTAssertEqual(widget.surface.shaderInput(content, lowPower: true).rate, low ? 8 : 0)
-                        XCTAssertEqual(widget.surface.shaderInput(content, lowPower: false).rate, low ? 8 : 30)
+                        XCTAssertEqual(widget.surface.shaderInput(content, lowPower: false).rate, low ? 8 : 60)
                         widget.resources.motion.systemReducesMotion = true
                         XCTAssertEqual(widget.surface.shaderInput(content, lowPower: true).rate, 0)
                         widget.resources.motion.systemReducesMotion = false
@@ -199,18 +206,18 @@ final class ShellBatteryBoltTests: XCTestCase {
         }
     }
 
-    func testHyperspaceRendersMovingStreaksOverATransparentBackground() async throws {
+    func testLowPowerCurvesSettleAndHighPowerPulsesLoopInThemeAccent() async throws {
         let widget = try ShellRenderedWidget("battery")
         let shaders = try XCTUnwrap(ShellDefaults.bundled).appendingPathComponent("shaders")
-        let program = widget.resources.shaders.program(source: "battery-hyperspace.metal", directories: [shaders])
+        let program = widget.resources.shaders.program(source: "battery-power-curves.metal", directories: [shaders])
         await waitForShaders(in: widget.resources.shaders) { !program.isCompiling }
         let pipeline = try XCTUnwrap(program.pipeline, program.failure ?? "")
         let size = CGSize(width: 320, height: 280)
-        func frame(at time: Double, low: Bool, accent: SIMD4<Float>) throws -> [UInt8] {
+        func frame(at time: Double, low: Bool, accent: SIMD4<Float>, still: Bool = false) throws -> [UInt8] {
             var colors = ShellShaderInput.Colors(repeating: .zero)
             colors[ShellRole.accent.rawValue] = accent
             colors[ShellRole.foreground.rawValue] = SIMD4(repeating: 1)
-            let input = ShellShaderInput(values: SIMD4(low ? 1 : 0, 0, 0, 0), rate: low ? 8 : 30, colors: colors)
+            let input = ShellShaderInput(values: SIMD4(low ? 1 : 0, 0, 0, 0), rate: still ? 0 : (low ? 8 : 60), colors: colors, playFor: low ? 3 : 0)
             return try ShellShaderTests.pixels(pipeline, input.uniforms(
                 size: size, scale: 1, elapsed: time, now: 0, transition: .settled
             ), width: Int(size.width), height: Int(size.height))
@@ -223,6 +230,14 @@ final class ShellBatteryBoltTests: XCTestCase {
             XCTAssertGreaterThan(alpha.max() ?? 0, 50)
             XCTAssertNotEqual(first, try frame(at: 0.5, low: low, accent: accent))
             XCTAssertNotEqual(first, try frame(at: 0, low: low, accent: SIMD4(0, 0, 1, 1)))
+            if low {
+                let settled = try frame(at: 3, low: true, accent: accent)
+                XCTAssertEqual(settled, try frame(at: 6, low: true, accent: accent))
+                XCTAssertEqual(settled, try frame(at: 0, low: true, accent: accent, still: true))
+            } else {
+                let loop = try frame(at: 4.8, low: false, accent: accent)
+                XCTAssertTrue(zip(first, loop).allSatisfy { abs(Int($0) - Int($1)) <= 1 })
+            }
         }
     }
 

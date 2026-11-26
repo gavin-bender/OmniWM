@@ -143,7 +143,8 @@ typedef struct omni_wire_node {
     uint32_t text;
     uint32_t reserve;
     uint32_t color;
-    uint32_t rate;
+    uint16_t rate;
+    uint16_t shader_duration_ms;
     uint32_t series;
     uint16_t style;
     uint16_t flags;

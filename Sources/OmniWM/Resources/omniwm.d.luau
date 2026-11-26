@@ -1008,6 +1008,7 @@ export type ShaderProps = Props & {
     values: { number }?,
     fps: number?,
     animateInLowPower: boolean?,
+    playFor: number?,
     audio: boolean?,
 }
 

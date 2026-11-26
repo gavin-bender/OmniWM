@@ -52,6 +52,7 @@ enum Atom : int16_t {
     AtomSource,
     AtomValues,
     AtomFps,
+    AtomPlayFor,
     AtomAnimateInLowPower,
     AtomAlign,
     AtomTarget,
@@ -163,7 +164,7 @@ const Name atomNames[AtomCount] = {
     {"kind", 4}, {"key", 3}, {"axis", 4}, {"w", 1}, {"h", 1}, {"grow", 4}, {"gap", 3}, {"pad", 3}, {"center", 6},
     {"fill", 4}, {"border", 6}, {"borderWidth", 11}, {"radius", 6}, {"opacity", 7}, {"text", 4}, {"reserve", 7},
     {"style", 5}, {"color", 5}, {"name", 4}, {"value", 5}, {"onClick", 7}, {"hover", 5},
-    {"animate", 7}, {"app", 3}, {"popout", 6}, {"source", 6}, {"values", 6}, {"fps", 3}, {"animateInLowPower", 17},
+    {"animate", 7}, {"app", 3}, {"popout", 6}, {"source", 6}, {"values", 6}, {"fps", 3}, {"playFor", 7}, {"animateInLowPower", 17},
     {"align", 5}, {"target", 6}, {"menu", 4}, {"preview", 7}, {"drag", 4}, {"drop", 4},
     {"dx", 2}, {"dy", 2}, {"scale", 5}, {"shadow", 6}, {"shadowRadius", 12}, {"onRightClick", 12},
     {"onScroll", 8}, {"size", 4}, {"weight", 6}, {"maxWidth", 8},
@@ -1968,6 +1969,9 @@ void readField(lua_State *L, int atom, omni_wire_node &node, omni_instance *inst
     case AtomAnimateInLowPower:
         if (lua_type(L, -1) != LUA_TBOOLEAN) { luaL_error(L, "animateInLowPower must be a boolean"); }
         if (lua_toboolean(L, -1)) { node.behavior_flags |= OMNI_NODE_BEHAVIOR_LOW_POWER_ANIMATION; }
+        break;
+    case AtomPlayFor:
+        node.shader_duration_ms = static_cast<uint16_t>(std::round(1000 * inputNumber(L, -1, "playFor", 0, 65.535)));
         break;
     case AtomFps: node.rate = unsignedValue(L, -1, 120); break;
     case AtomPlaying:

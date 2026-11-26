@@ -27,7 +27,7 @@ float4 shade(float2 uv, constant OmniShader& shader) {
 - `anchor`, the middle of the bar item that opened the popout, and `content`, the popout's content as x, y, width and height, both in points from the shader's top left;
 - `audio`, with `audio = true` on the shader: the 60 `spectrum` bars from 0 to 1, updated 30 times a second without re-rendering the widget. Such a shader draws at 30 fps unless `fps` says otherwise.
 
-With `fps` at 0 or animations off, a shader draws once, with `progress` at its end value. Low Power Mode also freezes shaders by default. Set `animateInLowPower = true` on an element shader to allow up to 8 fps in Low Power Mode.
+With `fps` at 0 or animations off, a shader draws once, with `progress` at its end value. Low Power Mode also freezes shaders by default. Set `playFor` to a duration in seconds (up to 65.535) to hold the final frame and stop its animation timer. With animations disabled, a finite shader draws its final frame immediately. Set `animateInLowPower = true` on an element shader to allow up to 8 fps in Low Power Mode.
 
 A profile can also draw a shader behind the entire workspace bar, underneath all three widget lanes:
 

@@ -178,7 +178,7 @@ extension SurfaceCore {
                 text: textChanged,
                 value: old.value != new.value || old.color != new.color,
                 shader: old.params != new.params || old.rate != new.rate || old.animateInLowPower != new.animateInLowPower
-                    || old.glassShape != new.glassShape
+                    || old.shaderDurationMS != new.shaderDurationMS || old.glassShape != new.glassShape
                     || old.glassFollow != new.glassFollow || old.glassFollowFixedRadius != new.glassFollowFixedRadius
             ),
             patches: &patches

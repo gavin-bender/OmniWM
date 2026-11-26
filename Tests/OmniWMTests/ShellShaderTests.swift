@@ -119,6 +119,31 @@ final class ShellShaderTests: XCTestCase {
         XCTAssertEqual(pixel, 0xFFFF_0000)
     }
 
+    func testFiniteShaderPublishesItsSettledFrameAndStopsItsTimer() async throws {
+        let program = try await compiled("settle.metal", """
+        float4 shade(float2 uv, constant OmniShader& shader) {
+            return float4(step(0.25, shader.time), 0, 0, 1);
+        }
+        """)
+        let scene = ShellLayerScene(container: CALayer(), scale: 1)
+        let input = ShellShaderInput(values: .zero, rate: 8, colors: .init(repeating: .zero), playFor: 0.25)
+        scene.submit([
+            .insert(slot: 0, parent: -1, kind: .shader, after: -1),
+            .frame(slot: 0, rect: CGRect(x: 0, y: 0, width: 4, height: 4), animation: nil),
+            .shader(slot: 0, program: program, input: input)
+        ], animated: false)
+        await waitForFrames(in: scene) {
+            ShellLayerScene.engineQueue.sync {
+                guard scene.shaders?.timerRate == 0, let surface = scene.layers[0]?.contents as? IOSurface else {
+                    return false
+                }
+                surface.lock(options: .readOnly, seed: nil)
+                defer { surface.unlock(options: .readOnly, seed: nil) }
+                return surface.baseAddress.load(as: UInt32.self) == 0xFFFF_0000
+            }
+        }
+    }
+
     func testAMaskShadersFramesShapeItsStackAndAFailureUnmasksIt() async throws {
         executionTimeAllowance = failureBound
         let program = try await compiled("half.metal", """

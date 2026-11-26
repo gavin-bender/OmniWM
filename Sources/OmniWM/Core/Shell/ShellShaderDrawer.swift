@@ -18,7 +18,7 @@ final class ShellShaderDrawer {
     private final class Target {
         let layer: CALayer
         let token: Int
-        let start = CACurrentMediaTime()
+        var start = CACurrentMediaTime()
         var program: ShellShaderProgram?
         var input: ShellShaderInput
         var image: CGImage?
@@ -93,6 +93,9 @@ final class ShellShaderDrawer {
             tokens += 1
             target = Target(layer: layer, token: tokens, input: input)
             targets[slot] = target
+        }
+        if input.playFor > 0, target.program !== program || target.input.playFor != input.playFor {
+            target.start = CACurrentMediaTime()
         }
         if target.program !== program {
             target.overruns = 0
@@ -210,6 +213,7 @@ final class ShellShaderDrawer {
         visible = isVisible
         if isVisible {
             for (slot, target) in targets {
+                if target.input.playFor > 0 { target.start = CACurrentMediaTime() }
                 if target.group != nil { target.pending = true }
                 else { draw(slot, target) }
             }
@@ -447,14 +451,13 @@ extension ShellShaderDrawer {
         (Int((layer.bounds.width * scale).rounded(.up)), Int((layer.bounds.height * scale).rounded(.up)))
     }
 
+    private func frameRate(_ target: Target) -> Int {
+        if target.input.playFor > 0, target.lastDraw - target.start >= target.input.playFor { return 0 }
+        return Self.rate(input: target.input, neutral: target.group?.neutral == true, sourceRate: target.group?.sourceRate ?? 0)
+    }
+
     private var shaderRate: Int {
-        targets.values.lazy.filter { $0.program?.pipeline != nil && $0.group?.failed != true }.map {
-            Self.rate(
-                input: $0.input,
-                neutral: $0.group?.neutral == true,
-                sourceRate: $0.group?.sourceRate ?? 0
-            )
-        }.max() ?? 0
+        targets.values.lazy.filter { $0.program?.pipeline != nil && $0.group?.failed != true }.map(frameRate).max() ?? 0
     }
 
     private func updateTimer() {
@@ -487,11 +490,7 @@ extension ShellShaderDrawer {
             return
         }
         for (slot, target) in targets {
-            let rate = Self.rate(
-                input: target.input,
-                neutral: target.group?.neutral == true,
-                sourceRate: target.group?.sourceRate ?? 0
-            )
+            let rate = frameRate(target)
             guard rate > 0, now - target.lastDraw >= 1 / Double(rate) - 0.002 else { continue }
             draw(slot, target)
         }

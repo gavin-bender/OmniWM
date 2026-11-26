@@ -15,6 +15,8 @@ extension ShellShaderInput {
         audio: ShellSpectrumBands.Bars = .init(repeating: 0)
     ) -> ShellShaderUniforms {
         let animates = rate > 0
+        let time = playFor > 0 ? (animates ? min(elapsed, playFor) : playFor)
+            : (animates ? elapsed.truncatingRemainder(dividingBy: ShellShaderDrawer.timeWrap) : 0)
         let stage = stage ?? ShellShaderStage(
             anchor: CGPoint(x: size.width / 2, y: size.height / 2),
             content: CGRect(origin: .zero, size: size)
@@ -22,7 +24,7 @@ extension ShellShaderInput {
         return ShellShaderUniforms(
             size: SIMD2(Float(size.width), Float(size.height)),
             scale: Float(scale),
-            time: animates ? Float(elapsed.truncatingRemainder(dividingBy: ShellShaderDrawer.timeWrap)) : 0,
+            time: Float(time),
             values: values,
             colors: colors,
             progress: animates || transition.forced ? transition.progress(at: now) : transition.to,
