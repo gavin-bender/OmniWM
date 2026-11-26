@@ -79,6 +79,7 @@ struct ShellMedia: Equatable, Sendable {
 
     var title = ""
     var compactTitle: String?
+    var musicTitle: String?
     var isVideo: Bool?
     var artist = ""
     var album = ""
@@ -96,11 +97,13 @@ struct ShellMedia: Equatable, Sendable {
     var repeatMode: Repeat?
 
     func write(into writer: inout ShellValueWriter) {
-        writer.map(16)
+        writer.map(17)
         writer.key("title")
         writer.string(title)
         writer.key("compactTitle")
         compactTitle.map { writer.string($0) } ?? writer.null()
+        writer.key("musicTitle")
+        musicTitle.map { writer.string($0) } ?? writer.null()
         writer.key("artist")
         writer.string(artist)
         writer.key("album")
@@ -433,11 +436,11 @@ final class MediaController {
         // Now Playing can briefly clear the item or omit its video metadata during transport changes.
         if let item = media, !item.title.isEmpty {
             let key = TitleKey(item)
+            let video = item.isVideo ?? (item.album.isEmpty && (item.artworkAspectRatio ?? 0) > 1.2)
             if key != summarySource {
                 titleTask?.cancel()
                 summarySource = nil
                 savedTitle = nil
-                let video = item.isVideo ?? (item.album.isEmpty && (item.artworkAspectRatio ?? 0) > 1.2)
                 if video, !MediaBarTitle.fits(item.title) {
                     summarySource = key
                     titleTask = Task { [weak self, summarize] in
@@ -451,6 +454,9 @@ final class MediaController {
                         }
                     }
                 }
+            }
+            if summarySource != key, !video {
+                media?.musicTitle = MediaBarTitle.withoutMusicQualifiers(item.title)
             }
             media?.compactTitle = savedTitle
         }

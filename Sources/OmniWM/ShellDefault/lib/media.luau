@@ -20,6 +20,13 @@ local function seek(time: number): string
     return string.format("media seek %.1f", time)
 end
 
+function media.fittingTitle(ctx, title, musicTitle, width, size, weight)
+    if musicTitle and ctx.format.measure(title, { size = size, weight = weight }) > width then
+        return musicTitle
+    end
+    return title
+end
+
 function media.state(ctx)
     local title = ctx.select("media", "title")
     if not title or title == "" then
@@ -71,7 +78,7 @@ function media.model(ctx, compact: boolean?, withoutLyrics: boolean?)
         return nil
     end
     local repeatMode = playing.repeatMode
-    local m = { title = playing.title, artist = playing.artist, album = playing.album, bundle = playing.bundle,
+    local m = { title = playing.title, musicTitle = playing.musicTitle, artist = playing.artist, album = playing.album, bundle = playing.bundle,
         app = if playing.app ~= "" then playing.app else playing.bundle, artwork = playing.artwork,
         playing = playing.playing, shuffle = playing.shuffle, repeatMode = repeatMode,
         repeating = repeatMode == "one" or repeatMode == "all",
@@ -148,7 +155,8 @@ function media.content(ctx, compact: boolean?, width: number?, m)
         ui.row{ w = inner, gap = 12,
             cover(m, 64),
             ui.column{ gap = 3, center = false,
-                look.text{ text = m.title, size = 14, weight = "semibold", maxWidth = inner - 76, lines = 2 },
+                look.text{ text = media.fittingTitle(ctx, m.title, m.musicTitle, inner - 76, 14, "semibold"),
+                    size = 14, weight = "semibold", maxWidth = inner - 76, lines = 2, help = m.title },
                 look.text{ text = m.artist, size = 13, color = "secondaryForeground", maxWidth = inner - 76 },
                 if not compact then look.text{ text = m.album, size = 11, color = "secondaryForeground",
                     maxWidth = inner - 76 } else nil } } }

@@ -26,8 +26,10 @@ function render(ctx)
         props[1] = ui.stack{ key = "cover", w = if style.vertical then height else height * 16 / 9, h = height, art }
         if not style.vertical then
             local summary = ctx.select("media", "compactTitle")
+            local title = summary or media.fittingTitle(ctx, m.title, ctx.select("media", "musicTitle"),
+                160 * scale, 13 * scale, "medium")
             props[#props + 1] = ui.stack{ key = "caption", h = height, animate = resize,
-                look.text{ key = if summary then "summary" else "original", text = summary or m.title,
+                look.text{ key = if summary then "summary" else "original", text = title,
                     size = 13 * scale, weight = "medium", maxWidth = 160 * scale, align = "leading",
                     appear = if summary then { opacity = 0, scale = 0.97, dy = 3 * scale, animate = 0.24 } else nil,
                     exit = { opacity = 0, dy = -2 * scale, animate = 0.13 } } }

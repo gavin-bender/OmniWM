@@ -57,6 +57,15 @@ final class MediaControllerTests: XCTestCase {
         XCTAssertNil(ShellMediaCommand.shuffle.mediaKey)
     }
 
+    func testMusicQualifiersInParenthesesAndBrackets() {
+        for title in ["DARK AURA FUNK (Super Slowed)", "DARK AURA FUNK [Super Slowed]",
+                      "DARK AURA FUNK (feat. Guest) [Club Remix]"] {
+            XCTAssertEqual(MediaBarTitle.withoutMusicQualifiers(title), "DARK AURA FUNK")
+        }
+        XCTAssertNil(MediaBarTitle.withoutMusicQualifiers("Escape (The Piña Colada Song)"))
+        XCTAssertNil(MediaBarTitle.withoutMusicQualifiers("[Remix]"))
+    }
+
     func testVideoTypeFromNowPlaying() throws {
         for (value, expected): (String, Bool?) in [
             (#""kMRMediaRemoteNowPlayingInfoTypeVideo""#, true),

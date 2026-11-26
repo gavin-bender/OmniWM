@@ -83,6 +83,22 @@ final class ShellBarIconSizeTests: XCTestCase {
         }
     }
 
+    func testMusicBarKeepsQualifiersOnlyWhenTheyFit() throws {
+        let widget = try ShellRenderedWidget("media")
+        let bar = try bar(scale: 1)
+        var media = ShellMedia()
+        for (title, base, expected) in [
+            ("One [Remix]", "One", "One [Remix]"),
+            ("DARK AURA FUNK (Super Slowed)", "DARK AURA FUNK", "DARK AURA FUNK")
+        ] {
+            media.title = title
+            media.musicTitle = base
+            widget.set("media") { media.write(into: &$0) }
+            widget.render(bar)
+            XCTAssertTrue(widget.strings().contains(expected))
+        }
+    }
+
     func testMediaBarSizesArtworkAndSwapsThePlaybackIndicator() throws {
         let widget = try ShellRenderedWidget("media")
         let bar = try bar(scale: 1)

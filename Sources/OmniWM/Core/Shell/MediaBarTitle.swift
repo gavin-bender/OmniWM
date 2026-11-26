@@ -12,6 +12,20 @@ enum MediaBarTitle {
         return (text as NSString).size(withAttributes: [.font: font]).width <= 159
     }
 
+    static func withoutMusicQualifiers(_ title: String) -> String? {
+        guard title.contains("(") || title.contains("[") else { return nil }
+        let group = /\s*(?:\(([^()\[\]]+)\)|\[([^()\[\]]+)\])/
+        let qualifier = /\b(?:feat(?:uring)?|ft|remix|mix|edit|version|remaster(?:ed)?|slowed|sped[\s-]+up|reverb|instrumental|acoustic|live|demo|radio edit|dub)\b/.ignoresCase()
+        var result = title
+        for match in title.matches(of: group).reversed() {
+            if let annotation = match.1 ?? match.2, annotation.contains(qualifier) {
+                result.removeSubrange(match.range)
+            }
+        }
+        result = result.trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.isEmpty || result == title ? nil : result
+    }
+
     static func summarize(_ title: String) async -> String? {
         guard SystemLanguageModel.default.availability == .available else { return nil }
         let instructions = """

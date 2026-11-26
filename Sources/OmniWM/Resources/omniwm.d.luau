@@ -304,6 +304,7 @@ export type AudioApps = {
 
 export type Media = {
     compactTitle: string?,
+    musicTitle: string?,
     title: string,
     artist: string,
     album: string,
