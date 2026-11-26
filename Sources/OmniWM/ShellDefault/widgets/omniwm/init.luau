@@ -50,9 +50,11 @@ function render(ctx: Context)
             glyph.w, glyph.h = glyph.size, glyph.size
         end
         props.w, props.h = item, item
-        if mark and style.vertical then
+        if not mark then
+            props.pad = (item - glyph.size) / 2
+        elseif style.vertical then
             props.h = nil
-        elseif mark then
+        else
             props.w = nil
         end
         props[1] = ui.symbol(glyph)

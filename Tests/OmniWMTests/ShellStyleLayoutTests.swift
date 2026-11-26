@@ -4437,6 +4437,12 @@ final class ShellStyleLayoutTests: XCTestCase {
                             [state.locked ? "lock.fill" : "gearshape.fill"],
                             context
                         )
+                        let glyph = try XCTUnwrap(widget.surface.layout.core.elements {
+                            widget.text.string($0.text) == (state.locked ? "lock.fill" : "gearshape.fill")
+                        }.first, context)
+                        let glyphFrame = CGRect(widget.surface.layout.core.absoluteFrame(of: glyph))
+                        XCTAssertEqual(glyphFrame.midX, frame.midX, accuracy: 0.01, context)
+                        XCTAssertEqual(glyphFrame.midY, frame.midY, accuracy: 0.01, context)
                         XCTAssertEqual(logos.first?.content.color, Color(packed: 0xFFFF_FFFF), context)
                         if ["default", "lake", "matrix", "sakura"].contains(profile) {
                             XCTAssertEqual(frame.width, height - 4, context)
