@@ -14,11 +14,36 @@ function render(ctx)
     if not button then
         local scale = look.scale(ctx)
         local props = table.clone(behaviour)
-        props[1] = look.barGlyph(ctx, { name = m.symbol, size = 14 * scale })
-        if not ctx.data.bar.style.vertical then
-            props[2] = look.text{ text = m.title, size = 13 * scale, maxWidth = 160 * scale }
+        local style = ctx.data.bar.style
+        local resize = if style.vertical then nil else { duration = 0.24, curve = "easeInOut" }
+        props.animate = resize
+        local artwork = ctx.select("media", "artwork")
+        local height = 18 * scale
+        local ratio = ctx.select("media", "artworkAspectRatio") or 1
+        local width = height * math.clamp(ratio, 0.6, if style.vertical then 1 else 16 / 9)
+        local art = if artwork then ui.image{ key = "artwork", image = artwork, w = width, h = height, radius = 4 * scale }
+            else ui.icon{ app = ctx.select("media", "bundle"), w = height, h = height, placeholder = "music.note" }
+        props[1] = ui.stack{ key = "cover", w = if style.vertical then height else height * 16 / 9, h = height, art }
+        if not style.vertical then
+            local summary = ctx.select("media", "compactTitle")
+            props[#props + 1] = ui.stack{ key = "caption", h = height, animate = resize,
+                look.text{ key = if summary then "summary" else "original", text = summary or m.title,
+                    size = 13 * scale, weight = "medium", maxWidth = 160 * scale, align = "leading",
+                    appear = if summary then { opacity = 0, scale = 0.97, dy = 3 * scale, animate = 0.24 } else nil,
+                    exit = { opacity = 0, dy = -2 * scale, animate = 0.13 } } }
         end
+        local slot = look.px(ctx, "barSymbol")
+        props[#props + 1] = ui.stack{ key = "playback", w = slot, h = slot, animate = resize,
+            if m.playing then ui.shader{ key = "waveform", source = "media-waveform.metal",
+                fps = 24, w = slot, h = slot }
+            else look.barGlyph(ctx, { name = "play.fill", size = slot, color = "secondaryForeground" }) }
         button = look.bar(ctx, props)
+        if style.backgrounds then
+            button.radius = (style.height - 4) / 2
+            button.fill = "surface"
+            button.border = "border"
+            button.borderWidth = 0.5
+        end
     end
     for key, value in behaviour do
         button[key] = value

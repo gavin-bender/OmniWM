@@ -303,6 +303,7 @@ export type AudioApps = {
 }
 
 export type Media = {
+    compactTitle: string?,
     title: string,
     artist: string,
     album: string,
@@ -315,6 +316,7 @@ export type Media = {
     rate: number,
     sampledAt: number,
     artwork: string?,
+    artworkAspectRatio: number?,
     shuffle: boolean?,
     repeatMode: ("off" | "one" | "all")?,
 }

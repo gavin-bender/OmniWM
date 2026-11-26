@@ -7,6 +7,35 @@ import XCTest
 
 @MainActor
 final class ShellWidgetSlotTests: XCTestCase {
+    func testMediaWidthPassesThroughIntermediateSizes() async throws {
+        let content = WidthRecordingView()
+        func slot(_ width: CGFloat) -> some View {
+            ShellWidgetSlot(
+                widget: WorkspaceBarShellWidget(id: "media", size: CGSize(width: width, height: 24), lane: .trailing),
+                view: content, cuttable: true, resizeDuration: 0.24
+            )
+            .fixedSize()
+        }
+        let host = NSHostingView(rootView: slot(180))
+        let panel = NSPanel(contentRect: CGRect(x: -500, y: -500, width: 240, height: 32),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.contentView = host
+        panel.orderBack(nil)
+        defer { panel.orderOut(nil) }
+        host.layoutSubtreeIfNeeded()
+        for (start, end): (CGFloat, CGFloat) in [(180, 100), (100, 180)] {
+            content.widths = []
+            host.rootView = slot(end)
+            for _ in 0 ..< 90 {
+                host.layoutSubtreeIfNeeded()
+                if content.widths.last == end { break }
+                try await Task.sleep(for: .milliseconds(16))
+            }
+            XCTAssertEqual(content.widths.last, end)
+            XCTAssertTrue(content.widths.contains { $0 > min(start, end) + 1 && $0 < max(start, end) - 1 })
+        }
+    }
+
     func testSlotHostsTheReplacementSurfaceView() {
         let widget = WorkspaceBarShellWidget(id: "clock", size: CGSize(width: 40, height: 20), lane: .trailing)
         let first = NSView()
@@ -183,5 +212,15 @@ private final class MoveCounter: NSObject {
 
     @objc func moved() {
         count += 1
+    }
+}
+
+@MainActor
+private final class WidthRecordingView: NSView {
+    var widths: [CGFloat] = []
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        widths.append(newSize.width)
     }
 }

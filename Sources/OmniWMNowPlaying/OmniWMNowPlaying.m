@@ -68,6 +68,7 @@ static void emit(void) {
                 payload[@"playing"] = @((BOOL)(playing != 0));
                 payload[@"pid"] = @(pid);
                 NSDictionary<NSString *, NSString *> *fields = @{
+                    @"kMRMediaRemoteNowPlayingInfoMediaType" : @"mediaType",
                     @"kMRMediaRemoteNowPlayingInfoTitle" : @"title",
                     @"kMRMediaRemoteNowPlayingInfoArtist" : @"artist",
                     @"kMRMediaRemoteNowPlayingInfoAlbum" : @"album",

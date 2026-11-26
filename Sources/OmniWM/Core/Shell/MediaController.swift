@@ -78,6 +78,8 @@ struct ShellMedia: Equatable, Sendable {
     }
 
     var title = ""
+    var compactTitle: String?
+    var isVideo: Bool?
     var artist = ""
     var album = ""
     var app = ""
@@ -89,13 +91,16 @@ struct ShellMedia: Equatable, Sendable {
     var rate = 0.0
     var sampledAt = 0.0
     var artwork: String?
+    var artworkAspectRatio: Double?
     var shuffle: Bool?
     var repeatMode: Repeat?
 
     func write(into writer: inout ShellValueWriter) {
-        writer.map(14)
+        writer.map(16)
         writer.key("title")
         writer.string(title)
+        writer.key("compactTitle")
+        compactTitle.map { writer.string($0) } ?? writer.null()
         writer.key("artist")
         writer.string(artist)
         writer.key("album")
@@ -118,6 +123,8 @@ struct ShellMedia: Equatable, Sendable {
         writer.number(sampledAt)
         writer.key("artwork")
         artwork.map { writer.string($0) } ?? writer.null()
+        writer.key("artworkAspectRatio")
+        artworkAspectRatio.map { writer.number($0) } ?? writer.null()
         writer.key("shuffle")
         shuffle.map { writer.bool($0) } ?? writer.null()
         writer.key("repeatMode")
@@ -176,6 +183,16 @@ final class MediaAdapterReader: Sendable {
         }
         var media = ShellMedia()
         media.title = title
+        switch (object["mediaType"] as? NSNumber)?.intValue {
+        case 1: media.isVideo = false
+        case 2: media.isVideo = true
+        default:
+            switch object["mediaType"] as? String {
+            case "kMRMediaRemoteNowPlayingInfoTypeAudio": media.isVideo = false
+            case "kMRMediaRemoteNowPlayingInfoTypeVideo": media.isVideo = true
+            default: break
+            }
+        }
         media.artist = object["artist"] as? String ?? ""
         media.album = object["album"] as? String ?? ""
         media.pid = pid
@@ -217,12 +234,31 @@ final class MediaController {
     private var generation = 0
     private var restarts = 0
     private var listening = false
+    private var pendingClear: Task<Void, Never>?
+    private var titleTask: Task<Void, Never>?
+    private struct TitleKey: Equatable {
+        let pid: Int32
+        let title: String
+
+        init(_ media: ShellMedia) {
+            pid = media.pid
+            title = media.title
+        }
+    }
+
+    private let summarize: @MainActor (String) async -> String?
+    private var summarySource: TitleKey?
+    private var savedTitle: String?
     private var artwork: (id: String, image: CGImage)?
     private(set) var media: ShellMedia?
     var onChange: (@MainActor (ShellMedia?) -> Void)?
 
-    init(adapter: Adapter? = MediaController.bundledAdapter()) {
+    init(
+        adapter: Adapter? = MediaController.bundledAdapter(),
+        summarize: @escaping @MainActor (String) async -> String? = MediaBarTitle.summarize
+    ) {
         self.adapter = adapter
+        self.summarize = summarize
     }
 
     static func bundledAdapter() -> Adapter? {
@@ -322,6 +358,8 @@ final class MediaController {
     }
 
     private func terminate() {
+        pendingClear?.cancel()
+        pendingClear = nil
         generation += 1
         if let input {
             do {
@@ -337,11 +375,21 @@ final class MediaController {
 
     private func received(_ line: MediaAdapterLine, generation: Int) {
         guard generation == self.generation else { return }
-        guard var media = line.media else {
-            artwork = nil
-            publish(nil)
+        guard var media = line.media, !media.title.isEmpty else {
+            // Coalesce a brief empty snapshot between a pause and its replacement metadata.
+            if self.media != nil, pendingClear == nil {
+                pendingClear = Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled, let self else { return }
+                    self.pendingClear = nil
+                    self.artwork = nil
+                    self.publish(nil)
+                }
+            }
             return
         }
+        pendingClear?.cancel()
+        pendingClear = nil
         let application = NSRunningApplication(processIdentifier: media.pid)
         media.app = application?.localizedName ?? ""
         media.bundle = application?.bundleIdentifier ?? ""
@@ -349,7 +397,13 @@ final class MediaController {
             if let image = line.artwork {
                 artwork = (id, image)
             }
-            media.artwork = artwork?.id == id ? Self.artworkPrefix + id : nil
+            if let artwork, artwork.id == id {
+                media.artwork = Self.artworkPrefix + id
+                media.artworkAspectRatio = Double(artwork.image.width) / Double(artwork.image.height)
+            }
+        } else if let previous = self.media, TitleKey(previous) == TitleKey(media) {
+            media.artwork = previous.artwork
+            media.artworkAspectRatio = previous.artworkAspectRatio
         } else {
             artwork = nil
         }
@@ -375,6 +429,31 @@ final class MediaController {
     }
 
     private func publish(_ media: ShellMedia?) {
+        var media = media
+        // Now Playing can briefly clear the item or omit its video metadata during transport changes.
+        if let item = media, !item.title.isEmpty {
+            let key = TitleKey(item)
+            if key != summarySource {
+                titleTask?.cancel()
+                summarySource = nil
+                savedTitle = nil
+                let video = item.isVideo ?? (item.album.isEmpty && (item.artworkAspectRatio ?? 0) > 1.2)
+                if video, !MediaBarTitle.fits(item.title) {
+                    summarySource = key
+                    titleTask = Task { [weak self, summarize] in
+                        guard let label = await summarize(key.title), !Task.isCancelled,
+                              let self, self.summarySource == key else { return }
+                        self.savedTitle = label
+                        if var current = self.media, TitleKey(current) == key {
+                            current.compactTitle = label
+                            self.media = current
+                            self.onChange?(current)
+                        }
+                    }
+                }
+            }
+            media?.compactTitle = savedTitle
+        }
         guard media != self.media else { return }
         self.media = media
         onChange?(media)

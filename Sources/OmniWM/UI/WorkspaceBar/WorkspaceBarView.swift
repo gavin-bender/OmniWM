@@ -31,6 +31,7 @@ struct WorkspaceBarView: View {
             hiddenBarJoinEdge: slice == .secondary ? nil : model.hiddenBarJoinEdge,
             zones: model.zones,
             animationsEnabled: motionPolicy.animationsEnabled,
+            animationSpeed: motionPolicy.animationSpeed,
             shellSurface: shellSurface,
             shaderBackground: shaderBackground
         )
@@ -74,6 +75,7 @@ private struct WorkspaceBarContentView: View {
     var hiddenBarJoinEdge: PopupAttachment.Edge?
     var zones: WorkspaceBarZones?
     let animationsEnabled: Bool
+    var animationSpeed = 1.0
     var shellSurface: ((String) -> NSView?)?
     var shaderBackground: (() -> NSView?)?
 
@@ -121,7 +123,11 @@ private struct WorkspaceBarContentView: View {
     private var slots: some View {
         ForEach(ShellLane.allCases, id: \.self) { lane in
             ForEach(slice.shellWidgets(in: snapshot, lane: lane)) { widget in
-                ShellWidgetSlot(widget: widget, view: shellSurface?(widget.id), cuttable: zones != nil)
+                ShellWidgetSlot(
+                    widget: widget, view: shellSurface?(widget.id), cuttable: zones != nil,
+                    resizeDuration: animationsEnabled && !snapshot.orientation.isVertical && widget.id == "media"
+                        ? 0.24 / animationSpeed : nil
+                )
                     .layoutValue(key: WorkspaceBarZoneLayout.Lane.self, value: lane)
                     .layoutValue(key: WorkspaceBarZoneLayout.Priority.self, value: widget.priority)
             }

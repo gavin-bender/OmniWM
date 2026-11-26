@@ -9,10 +9,37 @@ struct ShellWidgetSlot: View {
     let widget: WorkspaceBarShellWidget
     let view: NSView?
     var cuttable = false
+    var resizeDuration: Double?
 
     var body: some View {
-        ShellWidgetSlotHost(widget: widget, view: view, cuttable: cuttable)
-            .id(view.map(ObjectIdentifier.init))
+        if let resizeDuration {
+            ResizingShellWidgetSlot(widget: widget, view: view, cuttable: cuttable, width: widget.size.width)
+                .animation(.easeInOut(duration: resizeDuration), value: widget.size.width)
+                .id(view.map(ObjectIdentifier.init))
+        } else {
+            ShellWidgetSlotHost(widget: widget, view: view, cuttable: cuttable, size: widget.size)
+                .id(view.map(ObjectIdentifier.init))
+        }
+    }
+}
+
+@MainActor
+private struct ResizingShellWidgetSlot: View, Animatable {
+    let widget: WorkspaceBarShellWidget
+    let view: NSView?
+    let cuttable: Bool
+    nonisolated var width: CGFloat
+
+    nonisolated var animatableData: CGFloat {
+        get { width }
+        set { width = newValue }
+    }
+
+    var body: some View {
+        ShellWidgetSlotHost(
+            widget: widget, view: view, cuttable: cuttable,
+            size: CGSize(width: max(0, width), height: widget.size.height)
+        )
     }
 }
 
@@ -45,6 +72,7 @@ private struct ShellWidgetSlotHost: NSViewRepresentable {
     let widget: WorkspaceBarShellWidget
     let view: NSView?
     let cuttable: Bool
+    let size: CGSize
 
     func makeNSView(context _: Context) -> ShellWidgetClipView {
         ShellWidgetClipView(content: view)
@@ -66,7 +94,7 @@ private struct ShellWidgetSlotHost: NSViewRepresentable {
 
     private func update(_ clip: ShellWidgetClipView) {
         clip.update(
-            surface: widget.size,
+            surface: size,
             badge: widget.failure.map { ShellWidgetFailureBadge(name: widget.id, failure: $0) },
             keepsEnd: widget.lane == .trailing
         )

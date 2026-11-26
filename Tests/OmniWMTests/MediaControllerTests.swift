@@ -17,11 +17,14 @@ final class MediaControllerTests: XCTestCase {
         let (arrivals, arrived) = boundedChanges()
     }
 
-    private func controller(_ script: String) -> MediaController {
+    private func controller(
+        _ script: String,
+        summarize: @escaping @MainActor (String) async -> String? = MediaBarTitle.summarize
+    ) -> MediaController {
         MediaController(adapter: MediaController.Adapter(
             executable: URL(fileURLWithPath: "/usr/bin/perl"),
             arguments: ["-e", script]
-        ))
+        ), summarize: summarize)
     }
 
     private func record(_ controller: MediaController) -> Changes {
@@ -52,6 +55,17 @@ final class MediaControllerTests: XCTestCase {
         XCTAssertNil(ShellAction("media shuffle on"))
         XCTAssertEqual(ShellMediaCommand.repeat.adapterLine, "repeat")
         XCTAssertNil(ShellMediaCommand.shuffle.mediaKey)
+    }
+
+    func testVideoTypeFromNowPlaying() throws {
+        for (value, expected): (String, Bool?) in [
+            (#""kMRMediaRemoteNowPlayingInfoTypeVideo""#, true),
+            (#""kMRMediaRemoteNowPlayingInfoTypeAudio""#, false), ("2", true), ("1", false), ("null", nil)
+        ] {
+            let json = #"{"title":"Example","mediaType":\#(value)}"#
+            let media = try XCTUnwrap(MediaAdapterReader.parse(Data(json.utf8))?.media)
+            XCTAssertEqual(media.isVideo, expected)
+        }
     }
 
     func testShuffleAndRepeatDecodeOnlyFromKnownModes() throws {
@@ -104,6 +118,42 @@ final class MediaControllerTests: XCTestCase {
         XCTAssertEqual(decoded[0].artworkId, "a1")
         XCTAssertEqual(decoded[0].artwork?.width, 1)
         XCTAssertNil(decoded[1].media)
+    }
+
+    func testCompactTitleSurvivesSparsePauseAndResumeSnapshots() async {
+        var requests = 0
+        let controller = controller(#"""
+        $| = 1;
+        my $item = '"title":"A long video title that needs to be shortened for the bar","pid":1';
+        print qq({$item,"playing":true,"mediaType":2}\n);
+        while (<STDIN>) {
+            if (/pause/) { print qq({$item,"playing":false}\n); }
+            if (/play/) { print qq({"pid":0}\n{$item,"playing":true}\n); }
+            if (/next/) { print qq({"pid":1,"title":"Other","playing":true}\n); }
+            if (/previous/) { print qq({"pid":0}\n); }
+        }
+        """#) { _ in
+            requests += 1
+            return "Short label"
+        }
+        let changes = record(controller)
+        controller.setListening(true)
+        defer { controller.setListening(false) }
+        await wait(in: changes) { $0.last??.compactTitle == "Short label" }
+        controller.perform(.pause)
+        await wait(in: changes) { $0.last??.playing == false }
+        XCTAssertEqual(controller.media?.compactTitle, "Short label")
+        controller.perform(.play)
+        await wait(in: changes) { $0.last??.playing == true }
+        XCTAssertEqual(controller.media?.compactTitle, "Short label")
+        controller.perform(.next)
+        await wait(in: changes) { $0.last??.title == "Other" }
+        XCTAssertNil(controller.media?.compactTitle)
+        XCTAssertEqual(requests, 1)
+        XCTAssertFalse(changes.values.contains(nil))
+        controller.perform(.previous)
+        await wait(in: changes) { $0.last.map { $0 == nil } ?? false }
+        XCTAssertNil(controller.media)
     }
 
     func testTheAdapterRunsOnlyWhileListenedToAndReceivesCommands() async throws {

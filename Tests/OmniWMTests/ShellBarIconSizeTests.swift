@@ -83,6 +83,48 @@ final class ShellBarIconSizeTests: XCTestCase {
         }
     }
 
+    func testMediaBarSizesArtworkAndSwapsThePlaybackIndicator() throws {
+        let widget = try ShellRenderedWidget("media")
+        let bar = try bar(scale: 1)
+        var media = ShellMedia()
+        media.title = "A lengthy video title about configuring TopBar Plus"
+        media.bundle = "com.apple.Music"
+        media.artwork = "media/cover"
+        media.playing = true
+        widget.set("media") { media.write(into: &$0) }
+        widget.render(bar)
+        let originalSize = widget.surface.size
+        media.compactTitle = "iPhone Duo"
+        var playingSize: CGSize?
+        for ratio in [1.0, 16.0 / 9.0] {
+            media.artworkAspectRatio = ratio
+            widget.set("media") { media.write(into: &$0) }
+            widget.render(bar)
+            XCTAssertLessThan(widget.surface.size.width, originalSize.width - 40)
+            if let playingSize { XCTAssertEqual(widget.surface.size, playingSize) }
+            playingSize = widget.surface.size
+            XCTAssertTrue(widget.strings().contains("iPhone Duo"))
+            let art = try XCTUnwrap(widget.tree().first { $0.kind == .bitmap })
+            XCTAssertEqual(art.layout.width, Float(18 * ratio), accuracy: 0.01)
+            XCTAssertEqual(art.layout.height, 18)
+            let waveform = try XCTUnwrap(widget.tree().first { $0.kind == .shader })
+            XCTAssertFalse(waveform.content.audio)
+            XCTAssertGreaterThan(waveform.content.rate, 0)
+            let source = widget.text.string(waveform.content.text)
+            let directory = try XCTUnwrap(ShellDefaults.bundled).appendingPathComponent("shaders")
+            _ = try ShellShaderLibrary.pipeline(Data(contentsOf: directory.appendingPathComponent(source)), name: source)
+        }
+        media.artwork = nil
+        media.artworkAspectRatio = nil
+        media.playing = false
+        widget.set("media") { media.write(into: &$0) }
+        widget.render(bar)
+        XCTAssertEqual(widget.surface.size, playingSize)
+        XCTAssertFalse(widget.tree().contains { $0.kind == .shader || $0.kind == .bitmap })
+        XCTAssertTrue(widget.tree().contains { $0.kind == .image && widget.text.string($0.content.text) == media.bundle })
+        XCTAssertTrue(widget.tree().contains { $0.kind == .symbol && widget.text.string($0.content.text) == "play.fill" })
+    }
+
     func testSystemStatsNeedleTracksSharedCPUReading() throws {
         let widget = try ShellRenderedWidget("system-stats")
         let data = try bar(scale: 1)
@@ -233,8 +275,6 @@ final class ShellBarIconSizeTests: XCTestCase {
             media.title = "Northern Lights"
             media.artist = "Sample Artist"
             media.bundle = "com.apple.Music"
-            media.playing = true
-            media.rate = 1
             widget.set("media") { media.write(into: &$0) }
             widget.set("seconds") { $0.number(1012) }
         case "privacy":
