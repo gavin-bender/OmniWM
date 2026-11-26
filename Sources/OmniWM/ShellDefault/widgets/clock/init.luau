@@ -197,12 +197,33 @@ function render(ctx)
 end
 
 function popout(ctx)
-    if look.clockBar or ctx.data.bar.style.vertical then return calendar.popout(ctx) end
-    local hidden = eventsHidden(ctx)
-    return look.panel(ctx, {
-        calendar.content(ctx),
-        actions.row(if hidden then "eye" else "eye.slash",
+    if look.clockBar then return calendar.popout(ctx) end
+    if ctx.state.choosingFocus then
+        local rows = { actions.row("chevron.left", omniwm.l10n("Back"), function(ctx)
+            ctx.state.choosingFocus = false
+        end, look.width, true) }
+        local modes = ctx.data.focusModes or {}
+        for _, mode in modes do
+            local row = actions.row(mode.symbol, mode.name,
+                "focus " .. (if mode.active then "disable " else "enable ") .. mode.id, look.width, true)
+            if mode.active then
+                row[#row + 1] = ui.box{ grow = 1, h = 1 }
+                row[#row + 1] = look.glyph{ name = "checkmark", size = 12, color = "accent" }
+            end
+            rows[#rows + 1] = row
+        end
+        rows[#rows + 1] = actions.row("gearshape", omniwm.l10n("Focus Settings…"), "focus settings", look.width, true)
+        return look.panel(ctx, rows)
+    end
+    local rows = { calendar.content(ctx) }
+    if not ctx.data.bar.style.vertical then
+        local hidden = eventsHidden(ctx)
+        rows[#rows + 1] = actions.row(if hidden then "eye" else "eye.slash",
             if hidden then omniwm.l10n("Show upcoming events") else omniwm.l10n("Hide upcoming events"),
-            toggleEvents, look.width, true),
-    })
+            toggleEvents, look.width, true)
+    end
+    rows[#rows + 1] = actions.row(ctx.data.focusSymbol or "moon.fill", omniwm.l10n("Focus"), function(ctx)
+        ctx.state.choosingFocus = true
+    end, look.width, true)
+    return look.panel(ctx, rows)
 end

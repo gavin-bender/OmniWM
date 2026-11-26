@@ -176,7 +176,7 @@ final class ShellDataFeed {
     func start() {
         guard !started else { return }
         started = true
-        listenToFocus(!paused && demands(.focusSymbol))
+        listenToFocus(!paused && (demands(.focusSymbol) || demands(.focusModes)))
         listenToThermalPressure(!paused && demands(.thermalPressure))
         listenToAwake(!paused && demands(.awake))
         listenToMicrophone(!paused && demands(.microphone))

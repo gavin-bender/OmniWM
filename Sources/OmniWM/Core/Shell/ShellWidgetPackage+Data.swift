@@ -26,6 +26,9 @@ extension ShellWidgetPackage {
         if changed & ShellDataKey.clock.bit != 0 {
             setString(instance, .clock, next.clock)
         }
+        if changed & ShellDataKey.focusModes.bit != 0 {
+            setValue(instance, .focusModes) { next.focusModes.write(into: &$0) }
+        }
         if changed & ShellDataKey.focusSymbol.bit != 0 {
             setValue(instance, .focusSymbol) { writer in
                 next.focusSymbol.map { writer.string($0) } ?? writer.null()

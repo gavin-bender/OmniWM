@@ -621,6 +621,7 @@ export type Data = {
     clock: string,
     date: string,
     focusSymbol: string?,
+    focusModes: { { id: string, name: string, symbol: string, active: boolean } }?,
     seconds: number,
     cpu: number?,
     memory: number,

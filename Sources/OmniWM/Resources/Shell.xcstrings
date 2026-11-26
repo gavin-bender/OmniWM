@@ -1,6 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Focus Settings…" : { "extractionState" : "manual" },
     "%@ at %@" : {
       "extractionState" : "manual",
       "localizations" : {

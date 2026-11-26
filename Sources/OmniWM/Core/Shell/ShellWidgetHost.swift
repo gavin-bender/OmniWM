@@ -97,6 +97,7 @@ enum ShellWidgetSettingsDestination: String, Sendable {
 
 enum ShellAction: Equatable, Sendable {
     case wm(ShellRequest)
+    case selectFocus(id: String, enabled: Bool)
     case powerMode(ShellPowerMode)
     case volume(ShellVolumeCommand)
     case microphone(ShellMicrophoneCommand)
@@ -117,6 +118,10 @@ enum ShellAction: Equatable, Sendable {
     case trigger(widget: String, name: String, value: String?)
 
     private static let domains: [String: @Sendable ([String]) -> ShellAction?] = [
+        "focus": { words in
+            guard words.count == 2, ["enable", "disable"].contains(words[0]) else { return nil }
+            return .selectFocus(id: words[1], enabled: words[0] == "enable")
+        },
         "battery": { words in
             guard words.count == 2, words[0] == "mode" else { return nil }
             return ShellPowerMode(rawValue: words[1]).map(ShellAction.powerMode)
@@ -348,6 +353,7 @@ final class ShellWidgetHost {
     static var sealedTraceCapture: UInt64 = 0
     var traceCaptureContext: ShellFrameTraceContext?
     var traceImagesBegin: Task<Void, Never>?
+    var changingFocus = false
     var changingPowerMode = false
     var feed: ShellDataFeed?
     var observation: ShellDirectoryObservation?

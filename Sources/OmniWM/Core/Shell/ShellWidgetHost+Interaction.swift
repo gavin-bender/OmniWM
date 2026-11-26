@@ -122,6 +122,20 @@ extension ShellWidgetHost {
     func run(_ action: ShellAction, origin: ShellCommandOrigin, for state: WidgetState) {
         switch action {
         case let .wm(request): onCommand(request, origin)
+        case let .selectFocus(id, enabled):
+            guard !changingFocus, let modes = feed?.data.focusModes,
+                  let mode = modes.modes.first(where: { $0.id == id }) else { return }
+            changingFocus = true
+            closePopout()
+            Task {
+                defer { changingFocus = false }
+                if !(await ShellFocusControl.select(name: mode.name, enabled: enabled)) {
+                    let alert = NSAlert()
+                    alert.messageText = String(localized: "Couldn’t switch Focus")
+                    alert.informativeText = String(localized: "Add Focus to Control Center or the macOS menu bar, then try again.")
+                    alert.runModal()
+                }
+            }
         case let .powerMode(mode):
             guard !changingPowerMode, let power = feed?.data.power, let current = power.mode,
                   current != mode, mode != .high || power.supportsHighPower else { return }

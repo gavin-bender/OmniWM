@@ -1,6 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add Focus to Control Center or the macOS menu bar, then try again." : {},
+    "Couldn’t switch Focus" : {},
     "Connection saved on this Mac." : {},
     "Reconnect" : {},
     "Internal connection token" : {},

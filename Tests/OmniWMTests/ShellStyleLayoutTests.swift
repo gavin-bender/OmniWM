@@ -2681,10 +2681,10 @@ final class ShellStyleLayoutTests: XCTestCase {
         let assertions = directory.appending(path: "Assertions.json")
         try Data(#"{"data":[{"storeAssertionRecords":[{"assertionDetails":{"assertionDetailsModeIdentifier":"work"}}]}]}"#.utf8)
             .write(to: assertions)
-        try Data(#"{"data":[{"modeConfigurations":{"work":{"mode":{"symbolImageName":"briefcase.fill"}}}}]}"#.utf8)
+        try Data(#"{"data":[{"modeConfigurations":{"work":{"mode":{"name":"Work","symbolImageName":"briefcase.fill"}}}}]}"#.utf8)
             .write(to: directory.appending(path: "ModeConfigurations.json"))
-        let read = await ShellDataFeed.focusSymbol(in: directory)
-        let symbol = try XCTUnwrap(read)
+        let read = await ShellDataFeed.readFocusModes(in: directory)
+        let symbol = try XCTUnwrap(read.symbol)
         XCTAssertEqual(symbol, "briefcase.fill")
         let widget = try ShellRenderedWidget("clock")
         calendarFixture(widget)
@@ -2699,11 +2699,27 @@ final class ShellStyleLayoutTests: XCTestCase {
         XCTAssertLessThan(icon.maxX, time.minX)
         XCTAssertEqual(icon.midY, time.midY, accuracy: 1)
         try Data(#"{"data":[{"storeInvalidationRecords":[{}]}]}"#.utf8).write(to: assertions)
-        let inactive = await ShellDataFeed.focusSymbol(in: directory)
-        XCTAssertNil(inactive)
+        let inactive = await ShellDataFeed.readFocusModes(in: directory)
+        XCTAssertNil(inactive.symbol)
         widget.set("focusSymbol") { $0.null() }
         widget.render(ShellBarData())
         XCTAssertFalse(widget.strings().contains(symbol))
+        widget.layoutPopout()
+        let focusFrame = try frame("Focus")
+        let point = CGPoint(x: focusFrame.midX, y: focusFrame.midY)
+        widget.surface.press(at: point)
+        widget.surface.release(at: point)
+        widget.invoke(try XCTUnwrap(widget.actions.last), view: OMNI_VIEW_POPOUT)
+        for (modes, verb) in [(read, "disable"), (inactive, "enable")] {
+            widget.set("focusModes") { modes.write(into: &$0) }
+            widget.layoutPopout()
+            XCTAssertTrue(widget.strings(OMNI_VIEW_POPOUT).contains("Work"))
+            XCTAssertEqual(widget.strings(OMNI_VIEW_POPOUT).contains("checkmark"), modes.activeID != nil)
+            XCTAssertFalse(widget.surface.layout.core.elements { widget.text.string($0.action) == "focus " + verb + " work" }.isEmpty)
+            XCTAssertEqual(ShellAction("focus " + verb + " work"), .selectFocus(id: "work", enabled: verb == "enable"))
+        }
+        XCTAssertTrue(widget.strings(OMNI_VIEW_POPOUT).contains("Focus Settings…"))
+        XCTAssertFalse(widget.surface.layout.core.elements { widget.text.string($0.action) == "focus settings" }.isEmpty)
     }
 
     func testClockRequestsOneLabelForOverflowAndKeepsFullTitleInAgenda() throws {
