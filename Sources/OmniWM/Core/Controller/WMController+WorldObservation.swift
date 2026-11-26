@@ -7,6 +7,9 @@ import OmniWMIPC
 
 extension WMController {
     func handleSessionStateChanged(surfaceScope: SessionSurfaceInvalidationScope) {
+        axManager.nativeParks.restoreVisible { token in
+            workspaceManager.hiddenState(for: token) == nil
+        }
         pruneEdgePictures()
         intentLedger.cancelConfirmedWorkerRaise(unlessFocused: workspaceManager.nativeManagedFocusToken)
         axEventHandler.recheckVisibilityAfterFocusLoss()

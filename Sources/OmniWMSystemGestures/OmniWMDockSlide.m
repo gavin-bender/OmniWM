@@ -94,6 +94,25 @@ static int queueRequest(const void *request, size_t size) {
     return fd;
 }
 
+// yabai-sb 2.1.45 WINDOW_ORDER_LIST with a single window. A relative
+// window of zero orders it out (0) or back into its existing level (-1).
+bool omniwm_dock_order_parked_window(uint32_t window, bool visible) {
+    struct __attribute__((packed)) {
+        uint16_t length;
+        uint8_t opcode;
+        int32_t count;
+        uint32_t window;
+        int32_t order;
+        uint32_t relative;
+    } request = {17, 0x14, 1, window, visible ? -1 : 0, 0};
+    int fd = queueRequest(&request, sizeof(request));
+    if (fd < 0) return false;
+    uint8_t ack;
+    bool accepted = reply(fd, &ack, sizeof(ack)) && ack == 0;
+    close(fd);
+    return accepted;
+}
+
 // A column scroll only changes X. Leave scaling effects, resizes and vertical
 // placement to their owners. The Dock may move the window even when the separate
 // Space reassociation fails, so verify the drawing origin for every submission.

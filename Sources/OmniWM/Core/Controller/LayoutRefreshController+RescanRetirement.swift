@@ -87,6 +87,11 @@ extension LayoutRefreshController {
                 progress.seenKeys.insert(.init(pid: entry.pid, windowId: entry.windowId))
             }
 
+            for entry in trackedEntries where entry.hiddenState != nil && !progress.seenKeys.contains(entry.token)
+                && controller.axManager.nativeParks.stillExists(entry.token) {
+                progress.seenKeys.insert(entry.token)
+            }
+
             preserveScratchpadHiddenWindowsDuringFullRescan(
                 trackedEntries,
                 windowServerInfoByWindowId: enumerationSnapshot.windowServerInfoByWindowId,

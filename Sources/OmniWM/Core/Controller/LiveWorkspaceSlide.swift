@@ -261,6 +261,9 @@ extension WorkspaceSwipePresentation {
             cancel(flight, reason: "display-link-unavailable")
             return false
         }
+        for member in members where member.incoming {
+            controller.axManager.nativeParks.reveal(member.token)
+        }
         present(flight, at: mediaTimeProvider())
         if flight.isKeyboard, isCurrent(flight) {
             focusIncomingWindow(for: flight)
@@ -291,6 +294,11 @@ extension WorkspaceSwipePresentation {
             controller.axManager.markParkPending(for: entry.windowId, pid: entry.pid)
             refreshController.hideWindow(entry, monitor: monitor, side: refreshController.preferredHideSide(for: monitor),
                                          reason: .workspaceInactive)
+        }
+        if !keepingIncomingPlacement, let controller {
+            for member in slide.members where member.incoming && controller.workspaceManager.hiddenState(for: member.token) != nil {
+                controller.axManager.nativeParks.hide(member.token)
+            }
         }
         guard !translated.isEmpty else { return unresolved.isEmpty }
         for member in translated { retiredSlideWindows[member.token] = member.window }

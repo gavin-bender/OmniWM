@@ -19,7 +19,6 @@ final class AXManager {
     var onFrameApplyTerminated: ((AXFrameApplyResult) -> Void)?
     var onFrameApplySucceeded: ((AXFrameApplyResult) -> Void)?
     var onStableSizeClamp: ((AXFrameApplyResult) -> Void)?
-    var finishParkPlacement: ((AXFrameApplyResult) -> CGRect?)?
     var onParkFrameApplyFailed: ((AXFrameApplyResult) -> Void)?
     var onManagedWindowBindingFailed: ((pid_t) -> Void)? {
         get { managedWindowBindings.onManagedWindowBindingFailed }
@@ -56,6 +55,7 @@ final class AXManager {
 
     private var skyLightLivePositionByWindowId: [Int: CGPoint] = [:]
 
+    let nativeParks = NativeParkedWindows()
     let parkLedger = AXParkFrameLedger()
 
     var pendingParkWindowIds: Set<Int> {
@@ -88,6 +88,7 @@ final class AXManager {
     }
 
     func installWorkspaceObservers() {
+        nativeParks.start()
         if appTerminationObserver == nil {
             setupTerminationObserver()
         }
@@ -427,6 +428,7 @@ extension AXManager {
     }
 
     private func cancelAllPendingFrameState() {
+        nativeParks.stop()
         parkLedger.shutdown()
 
         let retryWindowIds = Set(pendingFrameRetryTasksByWindowId.keys)

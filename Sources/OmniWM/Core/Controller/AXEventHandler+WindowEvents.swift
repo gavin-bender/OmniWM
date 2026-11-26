@@ -147,6 +147,7 @@ extension AXEventHandler {
         else { return }
         lifecycleQueries.visibilityRechecksAfterFocusLoss.remove(token)
         if !isOrderedIn {
+            guard !controller.axManager.nativeParks.owns(token) else { return }
             let topology = controller.workspaceManager.spaceTopology
             guard !appFullscreen,
                   !topology.isWindowOnFullscreenSpace(token.windowId),
