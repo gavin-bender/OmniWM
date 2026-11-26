@@ -6,6 +6,7 @@ import SwiftUI
 
 struct ProductivityNotionSettings: View {
     let source: String
+    let refresh: () -> Void
     @State private var token = ""
     @State private var message = ""
 
@@ -15,6 +16,12 @@ struct ProductivityNotionSettings: View {
             HStack {
                 Button("Save Token") { update(token.trimmingCharacters(in: .whitespacesAndNewlines)) }
                     .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Reconnect") {
+                    let status = ProductivityNotionCredential.reconnect(source: source)
+                    if status == errSecSuccess { refresh() }
+                    message = status == errSecSuccess ? String(localized: "Keychain reconnected.")
+                        : SecCopyErrorMessageString(status, nil) as String? ?? String(localized: "Keychain unavailable.")
+                }
                 Button("Remove Token") { update(nil) }
             }
             Text("Share your checklist page with this Notion connection and paste its link above.")
@@ -26,6 +33,7 @@ struct ProductivityNotionSettings: View {
     private func update(_ value: String?) {
         let status = ProductivityNotionCredential.save(value, source: source)
         if status == errSecSuccess {
+            refresh()
             token = ""
             message = value == nil ? String(localized: "Token removed.") : String(localized: "Token saved in Keychain.")
         } else {

@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 OmniNull — https://github.com/OmniNull/OmniWM
 local notion = {}
 local page, selectedPage, request, poll
-local rows, problem
+local rows, problem, destination
 local base = "https://api.notion.com/v1/"
 
 local function validID(id)
@@ -47,7 +47,7 @@ local function pageID(ctx)
 end
 
 local function failure(result)
-    if result.error == "notion_keychain_locked" then return omniwm.l10n("Unlock your login Keychain. If access is still blocked, remove and save the token in widget settings.") end
+    if result.error == "notion_keychain_locked" then return omniwm.l10n("Reconnect your saved token in Notion settings.") end
     if result.error == "notion_token_unavailable" then return omniwm.l10n("Save your connection token in widget settings.") end
     if result.status == 401 then return omniwm.l10n("The Notion token was rejected.") end
     if result.status == 403 or result.status == 404 then return omniwm.l10n("Check page sharing and connection permissions.") end
@@ -63,13 +63,18 @@ local function send(id, method, path, body, complete, onError)
         request = nil
         if not result.ok then
             if onError and onError(result) then return end
+            if result.error and result.error:match("^network_") then destination = "permissions"
+            elseif result.status == 403 or result.status == 404 then destination = "notion" end
             problem = failure(result)
             return
         end
         complete(result.json)
     end)
     request = handle
-    if not handle then problem = err or omniwm.l10n("Refresh unavailable.") end
+    if not handle then
+        if err and err:match("^network_") then destination = "permissions" end
+        problem = err or omniwm.l10n("Refresh unavailable.")
+    end
 end
 
 -- Compare all-day dates as written and timed events in the Mac's local time zone.
@@ -110,7 +115,7 @@ local function readCalendar(id, databaseID, viewID)
             local title = field(props, "title", "name")
             local progress = field(props, "status", "status") or field(props, "checkbox", "done")
             if not (date and title and progress) then
-                problem = omniwm.l10n("Calendar tasks need a date and a Status or checkbox property.")
+                problem, destination = omniwm.l10n("Calendar tasks need a date and a Status or checkbox property."), "notion"
                 return
             end
             local kind = props[progress].type
@@ -124,7 +129,7 @@ local function readCalendar(id, databaseID, viewID)
                     elseif group.name == "To-do" then openID = group.option_ids[1] end
                 end
                 if not doneID or not openID then
-                    problem = omniwm.l10n("Check the Notion Status groups for this calendar.")
+                    problem, destination = omniwm.l10n("Check the Notion Status groups for this calendar."), "notion"
                     return
                 end
             end
@@ -177,7 +182,7 @@ local function readCalendar(id, databaseID, viewID)
     local function readDatabase()
         send(id, "GET", "databases/" .. databaseID, nil, function(database)
             if type(database.data_sources) ~= "table" or #database.data_sources ~= 1 then
-                problem = omniwm.l10n("Copy the link to a specific calendar view in Notion.")
+                problem, destination = omniwm.l10n("Copy the link to a specific calendar view in Notion."), "notion"
                 return
             end
             readSource(database.data_sources[1].id, {})
@@ -198,7 +203,7 @@ local function refresh(id)
         page, rows, request, problem = id, nil, nil, nil
     end
     if request or not id or id == "" then return end
-    problem = nil
+    problem, destination = nil, nil
     local databaseID, viewID = id:match("^(%x+)/(%x+)$")
     if viewID then
         readCalendar(id, databaseID, viewID)
@@ -239,7 +244,7 @@ end
 function notion.toggle(ctx, task)
     if request or pageID(ctx) ~= page or not rows or not table.find(rows, task) then return end
     local checked = not task.checked
-    problem = nil
+    problem, destination = nil, nil
     local path = "blocks/" .. task.id
     local changes = { to_do = { checked = checked } }
     if task.property then
@@ -273,13 +278,20 @@ end
 function notion.snapshot(ctx)
     local id = pageID(ctx)
     selectedPage = id
-    if id == "" then return nil, omniwm.l10n("Set a checklist page and token in widget settings.") end
-    if not id then return nil, omniwm.l10n("Paste the page link from Notion’s Share menu.") end
+    if id == "" then return nil, omniwm.l10n("Set a checklist page and token in widget settings."), false, "widget" end
+    if not id then return nil, omniwm.l10n("Paste the page link from Notion’s Share menu."), false, "widget" end
     if id ~= page then return nil, omniwm.l10n("Refresh to load your checklist.") end
     if rows and #rows == 0 and id:find("/", 1, true) and not problem then
         return rows, omniwm.l10n("No calendar tasks scheduled for today."), request ~= nil
     end
-    return rows, problem or (if not rows then omniwm.l10n("Loading checklist…") else nil), request ~= nil
+    return rows, problem or (if not rows then omniwm.l10n("Loading checklist…") else nil), request ~= nil, if problem then destination or "widget" else nil
+end
+
+function notion.openPage(ctx)
+    local id = pageID(ctx)
+    if not id or id == "" then return end
+    local database, view = id:match("^(%x+)/(%x+)$")
+    omniwm.open("https://www.notion.so/" .. (if database then database .. "?v=" .. view else id))
 end
 
 return notion

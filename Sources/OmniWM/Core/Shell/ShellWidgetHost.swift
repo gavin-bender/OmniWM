@@ -91,6 +91,10 @@ enum ShellSettingsPane: String, Sendable {
     }
 }
 
+enum ShellWidgetSettingsDestination: String, Sendable {
+    case widget, permissions, applications
+}
+
 enum ShellAction: Equatable, Sendable {
     case wm(ShellRequest)
     case powerMode(ShellPowerMode)
@@ -107,6 +111,7 @@ enum ShellAction: Equatable, Sendable {
     case bluetooth(ShellBluetoothCommand)
     case session(ShellSessionCommand)
     case appearance(ShellAppearanceCommand)
+    case widgetSettings(ShellWidgetSettingsDestination)
     case settings(ShellSettingsPane)
     case toggle(widget: String)
     case trigger(widget: String, name: String, value: String?)
@@ -135,7 +140,10 @@ enum ShellAction: Equatable, Sendable {
 
     init?(_ text: String) {
         let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
-        if words.count == 3, words[0] == "shell", words[1] == "toggle" {
+        if words.count == 3, words[0] == "shell", words[1] == "settings",
+           let destination = ShellWidgetSettingsDestination(rawValue: words[2]) {
+            self = .widgetSettings(destination)
+        } else if words.count == 3, words[0] == "shell", words[1] == "toggle" {
             self = .toggle(widget: words[2])
         } else if words.count >= 4, words[0] == "shell", words[1] == "trigger" {
             let value = words.count > 4 ? words[4...].joined(separator: " ") : nil
@@ -379,6 +387,7 @@ final class ShellWidgetHost {
     var onBadgesDemandChange: (@MainActor (Bool) -> Void)?
     var onConfigChange: (@MainActor (ShellConfig) -> Void)?
     var onPaletteChange: (@MainActor (ShellTheme) -> Void)?
+    var onWidgetSettings: (@MainActor (String, ShellWidgetSettingsDestination) -> Void)?
     var onWidgetMenu: (@MainActor (ShellWidgetMenuRequest) -> Void)?
     var onToggleNamesChange: (@MainActor () -> Void)?
     var onWidgetsChange: (@MainActor () -> Void)?

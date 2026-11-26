@@ -1,6 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Keychain reconnected." : {},
+    "Reconnect" : {},
     "Internal connection token" : {},
     "Keychain unavailable." : {},
     "Notion checklists, focus timers and lofi radio in Kaset." : {},

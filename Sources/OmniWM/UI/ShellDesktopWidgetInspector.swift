@@ -44,8 +44,10 @@ struct ShellDesktopWidgetInspector: View {
         } header: { Text("Options") }
             footer: { Text("Shared by all displays in this style.") }
         if widget == "productivity", let url = editor.snapshot?.config.widget(widget) {
-            ProductivityNotionSettings(source: ShellWidgetPrincipal.source(of: url.deletingLastPathComponent()))
-                .id(url)
+            ProductivityNotionSettings(source: ShellWidgetPrincipal.source(of: url.deletingLastPathComponent())) {
+                _ = editor.controller.workspaceBarManager.shellHost?.trigger(widget, name: "refresh", value: nil)
+            }
+            .id(url)
         }
         if widget == "world-clock" {
             ShellDesktopClocksDraft(editor: editor)

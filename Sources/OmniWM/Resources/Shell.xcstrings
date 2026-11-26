@@ -1,6 +1,10 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Open Applications" : { "extractionState" : "manual" },
+    "Notion Settings" : { "extractionState" : "manual" },
+    "Network & Permissions" : { "extractionState" : "manual" },
+    "Open in Notion" : { "extractionState" : "manual" },
     "Calendar tasks need a date and a Status or checkbox property." : {
       "extractionState" : "manual"
     },
@@ -91,7 +95,7 @@
     "Resume" : {
       "extractionState" : "manual"
     },
-    "Unlock your login Keychain. If access is still blocked, remove and save the token in widget settings." : {
+    "Reconnect your saved token in Notion settings." : {
       "extractionState" : "manual"
     },
     "Save your connection token in widget settings." : {

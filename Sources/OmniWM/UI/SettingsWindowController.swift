@@ -26,6 +26,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         updateCoordinator: (any AppUpdateCoordinating)? = nil,
         section: SettingsSection? = nil,
         anchor: String? = nil,
+        itemID: String? = nil,
         presentMonitorSetup: Bool = false,
         appRuleDraft: AppRuleDraft? = nil,
         launcherRequest: LauncherEditorRequest? = nil
@@ -37,7 +38,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         if presentMonitorSetup {
             navigation.requestMonitorSetupPresentation()
         } else if let section {
-            navigation.request(SettingsRoute(section: section, anchor: anchor))
+            navigation.request(SettingsRoute(section: section, anchor: anchor, itemID: itemID))
         }
         if let launcherRequest { navigation.presentLauncherEntry(launcherRequest) }
         if let appRuleDraft {

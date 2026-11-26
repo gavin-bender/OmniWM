@@ -191,6 +191,9 @@ extension ShellWidgetHost {
             if !command.perform(), let url = ShellSettingsPane.appearance.url {
                 NSWorkspace.shared.open(url)
             }
+        case let .widgetSettings(destination):
+            closePopout()
+            onWidgetSettings?(state.name, destination)
         case let .settings(pane):
             if let url = pane.url {
                 NSWorkspace.shared.open(url)

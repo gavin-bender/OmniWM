@@ -220,6 +220,18 @@ extension WorkspaceBarManager {
                 await bridge.publishEvent(.shellWidgets)
             }
         }
+        host.onWidgetSettings = { [weak self] name, destination in
+            guard let controller = self?.controller else { return }
+            switch destination {
+            case .widget:
+                SettingsWindowController.shared.show(settings: controller.settings, controller: controller,
+                                                     section: .styles, itemID: name)
+            case .permissions:
+                controller.statusBarController?.openSettings(section: .network, anchor: NetworkPermissionsPage.anchor(.bar, name))
+            case .applications:
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications", isDirectory: true))
+            }
+        }
         host.onWidgetMenu = { [weak self] request in
             self?.showWidgetMenu(request)
         }

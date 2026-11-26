@@ -35,6 +35,8 @@ function trigger(ctx, event)
     if event.source == "host" and event.name == "reloaded" then
         timer.restore()
         notion.start(ctx)
+    elseif event.name == "refresh" then
+        notion.refresh(ctx)
     elseif event.name == "status" then
         local rows, message = notion.snapshot(ctx)
         local done, count = totals(rows)
@@ -65,7 +67,7 @@ function render(ctx)
 end
 
 local function tasks(ctx)
-    local rows, message, busy = notion.snapshot(ctx)
+    local rows, message, busy, destination = notion.snapshot(ctx)
     local done, count = totals(rows)
     local list = { gap = 4, center = false,
         ui.row{ w = 284, gap = 8, look.text{ text = omniwm.l10n("Today in Notion"), size = 14, weight = "semibold" },
@@ -91,8 +93,17 @@ local function tasks(ctx)
                 look.text{ text = page .. " / " .. pages, size = 11 },
                 button("next", "›", function(next) next.state.taskPage = math.min(pages, page + 1) end, 30) }))
         end
-    elseif rows and not message then message = omniwm.l10n("No checkboxes on this page.") end
+    elseif rows and not message then
+        message, destination = omniwm.l10n("No checkboxes on this page."), "widget"
+    end
     if message then table.insert(list, animated(message, look.text{ text = message, size = 12, role = "secondary", maxWidth = 284, lines = 2 })) end
+    if destination == "notion" then
+        table.insert(list, button("open-notion", omniwm.l10n("Open in Notion"), notion.openPage, 140))
+    elseif destination == "permissions" then
+        table.insert(list, button("open-permissions", omniwm.l10n("Network & Permissions"), "shell settings permissions", 170))
+    elseif destination then
+        table.insert(list, button("open-settings", omniwm.l10n("Notion Settings"), "shell settings widget", 140))
+    end
     return animated("notion", ui.column(list))
 end
 
@@ -123,11 +134,16 @@ local function radio(ctx)
         end)
         if not handle then next.state.radioError = omniwm.l10n("Couldn’t open Kaset.") end
     end
-    return animated("radio", ui.row{ w = 284, gap = 9, pad = 8, radius = 10, fill = "surface", onClick = play,
+    local station = animated("radio", ui.row{ w = 284, gap = 9, pad = 8, radius = 10, fill = "surface", onClick = play,
         look.glyph{ name = "radio", size = 16 }, ui.column{ gap = 2, center = false,
             look.text{ text = omniwm.l10n("Lofi hip hop radio"), size = 13, weight = "medium" },
             look.text{ text = ctx.state.radioError or "Kaset", size = 11, color = if ctx.state.radioError then "error" else "secondaryForeground" } },
         ui.box{ grow = 1 }, animated(if pause then "pause" else "play", look.glyph{ name = if pause then "pause.fill" else "play.fill", size = 13 }) })
+    if ctx.state.radioError then
+        return ui.column{ gap = 4, center = false, station,
+            button("kaset-applications", omniwm.l10n("Open Applications"), "shell settings applications", 150) }
+    end
+    return station
 end
 
 function popout(ctx)

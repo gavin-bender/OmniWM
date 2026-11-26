@@ -10,23 +10,29 @@ enum ProductivityNotionCredential {
 
     private static let tokens = OSAllocatedUnfairLock(initialState: [String: String]())
 
-    private static func item(_ source: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "com.barut.OmniWM.productivity.notion",
+    private static func item(_ source: String, legacy: Bool = false) -> [String: Any] {
+        let service = legacy ? "com.barut.OmniWM" : (Bundle.main.bundleIdentifier ?? "com.barut.OmniWM") + ".widget"
+        return [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service + ".productivity.notion",
          kSecAttrAccount as String: source]
     }
 
     static func save(_ token: String?, source: String) -> OSStatus {
         tokens.withLock { cache in
             let status = write(token, source: source)
-            if status == errSecSuccess { cache[source] = token }
-            return status
+            guard status == errSecSuccess else { return status }
+            cache[source] = nil
+            if let token, (try? readSilently(source: source)) != token { return errSecInteractionNotAllowed }
+            cache[source] = token
+            return errSecSuccess
         }
     }
 
     private static func write(_ token: String?, source: String) -> OSStatus {
         let query = item(source)
         guard let token else {
+            let legacyStatus = SecItemDelete(item(source, legacy: true) as CFDictionary)
+            guard legacyStatus == errSecSuccess || legacyStatus == errSecItemNotFound else { return legacyStatus }
             let status = SecItemDelete(query as CFDictionary)
             return status == errSecItemNotFound ? errSecSuccess : status
         }
@@ -79,16 +85,42 @@ enum ProductivityNotionCredential {
         else { throw ShellHTTPFailure("notion_keychain_locked") }
         defer { _ = SecKeychainSetUserInteractionAllowed(previous.boolValue) }
 
-        var query = item(source)
-        query[kSecReturnData as String] = true
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let (status, token) = read(source)
         if status == errSecInteractionNotAllowed || status == errSecAuthFailed {
             throw ShellHTTPFailure("notion_keychain_locked")
         }
-        guard status == errSecSuccess, let data = result as? Data,
-              let token = String(data: data, encoding: .utf8)
+        guard status == errSecSuccess, let token
         else { throw ShellHTTPFailure("notion_token_unavailable") }
         return token
+    }
+
+    private static func read(_ source: String) -> (OSStatus, String?) {
+        for legacy in [false, true] {
+            var query = item(source, legacy: legacy)
+            query[kSecReturnData as String] = true
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            if status == errSecItemNotFound { continue }
+            guard status == errSecSuccess, let data = result as? Data,
+                  let token = String(data: data, encoding: .utf8) else {
+                return (status == errSecSuccess ? errSecDecode : status, nil)
+            }
+            return (errSecSuccess, token)
+        }
+        return (errSecItemNotFound, nil)
+    }
+
+    // Called only by the user's Reconnect button. Allow Keychain to request consent
+    // here, then verify a fresh noninteractive read before reporting success.
+    static func reconnect(source: String) -> OSStatus {
+        tokens.withLock { cache in
+            let (status, token) = read(source)
+            guard status == errSecSuccess, let token else { return status }
+            let saved = write(token, source: source)
+            guard saved == errSecSuccess else { return saved }
+            guard (try? readSilently(source: source)) == token else { return errSecInteractionNotAllowed }
+            cache[source] = token
+            return errSecSuccess
+        }
     }
 }
