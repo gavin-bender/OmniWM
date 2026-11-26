@@ -16,6 +16,17 @@ final class LiveWorkspaceSlide {
         let incoming: Bool
     }
 
+    struct HostedMember {
+        let token: WindowToken
+        let layout: CGRect
+        let original: CGRect
+        let wasVisible: Bool
+        let incoming: Bool
+    }
+
+    private weak var hostedManager: ShellAppWindowManager?
+    private var hostedMembers: [HostedMember]
+
     typealias PositionWriter = @MainActor (Member, CGRect, Bool) -> Bool
 
     let members: [Member]
@@ -27,6 +38,7 @@ final class LiveWorkspaceSlide {
 
     init(
         members: [Member], viewport: CGRect, dockDisplay: CGRect? = nil,
+        hostedManager: ShellAppWindowManager? = nil, hostedMembers: [HostedMember] = [],
         writeDockPosition: @escaping PositionWriter = { member, frame, verify in
             // AppKit can animate AX position writes for enhanced-UI apps. The
             // physical move from the parking strip must finish before the reveal.
@@ -36,6 +48,8 @@ final class LiveWorkspaceSlide {
             return AXWindowService.setFrame(member.window, frame: frame, components: .position, verify: verify).failureReason == nil
         }
     ) {
+        self.hostedManager = hostedManager
+        self.hostedMembers = hostedMembers
         self.members = members
         self.viewport = viewport
         if let dockDisplay {
@@ -76,6 +90,20 @@ final class LiveWorkspaceSlide {
     }
 
     func update(source: CGVector, destination: CGVector) -> Bool {
+        if let manager = hostedManager {
+            for member in hostedMembers {
+                let offset = member.incoming ? destination : source
+                let frame = member.layout.offsetBy(dx: offset.dx, dy: offset.dy)
+                let visible = viewport.intersects(frame)
+                guard let window = manager.windows[member.token] else { return false }
+                if visible, window.frame != frame {
+                    manager.setFrame(frame, for: member.token)
+                }
+                if window.isVisible != visible {
+                    manager.setHidden(!visible, for: member.token)
+                }
+            }
+        }
         if let dockSlide {
             return dockSlide.update(members, source: source, destination: destination)
         }
@@ -118,6 +146,17 @@ final class LiveWorkspaceSlide {
         return true
     }
 
+    func finishHostedWindows(committed: Bool) {
+        guard let manager = hostedManager else { return }
+        for member in hostedMembers {
+            let visible = committed ? member.incoming : member.wasVisible
+            if !visible { manager.setHidden(true, for: member.token) }
+            manager.setFrame(committed ? member.layout : member.original, for: member.token)
+            if visible { manager.setHidden(false, for: member.token) }
+        }
+        hostedMembers.removeAll()
+    }
+
     func adoptPlacedWindows(in controller: WMController, destination: WorkspaceSwipePresentation.Workspace) {
         for member in members where member.incoming {
             guard let entry = controller.workspaceManager.entry(for: member.token),
@@ -152,6 +191,7 @@ final class LiveWorkspaceSlide {
     }
 
     func restore(keepingIncomingPlacement: Bool, retryPark: (Member) -> Void) -> [Member] {
+        finishHostedWindows(committed: keepingIncomingPlacement)
         var unparked: [Member] = []
         let unresolved = dockSlide?.restore(keepingIncomingPlacement: keepingIncomingPlacement, unparked: &unparked) ?? []
         for member in unparked { retryPark(member) }
@@ -171,13 +211,23 @@ final class LiveWorkspaceSlide {
 extension WorkspaceSwipePresentation {
     func beginLiveSlide(_ flight: Flight, tracksGesture: Bool = true) -> Bool {
         guard let controller, let refreshController, flights[flight.preparation.monitor.id] == nil, participantsAreCurrent(flight) else { return false }
-        guard (flight.preparation.source.items.isEmpty && flight.destination.items.isEmpty) || AXIsProcessTrusted() else { return false }
+
         let monitor = flight.preparation.monitor
         let hideSide = refreshController.preferredHideSide(for: monitor)
         var members: [LiveWorkspaceSlide.Member] = []
+        var hosted: [LiveWorkspaceSlide.HostedMember] = []
         for (workspace, incoming) in [(flight.preparation.source, false), (flight.destination, true)] {
             for item in workspace.items {
-                guard let window = controller.workspaceManager.entry(for: item.handle)?.axRef,
+                guard let entry = controller.workspaceManager.entry(for: item.handle) else { return false }
+                if let metadata = entry.target.hostedMetadata {
+                    // AppKit moves attached windows with their parent.
+                    guard metadata.role.parent == nil else { continue }
+                    guard let window = controller.shellAppWindowManager.windows[item.token] else { return false }
+                    hosted.append(.init(token: item.token, layout: item.frame, original: window.frame,
+                                        wasVisible: window.isVisible, incoming: incoming))
+                    continue
+                }
+                guard AXIsProcessTrusted(), let window = entry.axRef,
                       let original = try? AXWindowService.frame(window) else { return false }
                 let constraints = refreshController.destinationConstraints(for: item.token, on: monitor)
                 let isFixed = constraints.isFixed || (flight.axis == .vertical && AXWindowService.sizeSettable(window) == false)
@@ -193,7 +243,8 @@ extension WorkspaceSwipePresentation {
         guard members.allSatisfy({ pendingSlideResets[$0.token] == nil }) else { return false }
         for member in members { retiredSlideWindows[member.token] = nil }
         flight.liveSlide = LiveWorkspaceSlide(
-            members: members, viewport: flight.preparation.frame, dockDisplay: flight.axis == .vertical ? monitor.frame : nil
+            members: members, viewport: flight.preparation.frame, dockDisplay: flight.axis == .vertical ? monitor.frame : nil,
+            hostedManager: controller.shellAppWindowManager, hostedMembers: hosted
         )
         install(flight, after: nil, tracksGesture: tracksGesture)
         if (flight.isKeyboard || flight.liveSlide?.followsDisplayLink == true || flight.motion.target != nil),

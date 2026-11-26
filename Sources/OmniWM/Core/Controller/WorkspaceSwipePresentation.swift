@@ -497,6 +497,7 @@ extension WorkspaceSwipePresentation {
             cancel(flight, reason: "commit-failed")
             return
         }
+        flight.liveSlide?.finishHostedWindows(committed: true)
         if let slide = flight.liveSlide, !slide.followsDisplayLink {
             slide.adoptPlacedWindows(in: controller, destination: flight.destination)
             flight.liveSlide = nil

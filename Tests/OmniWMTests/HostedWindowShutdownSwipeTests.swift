@@ -7,6 +7,43 @@ import XCTest
 
 @MainActor
 final class HostedWindowShutdownSwipeTests: XCTestCase {
+    func testSettingsWindowCanSlideOntoAndOffWorkspaceFour() throws {
+        let fixture = try HostedManagementFixture()
+        defer { fixture.close() }
+        let window = fixture.manager.makeWindow(fixture.definition)
+        let monitor = fixture.destinationMonitor
+        let layout = CGRect(origin: monitor.frame.origin, size: window.frame.size)
+        window.setFrame(layout, display: false)
+        let token = try XCTUnwrap(fixture.manager.admitSettingsWindow(window, to: fixture.destinationOther))
+        let handle = try XCTUnwrap(fixture.world.handle(for: token))
+        let swipe = fixture.controller.layoutRefreshController.workspaceSwipe
+        let three = WorkspaceSwipePresentation.Workspace(id: fixture.destination, items: [])
+        let four = WorkspaceSwipePresentation.Workspace(id: fixture.destinationOther, items: [.init(handle: handle, frame: layout)])
+        for (source, destination) in [(three, four), (four, three)] {
+            let incoming = destination.id == four.id
+            XCTAssertTrue(fixture.world.setActiveWorkspace(source.id, on: monitor.id))
+            fixture.manager.setHidden(incoming, for: token)
+            let original = window.frame
+            let preparation = WorkspaceSwipePresentation.Preparation(
+                monitor: monitor, frame: monitor.visibleFrame, source: source,
+                previous: incoming ? nil : destination, next: incoming ? destination : nil
+            )
+            let flight = WorkspaceSwipePresentation.Flight(
+                preparation: preparation, destination: destination, axis: .horizontal,
+                cumulative: 0, isNext: incoming, timestamp: 1, recognitionMovement: nil, captureFree: true
+            )
+            XCTAssertTrue(swipe.beginLiveSlide(flight))
+            let slide = try XCTUnwrap(flight.liveSlide)
+            let offset = CGVector(dx: 40, dy: 0)
+            XCTAssertTrue(slide.update(source: offset, destination: offset))
+            XCTAssertEqual(window.frame.minX, layout.minX + offset.dx)
+            XCTAssertTrue(window.isVisible)
+            swipe.cancel(flight, reason: "test")
+            XCTAssertEqual(window.frame, original)
+            XCTAssertEqual(window.isVisible, !incoming)
+        }
+    }
+
     func testShutdownCancelsConcurrentSwipesBeforeRemovalCanSettleFocus() async throws {
         let fixture = try HostedManagementFixture()
         defer { fixture.close() }
