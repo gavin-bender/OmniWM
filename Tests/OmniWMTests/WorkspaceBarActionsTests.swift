@@ -5,6 +5,7 @@ import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
+import SwiftUI
 @testable import OmniWM
 import XCTest
 
@@ -566,9 +567,13 @@ final class WorkspaceBarActionsTests: XCTestCase {
 
     func testToggleWorkspaceLayoutCyclesThroughTabbed() throws {
         let controller = try makeFixture(followsFocus: false).controller
-        for expected in [ActiveLayoutKind.dwindle, .tabbed, .niri] {
+        defer { controller.columnModeToast.destroy() }
+        for expected in [LayoutType.dwindle, .tabbed, .niri] {
             controller.commandHandler.toggleWorkspaceLayout()
-            XCTAssertEqual(controller.activeStatusBarWorkspaceSummary()?.layout, expected)
+            XCTAssertEqual(controller.activeStatusBarWorkspaceSummary()?.layout.rawValue, expected.rawValue)
+            let panel = try XCTUnwrap(controller.ownedWindowRegistry.visibleWindows(kind: .columnModeToast).first)
+            let view = try XCTUnwrap(panel.contentView as? NSHostingView<ColumnModeToastView>)
+            XCTAssertEqual(view.rootView.message, expected.localizedDisplayName)
         }
     }
 

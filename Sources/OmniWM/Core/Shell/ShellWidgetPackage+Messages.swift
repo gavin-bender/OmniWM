@@ -58,8 +58,8 @@ extension ShellWidgetPackage {
             log(1) { _ in line }
         case let .gesture(pending):
             await invokeGesture(pending)
-        case let .trigger(name, value):
-            await trigger(name, value: value, in: script)
+        case let .trigger(name, value, key):
+            await trigger(name, value: value, in: script, only: key)
         case let .popout(key, open, trace):
             await ShellFrameTrace.$context.withValue(trace) {
                 await setPopout(.bar(key), open: open, in: script)

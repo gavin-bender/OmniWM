@@ -171,6 +171,23 @@ final class ShellFocusRibbonTests: XCTestCase {
         }
     }
 
+    func testLayoutToastReplacesPreviousModeAndDismissesBelowNotch() throws {
+        let fixture = try Fixture(notch: true)
+        fixture.render()
+        for label in ["Dwindle (BSP)", "Tabbed", "Niri (Scrolling)"] {
+            VitreusFixture.trigger(fixture.widget.instance, "layout-toast", label)
+            fixture.render()
+            let text = try XCTUnwrap(fixture.widget.surface.layout.core.elements {
+                fixture.widget.text.string($0.text) == label
+            }.first)
+            XCTAssertGreaterThanOrEqual(CGRect(fixture.widget.surface.layout.core.absoluteFrame(of: text)).minY, 32)
+        }
+        let timer = try XCTUnwrap(fixture.drain().last { !$0.cancelled })
+        XCTAssertTrue(fixture.complete(timer))
+        fixture.render()
+        XCTAssertEqual(try fixture.panel().layout.height, 36)
+    }
+
     func testBaselineIsCompactAndNiriFocusExpandsWithNativeMotionWithoutKeyboardFocus() throws {
         for notch in [false, true] {
             let fixture = try Fixture(notch: notch)

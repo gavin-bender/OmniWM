@@ -36,8 +36,8 @@ final class ColumnModeToastController {
     }
 
     func show(
-        isTabbed: Bool,
-        columnFrame: CGRect,
+        message: String,
+        anchorFrame: CGRect,
         visibleFrame: CGRect,
         motion: MotionSnapshot,
         source: Source
@@ -50,9 +50,9 @@ final class ColumnModeToastController {
         dismissalTask?.cancel()
         generation += 1
         self.source = source
-        hostingView.rootView = ColumnModeToastView(isTabbed: isTabbed)
+        hostingView.rootView = ColumnModeToastView(message: message)
         panel.setFrame(
-            Self.pillFrame(size: hostingView.fittingSize, columnFrame: columnFrame, visibleFrame: visibleFrame),
+            Self.pillFrame(size: hostingView.fittingSize, anchorFrame: anchorFrame, visibleFrame: visibleFrame),
             display: true
         )
         NSAnimationContext.runAnimationGroup { context in
@@ -89,9 +89,9 @@ final class ColumnModeToastController {
         self.surface = nil
     }
 
-    static func pillFrame(size: CGSize, columnFrame: CGRect, visibleFrame: CGRect) -> CGRect {
-        let x = columnFrame.midX - size.width / 2
-        let y = columnFrame.maxY - topInset - size.height
+    static func pillFrame(size: CGSize, anchorFrame: CGRect, visibleFrame: CGRect) -> CGRect {
+        let x = anchorFrame.midX - size.width / 2
+        let y = anchorFrame.maxY - topInset - size.height
         let clampedX = min(max(x, visibleFrame.minX), visibleFrame.maxX - size.width)
         let clampedY = min(max(y, visibleFrame.minY), visibleFrame.maxY - size.height)
         return CGRect(origin: CGPoint(x: clampedX, y: clampedY), size: size)
@@ -135,7 +135,7 @@ final class ColumnModeToastController {
         panel.level = .floating
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
-        let hostingView = NSHostingView(rootView: ColumnModeToastView(isTabbed: false))
+        let hostingView = NSHostingView(rootView: ColumnModeToastView(message: ""))
         panel.contentView = hostingView
 
         ownedWindowRegistry.register(
@@ -154,10 +154,10 @@ final class ColumnModeToastController {
 }
 
 struct ColumnModeToastView: View {
-    let isTabbed: Bool
+    let message: String
 
     var body: some View {
-        Text(isTabbed ? "Tabbed mode on" : "Tabbed mode off")
+        Text(verbatim: message)
             .font(.system(size: 13, weight: .semibold))
             .padding(.horizontal, 14)
             .frame(height: 30)

@@ -162,8 +162,25 @@ local function ribbon(ctx, navigation, selected, index: number, width: number, h
             ui.path{ key = "clip", w = viewportWidth, h = viewportHeight, viewBox = { 0, 0, 1, 1 },
                 d = "M0 0 H1 V1 H0 Z", mask = true }, ui.row(track) },
         ui.stack{ key = "caption", w = viewportWidth, h = 16,
-            ui.text{ key = "title", text = caption, size = 12, color = FOREGROUND,
+            ui.text{ key = "title", text = ctx.state.toast or caption, size = 12, color = FOREGROUND,
                 maxWidth = viewportWidth } } }
+end
+
+function trigger(ctx, event)
+    local island = ctx.data.island
+    if not island or not island.navigation then return end
+    if event.name == "toggle" and ctx.data.bar and ctx.data.bar.monitorId == event.value then
+        toggle(ctx)
+    elseif event.name == "layout-toast" then
+        local state = ctx.state
+        if state.toastTimer then state.toastTimer:cancel() end
+        state.toastTimer = omniwm.after(1.5, function()
+            state.toastTimer = nil
+            state.toast = nil
+        end)
+        state.toast = if state.toastTimer then event.value else nil
+        state.toastWorkspace = island.navigation.workspace
+    end
 end
 
 function render(ctx)
@@ -184,7 +201,9 @@ function render(ctx)
     local compactHeight = math.min(availableHeight, math.max(36, notch and notch.h or 0))
     local expanded = ctx.state.expanded == true
     local width = if expanded then math.min(availableWidth, math.max(450, compactWidth)) else compactWidth
-    local height = if expanded then math.min(availableHeight, compactHeight + 94) else compactHeight
+    if ctx.state.toastWorkspace ~= navigation.workspace then ctx.state.toast = nil end
+    local toast = ctx.state.toast
+    local height = math.min(availableHeight, compactHeight + (if expanded then 94 elseif toast then 30 else 0))
     local center = math.clamp(if notch then notch.x + notch.w / 2 else availableWidth / 2,
         width / 2, availableWidth - width / 2)
     local selected, index, position = focused(ctx, navigation)
@@ -195,6 +214,10 @@ function render(ctx)
         context(navigation, selected, position, compactWidth, compactHeight, notch, center - compactWidth / 2) }
     if expanded then
         panel[#panel + 1] = ribbon(ctx, navigation, selected, index, width, height, compactHeight)
+    elseif toast then
+        panel[#panel + 1] = ui.stack{ key = "layout-toast", w = width, h = height - compactHeight,
+            align = "top", dy = compactHeight,
+            ui.text{ text = toast, size = 13, weight = "semibold", color = FOREGROUND } }
     end
     return ui.stack{ w = availableWidth, h = availableHeight, ui.stack(panel) }
 end

@@ -104,6 +104,22 @@ extension ShellWidgetHost {
         updateIslandDragMonitoring()
     }
 
+    func showLayoutToast(_ layout: LayoutType, on monitor: Monitor.ID) -> Bool {
+        let key = ShellBarKey(monitor: monitor, placement: .island)
+        guard config.island?.root == ShellIslandConfig.focusRibbon,
+              let island = islandWindows[monitor], island.panel.isVisible,
+              island.geometry.frame.height >= max(36, island.geometry.notch?.height ?? 0) + 30,
+              islandData[key]?.surface?.navigation != nil,
+              let state = widgets[ShellIslandConfig.focusRibbon], state.declaration.hasTrigger,
+              let mailbox = state.mailbox
+        else { return false }
+        let message = ShellWidgetMessage.trigger(name: "layout-toast", value: layout.localizedDisplayName, only: .bar(key))
+        if case .enqueued = mailbox.yield(message) {
+            return true
+        }
+        return false
+    }
+
     func toggleIsland(on monitor: Monitor.ID) -> Bool {
         guard let root = config.island?.root,
               islandData[ShellBarKey(monitor: monitor, placement: .island)]?.surface?.visible == true

@@ -302,7 +302,21 @@ final class CommandHandler {
         case .tabbed: .niri
         }
 
-        _ = setWorkspaceLayout(newLayout, forWorkspaceNamed: workspaceName)
+        guard setWorkspaceLayout(newLayout, forWorkspaceNamed: workspaceName),
+              let monitor = controller.workspaceManager.monitor(for: workspace.id)
+        else { return }
+
+        if controller.workspaceBarManager.shellHost?.showLayoutToast(newLayout, on: monitor.id) == true {
+            controller.columnModeToast.hide()
+            return
+        }
+        controller.columnModeToast.show(
+            message: newLayout.localizedDisplayName,
+            anchorFrame: monitor.visibleFrame,
+            visibleFrame: monitor.visibleFrame,
+            motion: controller.motionPolicy.snapshot(),
+            source: .init(workspaceId: workspace.id, monitorId: monitor.id)
+        )
     }
 
     @discardableResult

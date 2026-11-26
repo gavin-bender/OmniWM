@@ -25,8 +25,8 @@ extension NiriLayoutHandler {
             return
         }
         controller.columnModeToast.show(
-            isTabbed: column.isTabbed,
-            columnFrame: frame,
+            message: column.isTabbed ? String(localized: "Tabbed mode on") : String(localized: "Tabbed mode off"),
+            anchorFrame: frame,
             visibleFrame: monitor.visibleFrame,
             motion: motion,
             source: .init(workspaceId: workspaceId, monitorId: monitor.id)

@@ -73,7 +73,7 @@ enum ShellWidgetMessage: Sendable {
     case gesture(ShellGestureBox.Pending)
     case popout(ShellBarKey, Bool, trace: ShellFrameTraceContext? = nil)
     case interval(Double?)
-    case trigger(name: String, value: String?)
+    case trigger(name: String, value: String?, only: ShellInstanceKey? = nil)
     case log(String)
     case services
     case providers
