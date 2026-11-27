@@ -365,6 +365,7 @@ final class ShellWidgetHost {
     var barColors: (accent: SettingsColor?, foreground: SettingsColor?) = (nil, nil)
     let latestData = ShellLatestWidgetData()
     var outbox: ShellWidgetOutbox?
+    var wallpaperIsDark: [ShellBarKey: Bool] = [:]
     var bars: [ShellBarKey: ShellBarData] = [:]
     var barShaderViews: [ShellBarKey: ShellBarShaderView] = [:]
     var desiredIslands: [DesiredIslandSurface] = []

@@ -94,6 +94,33 @@ final class ShellBarShaderTests: XCTestCase {
         XCTAssertNotEqual(snapshot, model.snapshot)
     }
 
+    func testTransparentTopBarHasAnAdjustableBehindWindowGradient() throws {
+        func backdrop(top: Bool, opacity: Double) -> NSVisualEffectView? {
+            let model = WorkspaceBarModel(snapshot: WorkspaceBarSnapshot(
+                projection: WorkspaceBarProjection(items: [], scratchpads: []),
+                backgroundOpacity: opacity, transparentBackground: true, barHeight: 40
+            ))
+            model.usesTopEdge = top
+            model.zones = WorkspaceBarZones(notch: nil, mode: .splitAroundNotch)
+            let host = NSHostingView(rootView: WorkspaceBarView(
+                model: model, motionPolicy: MotionPolicy(animationsEnabled: false)
+            ).frame(width: 200, height: 40))
+            host.setFrameSize(CGSize(width: 200, height: 40))
+            host.layoutSubtreeIfNeeded()
+            func findEffect(_ view: NSView) -> NSVisualEffectView? {
+                if let effect = view as? NSVisualEffectView, effect.maskImage != nil { return effect }
+                return view.subviews.lazy.compactMap { findEffect($0) }.first
+            }
+            return findEffect(host)
+        }
+
+        let effect = try XCTUnwrap(backdrop(top: true, opacity: 0.5))
+        XCTAssertEqual(effect.blendingMode, .behindWindow)
+        XCTAssertEqual(effect.frame.size, CGSize(width: 200, height: 40))
+        XCTAssertNil(backdrop(top: true, opacity: 0))
+        XCTAssertNil(backdrop(top: false, opacity: 0.5))
+    }
+
     func testHostReusesBackgroundsAndRetiresThemPerDisplayOrProfile() {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let host = ShellWidgetHost(

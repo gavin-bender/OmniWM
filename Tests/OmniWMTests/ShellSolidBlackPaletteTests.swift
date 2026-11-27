@@ -35,6 +35,15 @@ final class ShellSolidBlackPaletteTests: XCTestCase {
         XCTAssertTrue(clock.instances[key]?.surface === surface)
         XCTAssertTrue(surface.palette === resources.palette)
 
+        source.bars[key]?.style.transparent = true
+        host.updateBars()
+        host.setWallpaperContrast([key: false])
+        XCTAssertTrue(surface.palette === resources.lightPalette)
+        host.setWallpaperContrast([key: true])
+        XCTAssertTrue(surface.palette === resources.darkPalette)
+        host.setWallpaperContrast([:])
+        XCTAssertTrue(surface.palette === resources.palette)
+
         source.bars = [key: bar(solidBlack: true)]
         host.updateBars()
         XCTAssertTrue(surface.palette === resources.darkPalette)
@@ -63,6 +72,23 @@ final class ShellSolidBlackPaletteTests: XCTestCase {
             let color = ShellRGBA(resources.darkPalette.color(Color(packed: 0), default: role))
             XCTAssertGreaterThanOrEqual(color.contrast(black), ShellRGBA.readableTextContrast, "\(role)")
         }
+    }
+
+    func testWallpaperSamplesTheBarOnAnOffsetDisplay() throws {
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: 100, height: 100, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ))
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 90, width: 50, height: 10))
+        let image = try XCTUnwrap(context.makeImage())
+        let screen = CGRect(x: -200, y: 30, width: 200, height: 200)
+        let left = CGRect(x: -200, y: 210, width: 100, height: 20)
+        XCTAssertEqual(WorkspaceBarManager.wallpaperIsDark(image, behind: left, on: screen), false)
+        XCTAssertEqual(WorkspaceBarManager.wallpaperIsDark(image, behind: left.offsetBy(dx: 100, dy: 0), on: screen), true)
+        XCTAssertNil(WorkspaceBarManager.wallpaperIsDark(image, behind: left.offsetBy(dx: 200, dy: 0), on: screen))
     }
 
     private func bar(solidBlack: Bool) -> ShellBarData {

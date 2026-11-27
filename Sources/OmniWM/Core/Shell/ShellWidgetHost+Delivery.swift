@@ -124,27 +124,23 @@ extension ShellWidgetHost {
     }
 
     func palette(for key: ShellBarKey) -> ShellPalette {
-        palette(for: key, dark: darkBarKeys())
+        guard key.placement == .bar else { return resources.palette }
+        if bars[key]?.style.solidBlack == true { return resources.darkPalette }
+        guard bars[key]?.style.transparent == true, let dark = wallpaperIsDark[key] else { return resources.palette }
+        return dark ? resources.darkPalette : resources.lightPalette
     }
 
-    private func palette(for key: ShellBarKey, dark: Set<ShellBarKey>) -> ShellPalette {
-        dark.contains(key) ? resources.darkPalette : resources.palette
-    }
-
-    private func darkBarKeys() -> Set<ShellBarKey> {
-        var keys: Set<ShellBarKey> = []
-        for (key, data) in bars where key.placement == .bar && data.style.solidBlack {
-            keys.insert(key)
-        }
-        return keys
+    func setWallpaperContrast(_ values: [ShellBarKey: Bool]) {
+        guard wallpaperIsDark != values else { return }
+        wallpaperIsDark = values
+        syncBarPalettes()
     }
 
     private func syncBarPalettes() {
-        let dark = darkBarKeys()
         for state in widgets.values {
             for (key, instance) in state.instances {
                 guard let surface = instance.surface else { continue }
-                let palette = palette(for: key, dark: dark)
+                let palette = palette(for: key)
                 guard surface.palette !== palette else { continue }
                 surface.palette = palette
                 instance.redraw(text: state.text)

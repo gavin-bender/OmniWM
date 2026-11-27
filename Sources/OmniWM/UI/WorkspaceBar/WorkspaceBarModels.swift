@@ -232,6 +232,8 @@ enum WorkspaceBarIslandSlice: String, CaseIterable, Sendable {
 final class WorkspaceBarModel {
     var snapshot: WorkspaceBarSnapshot
     var hiddenBarJoinEdge: PopupAttachment.Edge?
+    var usesTopEdge = false
+    var darkWallpaper: [WorkspaceBarIslandSlice: Bool] = [:]
     var zones: WorkspaceBarZones?
 
     init(snapshot: WorkspaceBarSnapshot) {

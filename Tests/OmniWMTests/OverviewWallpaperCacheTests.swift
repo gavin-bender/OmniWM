@@ -17,6 +17,24 @@ final class OverviewWallpaperCacheTests: XCTestCase {
         XCTAssertEqual(OverviewWallpaperCache.bucketedPixelSize(9000), 4096)
     }
 
+    func testWallpaperFileReadsNeverRequestScreenCapture() throws {
+        let url = try makeImageFile(width: 400, height: 200)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let cache = OverviewWallpaperCache { _ in
+            XCTFail("File-only wallpaper reads must never capture the desktop")
+            return nil
+        }
+        cache.desktopImageURL = { _ in url }
+        let original = try XCTUnwrap(cache.fileImage(for: 999, maxPixelSize: 512))
+        XCTAssertTrue(cache.fileImage(for: 999, maxPixelSize: 512) === original)
+        let replacement = try makeImageFile(width: 180, height: 90)
+        defer { try? FileManager.default.removeItem(at: replacement) }
+        try Data(contentsOf: replacement).write(to: url, options: .atomic)
+        XCTAssertEqual(cache.fileImage(for: 999, maxPixelSize: 512)?.width, 180)
+        cache.desktopImageURL = { _ in nil }
+        XCTAssertNil(cache.fileImage(for: 999, maxPixelSize: 512))
+    }
+
     func testSmallerVariantIsDerivedFromLargerCaptureWithoutRecapturing() throws {
         let image = try makeSolidImage(gray: 1)
         let frame = CGRect(x: 0, y: 0, width: 400, height: 200)

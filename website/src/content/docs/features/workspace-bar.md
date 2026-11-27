@@ -130,7 +130,7 @@ autoHide = true
 
 - **Fill Left of Notch** — an additional notch mode that fills the menu-bar area left of the notch, covering application menus. Without a notch it uses the left half of the menu bar. When effective at a top position, this mode always hides in native fullscreen, regardless of **Hide in Native Fullscreen**.
 - **Inactive Icon Opacity** — adjust unfocused app icons from 0–100%; **Reset to Style Defaults** clears the override.
-- **Transparent Background** — hide the bar material, tint, and border while keeping its contents interactive.
+- **Transparent Background** — hide the bar material, tint, and border. Widgets use the style’s light palette over bright wallpaper and its dark palette over dark wallpaper. Each visible bar panel samples its own region of the configured wallpaper file every 15 seconds. If the file is unavailable, the bar follows the app’s appearance. For top bars, raise **Background Opacity** to add a blur behind the widgets that fades toward the desktop. At 0% the bar is fully clear.
 - **Solid Black Background** — use an opaque black bar; it takes precedence over **Transparent Background** when both are enabled.
 - **Show Item Backgrounds** — show or hide backgrounds behind workspace groups, floating windows, scratchpads, and stats.
 - **Show Accent Highlights** — show or hide the focused-workspace outline and focused-icon glow.

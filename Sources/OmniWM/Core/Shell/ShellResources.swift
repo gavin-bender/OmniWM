@@ -7,6 +7,7 @@ import OmniWMShellCore
 @MainActor
 final class ShellResources {
     let palette = ShellPalette()
+    let lightPalette = ShellPalette(appearance: ShellPalette.lightAppearance)
     let darkPalette = ShellPalette(appearance: ShellPalette.darkAppearance)
     let shaders = ShellShaderLibrary()
     let images = ShellImageLibrary()
@@ -26,6 +27,7 @@ final class ShellResources {
 
     func refreshPalettes(theme: ShellTheme) {
         palette.refresh(theme: theme, appearance: NSApplication.shared.effectiveAppearance)
+        lightPalette.refresh(theme: theme, appearance: ShellPalette.lightAppearance)
         darkPalette.refresh(theme: theme, appearance: ShellPalette.darkAppearance)
     }
 

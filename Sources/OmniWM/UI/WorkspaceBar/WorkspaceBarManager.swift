@@ -35,6 +35,7 @@ final class WorkspaceBarManager {
     var notificationBadgeTargetsByMonitor: [Monitor.ID: Set<String>] = [:]
     var shellBadgeDemand = false
     var shellBadgeTargets: Set<String> = []
+    var wallpaperRefresh: Task<Void, Never>?
     let motionPolicy: MotionPolicy
     private let surfaceCoordinator = SurfaceCoordinator.shared
     private var hiddenBarJoin: HiddenBarPanelPlacement.Join?
@@ -72,6 +73,7 @@ final class WorkspaceBarManager {
     var revealedMenuMonitor: Monitor.ID?
 
     isolated deinit {
+        wallpaperRefresh?.cancel()
         if let commandPaletteColorsObserver {
             NotificationCenter.default.removeObserver(commandPaletteColorsObserver)
         }
@@ -134,6 +136,7 @@ final class WorkspaceBarManager {
         for monitorId in staleMonitorIds {
             removeBarForMonitor(monitorId)
         }
+        updateWallpaperMonitoring()
         updateNotificationBadgeTargets(bars)
         dragController.barsDidUpdate()
         refreshShellDrag()
@@ -284,6 +287,7 @@ final class WorkspaceBarManager {
         for monitorId in Array(barsByMonitor.keys) {
             removeBarForMonitor(monitorId)
         }
+        updateWallpaperMonitoring()
         if !keepingShell {
             stopShellHost()
         }
@@ -298,6 +302,7 @@ final class WorkspaceBarManager {
         instance: WorkspaceBarInstance
     ) {
         let geometry = WorkspaceBarGeometry.resolve(monitor: monitor, resolved: resolved, isVisible: true)
+        instance.model.usesTopEdge = WorkspaceBarGeometry.effectivePosition(for: monitor, resolved: resolved).usesNotch
         if let split = instance.splitLayout(
             geometry: geometry,
             snapshot: snapshot,

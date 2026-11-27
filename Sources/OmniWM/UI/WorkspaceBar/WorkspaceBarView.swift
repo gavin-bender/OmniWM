@@ -30,6 +30,8 @@ struct WorkspaceBarView: View {
             slice: slice,
             hiddenBarJoinEdge: slice == .secondary ? nil : model.hiddenBarJoinEdge,
             zones: model.zones,
+            usesTopEdge: model.usesTopEdge,
+            darkWallpaper: model.darkWallpaper[slice],
             animationsEnabled: motionPolicy.animationsEnabled,
             animationSpeed: motionPolicy.animationSpeed,
             shellSurface: shellSurface,
@@ -74,6 +76,8 @@ private struct WorkspaceBarContentView: View {
     var slice: WorkspaceBarIslandSlice = .all
     var hiddenBarJoinEdge: PopupAttachment.Edge?
     var zones: WorkspaceBarZones?
+    var usesTopEdge = false
+    var darkWallpaper: Bool?
     let animationsEnabled: Bool
     var animationSpeed = 1.0
     var shellSurface: ((String) -> NSView?)?
@@ -141,7 +145,15 @@ private struct WorkspaceBarContentView: View {
     private var background: some View {
         let style = snapshot.backgroundStyle
         let outline = style.outline(contrast: colorSchemeContrast, colorScheme: colorScheme)
-        if style != .transparent {
+        if style == .transparent {
+            if usesTopEdge, snapshot.backgroundOpacity > 0 {
+                WorkspaceBarFadingBackdrop(
+                    dark: darkWallpaper ?? (colorScheme == .dark), strength: snapshot.backgroundOpacity
+                )
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        } else {
             WorkspaceBarSurfaceFill(
                 shape: barShape,
                 backgroundStyle: style,
@@ -169,4 +181,45 @@ private struct WorkspaceBarShaderBackground: NSViewRepresentable {
     }
 
     func updateNSView(_: NSView, context _: Context) {}
+}
+
+@MainActor
+private struct WorkspaceBarFadingBackdrop: NSViewRepresentable {
+    let dark: Bool
+    let strength: Double
+
+    final class Coordinator {
+        var strength: Double?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    // AppKit stretches the alpha mask across the effect view. Keep the strongest
+    // part behind the labels and fade the lower edge back into the desktop.
+    private func mask() -> NSImage {
+        let color = NSColor.black.withAlphaComponent(strength)
+        let image = NSImage(size: NSSize(width: 1, height: 64), flipped: false) { rect in
+            NSGradient(colors: [.clear, color, color], atLocations: [0, 0.55, 1], colorSpace: .deviceRGB)?
+                .draw(in: rect, angle: 90)
+            return true
+        }
+        image.resizingMode = .stretch
+        return image
+    }
+
+    func makeNSView(context _: Context) -> NSVisualEffectView {
+        let effect = NSVisualEffectView()
+        effect.material = .menu
+        effect.blendingMode = .behindWindow
+        effect.state = .active
+        return effect
+    }
+
+    func updateNSView(_ effect: NSVisualEffectView, context: Context) {
+        if context.coordinator.strength != strength {
+            effect.maskImage = mask()
+            context.coordinator.strength = strength
+        }
+        effect.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    }
 }

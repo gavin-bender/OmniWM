@@ -21,7 +21,7 @@ final class OverviewWallpaperCache {
         }
     }
 
-    private var images: [Key: CGImage] = [:]
+    private var images: [Key: (image: CGImage, modified: Date?, bytes: Int?)] = [:]
     private var urlsByDisplay: [CGDirectDisplayID: URL] = [:]
     private var capturesByDisplay: [CGDirectDisplayID: Capture] = [:]
     var captureWallpaper: (CGRect) -> CGImage?
@@ -94,7 +94,7 @@ final class OverviewWallpaperCache {
         return context.makeImage()
     }
 
-    private func fileImage(for displayId: CGDirectDisplayID, maxPixelSize: Int) -> CGImage? {
+    func fileImage(for displayId: CGDirectDisplayID, maxPixelSize: Int) -> CGImage? {
         let url = desktopImageURL(displayId)
         let previousURL = urlsByDisplay[displayId]
         urlsByDisplay[displayId] = url
@@ -103,7 +103,13 @@ final class OverviewWallpaperCache {
         }
         guard let url else { return nil }
         let key = Key(url: url, maxPixelSize: maxPixelSize)
-        if let cached = images[key] { return cached }
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            images[key] = nil
+            return nil
+        }
+        let modified = attributes[.modificationDate] as? Date
+        let bytes = attributes[.size] as? Int
+        if let cached = images[key], cached.modified == modified, cached.bytes == bytes { return cached.image }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -112,7 +118,7 @@ final class OverviewWallpaperCache {
             kCGImageSourceShouldCacheImmediately: true
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        images[key] = image
+        images[key] = (image, modified, bytes)
         return image
     }
 
