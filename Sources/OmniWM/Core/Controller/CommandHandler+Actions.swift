@@ -76,6 +76,8 @@ extension CommandHandler {
             controller.workspaceNavigationHandler.switchWorkspaceRelative(isNext: true)
         case .previous:
             controller.workspaceNavigationHandler.switchWorkspaceRelative(isNext: false)
+        case .moveWorkspaceToNextMonitor:
+            controller.workspaceNavigationHandler.moveActiveWorkspaceToNextMonitor()
         case let .moveWorkspaceToMonitor(direction):
             moveActiveWorkspace(toMonitor: direction, controller: controller)
         case let .swapWithMonitor(direction):
@@ -101,6 +103,7 @@ extension CommandHandler {
              .next,
              .previous,
              .moveWorkspaceToMonitor,
+             .moveWorkspaceToNextMonitor,
              .swapWithMonitor,
              .backAndForth,
              .toggleLayout:

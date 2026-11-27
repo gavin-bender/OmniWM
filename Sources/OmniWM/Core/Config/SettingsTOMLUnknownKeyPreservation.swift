@@ -37,12 +37,26 @@ extension TOMLNode {
             } else if case let .array(rawArray) = rawValue, case let .array(knownArray) = knownValue {
                 result.append(contentsOf: unknownArrayKeyPaths(
                     raw: rawArray,
-                    known: knownArray,
+                    known: schemaRows(for: rawArray, known: knownArray, path: path),
                     prefix: path
                 ))
             }
         }
         return result
+    }
+
+    // Decoding fills in unassigned actions and sorts hotkeys into catalog order.
+    // Match the raw file's order before comparing individual tables.
+    private static func schemaRows(for raw: [TOMLNode], known: [TOMLNode], path: String) -> [TOMLNode] {
+        guard path == "hotkeys" else { return known }
+        var byID: [String: TOMLNode] = [:]
+        for case let .table(row) in known {
+            if case let .string(id) = row["id"] { byID[id] = .table(row) }
+        }
+        return raw.map { node in
+            guard case let .table(row) = node, case let .string(id) = row["id"] else { return .table([:]) }
+            return byID[id] ?? .table([:])
+        }
     }
 
     private static func unknownArrayKeyPaths(
@@ -91,7 +105,7 @@ extension TOMLNode {
             case let (.array(oldArray), .array(knownArray), .array(mergedArray)):
                 merged[key] = .array(try preserveUnknownKeys(
                     from: oldArray,
-                    known: knownArray,
+                    known: schemaRows(for: oldArray, known: knownArray, path: childPath),
                     into: mergedArray,
                     path: childPath
                 ))

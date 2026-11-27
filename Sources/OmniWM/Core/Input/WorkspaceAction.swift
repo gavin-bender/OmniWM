@@ -14,6 +14,7 @@ enum WorkspaceAction: Equatable, Hashable {
     case moveToSlot(Int)
     case next
     case previous
+    case moveWorkspaceToNextMonitor
     case moveWorkspaceToMonitor(Direction)
     case swapWithMonitor(Direction)
     case backAndForth
@@ -55,6 +56,10 @@ extension WorkspaceAction {
                 bundle: .omniWM
             )
         case let .moveToMonitor(direction): Self.moveToMonitorTitle(direction)
+        case .moveWorkspaceToNextMonitor: LocalizedStringResource(
+                "command.workspace.moveToNextMonitor", defaultValue: "Move Workspace to Next Monitor in Order",
+                table: "Commands", bundle: .omniWM
+            )
         case let .moveWorkspaceToMonitor(direction): Self.moveWorkspaceToMonitorTitle(direction)
         case let .swapWithMonitor(direction): Self.swapWithMonitorTitle(direction)
         case .backAndForth: LocalizedStringResource(
@@ -153,7 +158,7 @@ extension WorkspaceAction {
             .workspace(.moveDown)
         case .moveToMonitor:
             .workspace(.moveToMonitor)
-        case .moveWorkspaceToMonitor:
+        case .moveWorkspaceToMonitor, .moveWorkspaceToNextMonitor:
             nil
         case .swapWithMonitor:
             .swapWorkspaceWithMonitor
@@ -174,6 +179,7 @@ extension WorkspaceAction {
              .next,
              .previous,
              .moveWorkspaceToMonitor,
+             .moveWorkspaceToNextMonitor,
              .swapWithMonitor,
              .backAndForth,
              .toggleLayout:

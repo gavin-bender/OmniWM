@@ -120,6 +120,17 @@ extension WorkspaceNavigationHandler {
         }
     }
 
+    func moveActiveWorkspaceToNextMonitor() {
+        guard let controller, let workspace = controller.activeWorkspace() else { return }
+        let manager = controller.workspaceManager
+        guard let source = manager.monitorForWorkspace(workspace.id),
+              let target = manager.nextMonitor(from: source.id),
+              moveWorkspaceToMonitor(workspace.id, to: target.id, force: true)?.status == .executed,
+              manager.activeWorkspace(on: target.id)?.id == workspace.id
+        else { return }
+        _ = manager.setInteractionMonitor(target.id)
+    }
+
     func moveWorkspaceToMonitor(
         _ workspaceId: WorkspaceDescriptor.ID,
         direction: Direction,

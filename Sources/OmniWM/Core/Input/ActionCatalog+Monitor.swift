@@ -21,6 +21,13 @@ extension ActionCatalog {
     static func appendWorkspaceMonitorBindings(_ specs: inout [ActionSpec]) {
         specs.append(contentsOf: [
             action(
+                id: "moveWorkspaceToMonitor.next",
+                command: .workspace(.moveWorkspaceToNextMonitor),
+                category: .monitor,
+                binding: .unassigned,
+                keywords: workspaceMonitorMoveKeywords + ["cycle", "wrap"]
+            ),
+            action(
                 id: "moveWorkspaceToMonitor.left",
                 command: .workspace(.moveWorkspaceToMonitor(.left)),
                 category: .monitor,

@@ -95,6 +95,26 @@ final class WorkspaceMoveIPCIntegrationTests: XCTestCase {
         )
     }
 
+    func testNextMonitorHotkeyCyclesTheActiveWorkspaceAndWraps() throws {
+        let fixture = try makeFixture()
+        let controller = fixture.controller
+        defer { controller.layoutRefreshController.resetState() }
+        let manager = controller.workspaceManager
+        _ = manager.setInteractionMonitor(fixture.left.id)
+        let command = try XCTUnwrap(HotkeyBindingRegistry.command(for: "moveWorkspaceToMonitor.next"))
+        let invocation = HotkeyInvocation(
+            command: command,
+            trigger: PhysicalHotkeyTrigger(keyCode: 46, modifiers: 0, isRepeat: false)
+        )
+
+        for target in [fixture.center, fixture.right, fixture.left] {
+            XCTAssertEqual(controller.commandHandler.handleHotkeyInvocation(invocation), .executed)
+            XCTAssertEqual(manager.monitorForWorkspace(fixture.sourceWorkspaceId)?.id, target.id)
+            XCTAssertEqual(controller.activeWorkspace()?.id, fixture.sourceWorkspaceId)
+        }
+        XCTAssertNil(manager.descriptor(for: fixture.sourceWorkspaceId)?.runtimeMonitorOverride)
+    }
+
     func testHotkeyMoveAtMonitorEdgeDoesNotWrapOrMutate() throws {
         let fixture = try makeFixture()
         defer { fixture.controller.layoutRefreshController.resetState() }

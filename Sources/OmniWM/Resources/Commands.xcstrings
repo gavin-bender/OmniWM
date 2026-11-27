@@ -13549,6 +13549,17 @@
         }
       }
     },
+    "command.workspace.moveToNextMonitor" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move Workspace to Next Monitor in Order"
+          }
+        }
+      }
+    },
     "command.workspace.moveToMonitor.down" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
