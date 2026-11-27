@@ -112,6 +112,15 @@ final class WindowRuleEngineTests: XCTestCase {
         )
     }
 
+    func testSimulatorWindowsFloatWithoutUserRules() {
+        let engine = WindowRuleEngine()
+        engine.rebuild(rules: [])
+        for bundleId in ["com.apple.iphonesimulator", "com.apple.dt.devices"] {
+            let decision = evaluate(engine, facts(appName: "Simulator", bundleId: bundleId, title: "iPhone 18 Pro"))
+            XCTAssertEqual(decision.disposition, .floating, bundleId)
+        }
+    }
+
     func testAppNameWildcardMatchesNoBundleWindows() {
         let engine = WindowRuleEngine()
         let rule = AppRule(bundleId: "", appNameSubstring: "VMD", layout: .float)

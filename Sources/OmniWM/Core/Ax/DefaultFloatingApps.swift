@@ -8,6 +8,7 @@ enum DefaultFloatingApps {
         "com.apple.systempreferences",
         "com.apple.SystemPreferences",
         "com.apple.iphonesimulator",
+        "com.apple.dt.devices",
         "com.apple.PhotoBooth",
         "com.apple.calculator",
         "com.apple.ScreenSharing",
