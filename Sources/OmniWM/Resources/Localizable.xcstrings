@@ -92981,9 +92981,6 @@
         }
       }
     },
-    "One-finger drag to move. Two-finger drag near an edge to resize. Swipe with three fingers left or right for windows, or up or down for workspaces." : {
-
-    },
     "Only affects resizable windows in Niri when they create or claim a container. Primary span is width in horizontal orientation and height in vertical orientation." : {
       "localizations" : {
         "ja" : {
@@ -135103,9 +135100,6 @@
           }
         }
       }
-    },
-    "Touch Display Gestures" : {
-
     },
     "Trace" : {
       "localizations" : {

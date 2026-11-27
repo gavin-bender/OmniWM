@@ -11,7 +11,7 @@ final class MouseEventHandler {
     weak var controller: WMController?
     let eventIntake: EventIntake
     let inputTapThread = InputTapThread()
-    lazy var touchDisplayWindowGestures = TouchDisplayWindowGestures(mouse: self)
+    var directTouchDrag: DirectTouchDrag?
     var tabWindowStackAtPoint: @MainActor (CGPoint) -> [(id: Int, frame: CGRect)] = MouseEventHandler.tabWindowStack
     let tabDropFeedback = TabDropFeedback()
     var state = MouseInputState() {
@@ -33,6 +33,7 @@ final class MouseEventHandler {
 
     private var multitouchSource: MultitouchGestureSource?
     private var performanceCounters: MousePerformanceCounters?
+    var touchDisplayAvailable = { TouchDisplay.isAvailable }
     var multitouchSourceFactory: @MainActor () -> MultitouchGestureSource = { MultitouchGestureSource() }
     var pressedMouseButtonsProvider: @MainActor () -> Int = { Int(NSEvent.pressedMouseButtons) }
     var nativeWindowFrameProvider: @MainActor (AXWindowRef) -> CGRect? = {
@@ -82,7 +83,7 @@ final class MouseEventHandler {
     }
 
     func cleanup() {
-        touchDisplayWindowGestures.dismiss()
+        cancelDirectTouchDrag()
         state.latestFocusFollowsMouseSample = nil
         clearNativeTitleBarDrag()
         state.nativeResizeCorrectionsByWindowId.removeAll()
@@ -108,7 +109,7 @@ final class MouseEventHandler {
 
     func reconcileMultitouchSource() {
         guard let controller, controller.hasStartedServices else { return }
-        let shouldRun = controller.settings.effectiveTrackpadGesturesEnabled
+        let shouldRun = controller.settings.effectiveTrackpadGesturesEnabled || touchDisplayAvailable()
         if shouldRun {
             if let multitouchSource {
                 if !multitouchSource.startLifecycle() {
@@ -170,7 +171,7 @@ final class MouseEventHandler {
     }
 
     func suspendMultitouchForSleep() {
-        touchDisplayWindowGestures.dismiss()
+        cancelDirectTouchDrag()
         multitouchSource?.suspendForSleep()
     }
 
@@ -179,6 +180,7 @@ final class MouseEventHandler {
     }
 
     func resetForMultitouchSourceReplacement() {
+        cancelDirectTouchDrag()
         controller?.layoutRefreshController.workspaceSwipe.cancelAll(reason: "source-replaced")
         resetGestureState()
         state.workspaceSwipeTracker.reset()

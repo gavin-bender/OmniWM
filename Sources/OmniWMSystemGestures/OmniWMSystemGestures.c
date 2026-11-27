@@ -3,7 +3,6 @@
 
 #include "OmniWMSystemGestures.h"
 
-#include <objc/runtime.h>
 #include <pthread.h>
 #include <stddef.h>
 
@@ -192,24 +191,3 @@ bool omniwm_set_native_gesture_value(OmniWMNativeGesturePreference gesture, int 
 }
 
 #endif
-
-bool omniwm_set_window_direct_touch_system_gestures_disabled(void *window, bool disabled)
-{
-    if (pthread_main_np() == 0) {
-        return false;
-    }
-
-    id object = (id)window;
-    Class cls = object_getClass(object);
-    SEL setter = sel_registerName("setDisablesDirectTouchSystemGestures:");
-    SEL getter = sel_registerName("disablesDirectTouchSystemGestures");
-    Method setter_method = class_getInstanceMethod(cls, setter);
-    Method getter_method = class_getInstanceMethod(cls, getter);
-    if (setter_method == NULL || getter_method == NULL) {
-        return false;
-    }
-
-    ((void (*)(id, SEL, BOOL))method_getImplementation(setter_method))(object, setter, disabled);
-    BOOL observed = ((BOOL (*)(id, SEL))method_getImplementation(getter_method))(object, getter);
-    return (observed != NO) == disabled;
-}

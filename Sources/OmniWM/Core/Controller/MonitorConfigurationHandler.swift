@@ -81,6 +81,7 @@ struct MonitorConfigurationHandler {
         controller.resetMouseWarpTransientState()
         controller.syncMouseWarpPolicy(for: controller.workspaceManager.monitors)
         if topologyChanged {
+            controller.mouseEventHandler.reconcileMultitouchSource()
             controller.publishDisplayChanged()
         }
         guard performPostUpdateActions else { return }

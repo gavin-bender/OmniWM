@@ -10,6 +10,7 @@ extension NiriLayoutEngine {
         windowToken: WindowToken,
         startLocation: CGPoint,
         allowsInsertion: Bool = false,
+        reordersStrip: Bool = false,
         context: NiriInteractionContext,
         state: inout ViewportState
     ) -> Bool {
@@ -30,6 +31,7 @@ extension NiriLayoutEngine {
             windowToken: windowToken,
             workspaceId: context.workspaceId,
             startMouseLocation: startLocation,
+            reordersStrip: reordersStrip,
             allowsInsertion: allowsInsertion,
             orientation: context.orientation,
             currentHoverTarget: nil
@@ -177,12 +179,43 @@ extension NiriLayoutEngine {
             location.y - move.startMouseLocation.y
         )
         guard dragDistance >= moveConfiguration.dragThreshold else { return nil }
+        if move.reordersStrip {
+            return stripDropTarget(for: move.windowId, at: location, from: move.startMouseLocation,
+                                   orientation: move.orientation, in: move.workspaceId)
+        }
         return hitTestMoveTarget(
             point: location,
             excludingWindowId: move.windowId,
             allowsInsertion: move.allowsInsertion,
             in: move.workspaceId
         )
+    }
+
+    func stripDropTarget(
+        for source: NodeId, at point: CGPoint, from start: CGPoint,
+        orientation: Monitor.Orientation, in workspace: WorkspaceDescriptor.ID
+    ) -> MoveHoverTarget? {
+        let columns = projectedColumns(in: workspace)
+        guard let sourceIndex = columns.firstIndex(where: { $0.windows.contains { $0.id == source } }) else { return nil }
+        let horizontal = orientation == .horizontal
+        let travel = horizontal ? point.x - start.x : point.y - start.y
+        let crossTravel = horizontal ? point.y - start.y : point.x - start.x
+        let index: Int
+        if let hit = hitTestMoveTarget(point: point, excludingWindowId: source, in: workspace),
+           let hitIndex = columns.firstIndex(where: { $0.windows.contains { $0.id == hit.nodeId } }),
+           hitIndex != sourceIndex {
+            index = hitIndex
+        } else {
+            // A wide source window can cover the display. Allow a deliberate drag toward
+            // the next column without requiring the finger to land inside that column.
+            guard abs(travel) >= 64, abs(travel) > abs(crossTravel) else { return nil }
+            index = sourceIndex + (travel > 0 ? 1 : -1)
+        }
+        guard columns.indices.contains(index), let target = projectedActiveWindow(in: columns[index]),
+              !target.isFullscreen else { return nil }
+        let forward = index > sourceIndex
+        return MoveHoverTarget(nodeId: target.id, token: target.token,
+                               direction: horizontal ? (forward ? .right : .left) : (forward ? .up : .down))
     }
 
     private func insertWindowInNewColumnByMove(

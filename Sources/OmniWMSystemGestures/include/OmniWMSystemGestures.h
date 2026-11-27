@@ -21,7 +21,4 @@ bool omniwm_native_gesture_available(OmniWMNativeGesturePreference gesture);
 bool omniwm_native_gesture_value(OmniWMNativeGesturePreference gesture, int *_Nonnull value);
 bool omniwm_set_native_gesture_value(OmniWMNativeGesturePreference gesture, int value);
 
-// Runtime fallback when building against an SDK older than macOS 27.3.
-bool omniwm_set_window_direct_touch_system_gestures_disabled(void *_Nonnull window, bool disabled);
-
 #endif

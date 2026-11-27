@@ -130,6 +130,10 @@ extension MouseEventHandler {
             guard let engine = controller.niriEngine, let window = engine.findNode(for: token, in: wsId) else {
                 return false
             }
+            if source == .touchDisplay, let frame = window.renderedFrame ?? window.frame,
+               ResizeConfiguration.isCorner(location, of: frame, tolerance: 20) {
+                return beginNiriResize(window: window, engine: engine, wsId: wsId, at: location, source: source)
+            }
             return beginNiriMove(window: window, engine: engine, wsId: wsId, at: location, source: source)
         case (_, .windowResize):
             guard let engine = controller.niriEngine, let window = engine.findNode(for: token, in: wsId) else {

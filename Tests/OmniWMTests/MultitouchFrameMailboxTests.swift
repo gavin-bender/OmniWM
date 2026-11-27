@@ -313,6 +313,20 @@ final class MultitouchFrameMailboxTests: XCTestCase {
         XCTAssertEqual(snapshot?.drainBatches, 6)
     }
 
+    func testOneFingerScreenMotionSurvivesAPauseAndTheTrackpadFingerFloor() {
+        let mailbox = MultitouchFrameMailbox()
+        mailbox.activate(generation: 7)
+        mailbox.setSteadyFrameFloor(3)
+        for step in 0 ... 1 {
+            let touch = MultitouchGestureSource.RawTouch(x: Float(step), y: 0.5)
+            XCTAssertTrue(mailbox.offer(
+                .init(touches: [touch], timestamp: 1 + Double(step)),
+                generation: 7, slot: 0, isTouchScreen: true
+            ))
+            XCTAssertEqual(mailbox.take().deliveries.map(\.kind), [step == 0 ? .began : .changed])
+        }
+    }
+
     func testSkippedSteadyFramesKeepTheOwnerAliveAgainstASecondDevice() {
         let mailbox = MultitouchFrameMailbox()
         mailbox.activate(generation: 7)

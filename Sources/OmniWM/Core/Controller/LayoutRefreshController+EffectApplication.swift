@@ -23,6 +23,14 @@ extension LayoutRefreshController {
     }
 
     func publishAcceptedLayoutSurfaces(_ plan: WorkspaceLayoutPlan, controller: WMController) {
+        if plan.isActiveWorkspace {
+            let display = plan.monitor.displayId
+            let frames = controller.workspaceManager.activeLayoutKind(for: plan.workspaceId) == .niri
+                ? plan.diff.frameChanges.map(\.frame) : []
+            controller.mouseEventHandler.inputTapThread.updateFilterSnapshot {
+                $0.niriResizeFrames[display] = frames
+            }
+        }
         controller.surfaceReconciler.applyAcceptedNativeFullscreenSlots(
             plan.diff.nativeFullscreenSlots,
             workspaceId: plan.workspaceId,

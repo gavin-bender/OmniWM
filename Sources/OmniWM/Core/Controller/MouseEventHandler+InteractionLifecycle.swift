@@ -98,10 +98,12 @@ extension MouseEventHandler {
     }
 
     func cancelActiveMouseInteraction() {
+        directTouchDrag = nil
         state.tabbedTitleDrag = nil
         guard let controller else { return }
         if let session = state.tabbedGesture {
-            updateTabbedGesture(at: session.drag.start)
+            tabDropFeedback.hide()
+            updateTabbedFrame(session.drag, at: session.drag.start, token: session.token, workspace: session.workspace, released: false)
             state.tabbedGesture = nil
             clearMoveInteractionState()
             clearResizeInteractionState()
@@ -216,6 +218,9 @@ extension MouseEventHandler {
 
         guard state.isResizing else { return }
         guard shouldAcceptInteractionButton(button) else { return }
+        if button == .left, state.resizeLayout == .niri {
+            updateManagedResize(at: location)
+        }
         completeActiveResize()
     }
 

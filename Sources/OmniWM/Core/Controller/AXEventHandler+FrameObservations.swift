@@ -199,7 +199,7 @@ extension AXEventHandler {
                   let tile = state.leafByToken[token]?.tile,
                   tile.activeToken == token, !tile.activeMember.isFullscreen,
                   tile.freeFrame == observed else { return }
-            if controller.mouseEventHandler.pressedMouseButtonsProvider() & 1 != 0 {
+            if controller.mouseEventHandler.directTouchDrag?.token == token || controller.mouseEventHandler.pressedMouseButtonsProvider() & 1 != 0 {
                 settleTabbedBoundary(windowId: windowId, entry: current, observed: observed)
                 return
             }

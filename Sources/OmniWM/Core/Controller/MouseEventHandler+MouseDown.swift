@@ -18,6 +18,13 @@ extension MouseEventHandler {
         if shouldBlockOwnWindowInput(at: location) {
             return false
         }
+        if button == .left, windowServerFramesAtMouseDown == nil,
+           let touch = directTouchDrag, touch.layout == .niri, touch.mode == .windowResize,
+           modifiers.isDisjoint(with: Self.relevantModifierFlags),
+           hypot(touch.start.x - location.x, touch.start.y - location.y) <= 28 {
+            // The screen already owns this handle. Keep the app from starting a second native resize.
+            return true
+        }
         guard !state.isMoving, !state.isResizing else { return false }
 
         guard let wsId = workspaceIdForPointer(at: location) ?? controller.activeWorkspace()?.id else {
@@ -36,6 +43,20 @@ extension MouseEventHandler {
         }
 
         if button == .left, modifiers.isDisjoint(with: Self.relevantModifierFlags) {
+            if directTouchDrag == nil, windowServerFramesAtMouseDown == nil,
+               controller.workspaceManager.activeLayoutKind(for: wsId) == .niri,
+               let engine = controller.niriEngine,
+               let (front, frame) = frontTiledWindow(at: location, in: wsId)
+                   ?? nearbyNiriHandle(at: location, in: wsId, tolerance: 8),
+               let window = engine.findNode(for: front, in: wsId) {
+                let edges = ResizeConfiguration.handleEdges(at: location, in: frame)
+                if !edges.isEmpty,
+                   beginNiriResize(window: window, engine: engine, wsId: wsId, at: location,
+                                   source: .mouse(button), handleEdges: edges) {
+                    controller.axEventHandler.noteMouseFocusIntent(token: front)
+                    return true
+                }
+            }
             recordPointerFocusIntent(
                 at: location,
                 workspaceId: wsId,

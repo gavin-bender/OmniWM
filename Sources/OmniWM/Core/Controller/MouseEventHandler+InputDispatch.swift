@@ -119,7 +119,7 @@ extension MouseEventHandler {
             handleInputSuppressionBegan()
             return
         }
-        guard state.activeInteractionSource != .touchDisplay else { return }
+        guard state.activeInteractionSource != .touchDisplay, directTouchDrag?.layout != .tabbed else { return }
         if button == .left { updateTabbedTitleDrag(at: location, released: true) }
         markNativeTitleBarDragFallbackReleased(button: button, at: location)
         finishNativeTitleBarDragIfNeeded(button: button)
@@ -402,6 +402,7 @@ extension MouseEventHandler {
             handleInputSuppressionBegan()
             return
         }
+        if handleDirectTouchDrag(snapshot) { return }
         guard shouldProcessGestureFrame(snapshot) else { return }
         if shouldBlockOwnWindowGestureInput(at: snapshot.location) {
             dropPendingTapMovement()
@@ -450,7 +451,7 @@ extension MouseEventHandler {
             handleInputSuppressionBegan()
             return
         }
-        guard state.activeInteractionSource != .touchDisplay else { return }
+        guard state.activeInteractionSource != .touchDisplay, directTouchDrag?.layout != .tabbed else { return }
         warpDraggedPointer(at: location)
         controller?.workspaceBarManager.handleAutoHideMouseMoved(at: location)
         if button == .left, state.tabbedTitleDrag != nil {

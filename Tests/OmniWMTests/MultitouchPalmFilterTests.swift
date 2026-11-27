@@ -229,6 +229,16 @@ final class MultitouchPalmFilterTests: XCTestCase {
         XCTAssertEqual(location, CGPoint(x: -500, y: 600))
     }
 
+    func testKiwiTitleBarContactMapsToTopOfOffsetDisplay() throws {
+        let screen = CGRect(x: -1800, y: 200, width: 1800, height: 1182)
+        let touches = MultitouchGestureSource.RawTouchBuffer([.init(x: 0.25, y: 0.1)])
+        let frame = MultitouchGestureSource.RawFrame(touches: touches, timestamp: 1, origin: .topLeft)
+        let point = try XCTUnwrap(frame.screenLocation(in: screen))
+        XCTAssertEqual(point.x, -1350, accuracy: 0.01)
+        XCTAssertEqual(point.y, screen.maxY - 118.2, accuracy: 0.01)
+        XCTAssertEqual(frame.touches[0].y, 0.1)
+    }
+
     func testFingerPositionsSurviveFiltering() throws {
         var filter = MultitouchPalmFilter()
         let finger = Contact(pathId: 1, fingerId: 2, x: 0.25, y: 0.75)

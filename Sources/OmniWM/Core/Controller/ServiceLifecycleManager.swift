@@ -25,7 +25,6 @@ final class ServiceLifecycleManager {
     private var workspaceObservation = WorkspaceEventObservation()
     private var screenParametersObserver: NSObjectProtocol?
     private var permissionCheckerTask: Task<Void, Never>?
-    private var touchDisplayGestureCaptureActive = false
     private lazy var trackpadNavigationGestures = [
         nativeNavigationGesture(.system(OmniWMNativeGestureTrackpadMissionControl), "trackpad-mission-control-restore"),
         nativeNavigationGesture(.system(OmniWMNativeGestureTrackpadAppExpose), "trackpad-app-expose-restore")
@@ -83,17 +82,10 @@ final class ServiceLifecycleManager {
         for gesture in trackpadNavigationGestures {
             gesture.reconcile(shouldPause: pauseNative)
         }
-        guard #available(macOS 27.2, *), TouchDisplayWindowGestures.isPROLEDMac else { return }
-        let pauseTouchDisplay = pauseNative || (servicesActive && touchDisplayGestureCaptureActive)
+        guard #available(macOS 27.2, *), TouchDisplay.isPROLEDMac else { return }
         for gesture in touchDisplayNavigationGestures {
-            gesture.reconcile(shouldPause: pauseTouchDisplay)
+            gesture.reconcile(shouldPause: pauseNative)
         }
-    }
-
-    func setTouchDisplayGestureCapture(active: Bool) {
-        guard touchDisplayGestureCaptureActive != active else { return }
-        touchDisplayGestureCaptureActive = active
-        reconcileNativeNavigationGestures()
     }
 
     func restart() {
@@ -347,7 +339,6 @@ final class ServiceLifecycleManager {
         }
         controller.layoutRefreshController.workspaceSwipe.cancelAll(reason: "service-stop")
         controller.hasStartedServices = false
-        touchDisplayGestureCaptureActive = false
         reconcileNativeNavigationGestures()
         let hostedRestorations = controller.shellAppWindowManager.prepareManagementStop()
         controller.updateWorkspaceBarNotificationBadgeSettings()

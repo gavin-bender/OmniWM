@@ -670,6 +670,59 @@ final class WorkspaceBarActionsTests: XCTestCase {
         XCTAssertEqual(engine.tileCount(in: ws), 4)
     }
 
+    func testDirectTitleDragGroupsOnFingerLiftOnly() throws {
+        let fixture = try makeFixture(followsFocus: false)
+        let controller = fixture.controller
+        let ws = fixture.ws1
+        let engine = try XCTUnwrap(controller.dwindleEngine)
+        let mouse = controller.mouseEventHandler
+        defer {
+            mouse.tabDropFeedback.hide()
+            controller.layoutRefreshController.resetState()
+        }
+        let a = try addWindow(pid: 711_001, windowId: 1, to: ws, fixture: fixture).id
+        let b = try addWindow(pid: 711_002, windowId: 2, to: ws, fixture: fixture).id
+        XCTAssertTrue(controller.commandHandler.setWorkspaceLayout(.tabbed))
+        func layout() {
+            _ = controller.layoutRefreshController.buildRelayoutEffectPlan(
+                useScrollAnimationPath: false, recoverFocus: false, affectedWorkspaceIds: [ws]
+            )
+        }
+        layout()
+        let source = CGRect(x: 200, y: 100, width: 300, height: 300)
+        let target = source.offsetBy(dx: 350, dy: 0)
+        controller.workspaceManager.withEngineMutationScope {
+            XCTAssertTrue(engine.detachTab(a, to: source, in: ws))
+        }
+        layout()
+        let contact = MultitouchContactSession(generation: 1, slot: 0, session: 1, senderId: nil, isTouchScreen: true)
+        func touch(_ phase: NSEvent.Phase, at point: CGPoint) {
+            var event = MouseEventHandler.GestureEventSnapshot(
+                location: .zero, phaseRawValue: phase.rawValue,
+                touches: phase == .ended || phase == .cancelled ? [] : [.init(phase: .moved, normalizedPosition: .zero)],
+                contactSession: contact
+            )
+            event.directDisplayLocation = phase == .ended || phase == .cancelled ? nil : point
+            mouse.receiveTapGestureEvent(event)
+        }
+        let start = CGPoint(x: source.midX, y: source.maxY - 12)
+        let end = CGPoint(x: target.midX, y: target.maxY - 12)
+        mouse.tabWindowStackAtPoint = { point in
+            point == start ? [(a.windowId, source)] : [(a.windowId, target), (b.windowId, target)]
+        }
+        for terminal in [NSEvent.Phase.cancelled, .ended] {
+            touch(.began, at: start)
+            touch(.changed, at: end)
+            XCTAssertNil(mouse.state.activeInteractionSource)
+            XCTAssertNil(mouse.state.tabbedGesture)
+            XCTAssertEqual(engine.tile(containing: a, in: ws)?.freeFrame, source)
+            XCTAssertEqual(engine.tileCount(in: ws), 2)
+            touch(terminal, at: end)
+            XCTAssertEqual(engine.tileCount(in: ws), terminal == .ended ? 1 : 2)
+            XCTAssertNil(mouse.state.activeInteractionSource)
+        }
+    }
+
     func testToggleWorkspaceLayoutCyclesThroughTabbed() throws {
         let controller = try makeFixture(followsFocus: false).controller
         defer { controller.columnModeToast.destroy() }

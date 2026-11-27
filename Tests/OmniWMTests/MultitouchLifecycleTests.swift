@@ -609,6 +609,7 @@ final class MultitouchLifecycleTests: XCTestCase {
         controller.settings.gestures.workspaceSwipeEnabled = false
         controller.hasStartedServices = true
         let handler = controller.mouseEventHandler
+        handler.touchDisplayAvailable = { false }
 
         XCTAssertTrue(handler.installMultitouchSource(harness.source))
         try await runNext(harness)
@@ -644,6 +645,7 @@ final class MultitouchLifecycleTests: XCTestCase {
         controller.settings.gestures.workspaceSwipeEnabled = false
         controller.hasStartedServices = true
         let handler = controller.mouseEventHandler
+        handler.touchDisplayAvailable = { false }
         var replacementCreations = 0
         handler.multitouchSourceFactory = {
             replacementCreations += 1

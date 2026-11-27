@@ -188,97 +188,187 @@ final class TrackpadWindowGestureTests: XCTestCase {
         XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
     }
 
-    func testTouchDisplayThreeFingerSwipeMapsBothAxesAndRespectsDirection() {
-        let cases: [(CGPoint, Bool, TouchDisplayWindowGestures.NavigationSwipe.Action)] = [
-            (CGPoint(x: -85, y: 15), true, .focusWindow(.right)),
-            (CGPoint(x: 85, y: 15), true, .focusWindow(.left)),
-            (CGPoint(x: 15, y: 85), true, .switchWorkspace(isNext: true)),
-            (CGPoint(x: 15, y: -85), true, .switchWorkspace(isNext: false)),
-            (CGPoint(x: -85, y: 15), false, .focusWindow(.left)),
-            (CGPoint(x: 15, y: 85), false, .switchWorkspace(isNext: false))
-        ]
-        for (translation, naturalDirection, action) in cases {
-            var swipe = TouchDisplayWindowGestures.NavigationSwipe()
-            XCTAssertEqual(swipe.finish(translation: translation, naturalDirection: naturalDirection), action)
+    func testNiriCornerResizeWithPrimaryButtonAndDirectTouch() throws {
+        for source in [MouseInputState.InteractionSource.mouse(.left), .touchDisplay] {
+            let fixture = try makeNiriFixture(pid: 9_153)
+            let handler = fixture.handler
+            let frame = fixture.firstFrame
+            let corner = CGPoint(x: frame.maxX - 3, y: frame.minY + 3)
+            let workspace = try XCTUnwrap(fixture.controller.workspaceManager.descriptor(for: fixture.workspaceId))
+            if source == .touchDisplay {
+                XCTAssertTrue(handler.beginWindowInteraction(
+                    .windowMove, target: fixture.first.token, workspace: workspace, at: corner, source: source
+                ))
+            } else {
+                let id = fixture.first.token.windowId
+                handler.tabWindowStackAtPoint = { _ in [(id, frame)] }
+                let previous = MouseEventHandler._instance
+                MouseEventHandler._instance = handler
+                defer { MouseEventHandler._instance = previous }
+                var snapshot = handler.inputTapThread.filterSnapshot
+                snapshot.niriResizeFrames[fixture.monitor.displayId] = [frame]
+                XCTAssertTrue(handler.inputTapThread.evaluateLeftMouseDown(
+                    at: corner, modifiers: [], timestamp: 0, snapshot: snapshot
+                ) {
+                    XCTFail("A managed corner press should capture the resize synchronously")
+                    return [:]
+                })
+            }
+            XCTAssertEqual(handler.state.currentHoveredEdges, [.right, .bottom])
+            XCTAssertEqual(handler.state.activeInteractionSource, source)
+            let end = CGPoint(x: corner.x + 75, y: corner.y)
+            if source == .touchDisplay {
+                handler.updateManagedResize(at: end)
+                handler.completeActiveResize()
+            } else {
+                handler.receiveTapMouseUp(at: end)
+            }
+            XCTAssertGreaterThan(try XCTUnwrap(fixture.frames()[fixture.first.token]).width, frame.width)
         }
     }
 
-    func testTouchDisplaySwipeIgnoresDiagonalAndKeepsFirstClearAxis() {
-        var swipe = TouchDisplayWindowGestures.NavigationSwipe()
-        XCTAssertNil(swipe.finish(translation: CGPoint(x: 90, y: 90), naturalDirection: true))
-        XCTAssertNil(swipe.finish(translation: CGPoint(x: 30, y: 5), naturalDirection: true))
-        swipe.observe(translation: CGPoint(x: -75, y: 20))
-        XCTAssertEqual(
-            swipe.finish(translation: CGPoint(x: -75, y: 150), naturalDirection: true),
-            .focusWindow(.right)
-        )
-        XCTAssertNil(swipe.finish(translation: CGPoint(x: -20, y: 150), naturalDirection: true))
+    func testNiriTrackpadClickDragJustOutsideSideEdgePersistsAfterRelease() throws {
+        let fixture = try makeNiriFixture(pid: 9_157)
+        let handler = fixture.handler
+        let frame = fixture.firstFrame
+        let press = CGPoint(x: frame.maxX + 2, y: frame.midY)
+        let end = CGPoint(x: press.x + 65, y: press.y + 15)
+        handler.tabWindowStackAtPoint = { frame.contains($0) ? [(fixture.first.token.windowId, frame)] : [] }
+        let previous = MouseEventHandler._instance
+        MouseEventHandler._instance = handler
+        defer { MouseEventHandler._instance = previous }
+        var snapshot = handler.inputTapThread.filterSnapshot
+        snapshot.niriResizeFrames[fixture.monitor.displayId] = [frame]
+        XCTAssertTrue(handler.inputTapThread.evaluateLeftMouseDown(at: press, modifiers: [], timestamp: 0,
+                                                                  snapshot: snapshot) { [:] })
+        XCTAssertEqual(handler.state.currentHoveredEdges, [.right])
+        handler.dispatchQueuedMouseDragged(at: end, button: .left)
+        let live = try XCTUnwrap(fixture.frames()[fixture.first.token])
+        XCTAssertGreaterThan(live.width, frame.width)
+        XCTAssertEqual(live.height, frame.height)
+        handler.receiveTapMouseUp(at: end)
+        XCTAssertEqual(try XCTUnwrap(fixture.frames()[fixture.first.token]).size, live.size)
     }
 
-    func testTouchDisplayNavigatesNiriWindowsOnTouchedDisplay() throws {
-        let fixture = try makeNiriFixture(pid: 9_151)
-        let manager = fixture.controller.workspaceManager
-        let otherFrame = workingFrame.offsetBy(dx: workingFrame.width, dy: 0)
-        let otherMonitor = Monitor(
-            id: .init(displayId: 52_002),
-            displayId: 52_002,
-            frame: otherFrame,
-            visibleFrame: otherFrame,
-            hasNotch: false,
-            name: "External Display"
-        )
-        manager.applyMonitorConfigurationChange([fixture.monitor, otherMonitor])
-        manager.updateInteractionMonitor(otherMonitor.id, preservePrevious: true, notify: false)
-        XCTAssertNotEqual(fixture.controller.activeWorkspace()?.id, fixture.workspaceId)
-
-        let workspace = try XCTUnwrap(manager.activeWorkspace(on: fixture.monitor.id))
-        XCTAssertEqual(workspace.id, fixture.workspaceId)
-        manager.commitWorkspaceSelection(nodeId: fixture.first.id, focusedToken: fixture.first.token, in: workspace.id)
-
-        TouchDisplayWindowGestures.performNavigation(
-            .focusWindow(.right), in: workspace, on: fixture.monitor.id, controller: fixture.controller
-        )
-
-        XCTAssertEqual(manager.niriViewportState(for: fixture.workspaceId).selectedNodeId, fixture.second.id)
+    func testNiriGestureDropAtFarEdgeInsertsColumn() throws {
+        for source in [MouseInputState.InteractionSource.trackpadGesture, .touchDisplay] {
+            let fixture = try makeNiriFixture(pid: 9_154)
+            let workspace = try XCTUnwrap(fixture.controller.workspaceManager.descriptor(for: fixture.workspaceId))
+            let targetColumn = try XCTUnwrap(fixture.engine.findColumn(containing: fixture.second, in: workspace.id))
+            XCTAssertTrue(fixture.handler.beginWindowInteraction(
+                .windowMove, target: fixture.first.token, workspace: workspace, at: fixture.firstFrame.center,
+                source: source
+            ))
+            let drop = CGPoint(x: fixture.secondFrame.maxX - 3, y: fixture.secondFrame.midY)
+            fixture.handler.updateActiveMove(at: drop)
+            XCTAssertEqual(fixture.engine.interactiveMove?.currentHoverTarget?.direction, .right)
+            fixture.handler.completeActiveMove(at: drop)
+            XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
+            XCTAssertEqual(targetColumn.windowNodes.map(\.token), [fixture.second.token])
+        }
     }
 
-    func testTouchDisplayNavigatesDwindleWindows() throws {
-        let fixture = try makeDwindleFixture(pid: 9_205)
-        let manager = fixture.controller.workspaceManager
-        let workspace = try XCTUnwrap(manager.descriptor(for: fixture.workspaceId))
-        let monitor = try XCTUnwrap(manager.monitorId(for: workspace.id))
-        let direction: Direction = fixture.firstFrame.midX < fixture.secondFrame.midX ? .right : .left
-        manager.withEngineMutationScope(in: workspace.id) {
-            fixture.engine.setSelectedNode(fixture.engine.findNode(for: fixture.first, in: workspace.id), in: workspace.id)
+    func testShortTouchDragAcrossAWideWindowMovesItOneStripPosition() throws {
+        let fixture = try makeNiriFixture(pid: 9_156)
+        let workspace = try XCTUnwrap(fixture.controller.workspaceManager.descriptor(for: fixture.workspaceId))
+        let start = CGPoint(x: fixture.firstFrame.midX, y: fixture.firstFrame.maxY - 12)
+        let end = CGPoint(x: start.x + 90, y: start.y)
+        XCTAssertTrue(fixture.firstFrame.contains(end))
+        XCTAssertTrue(fixture.handler.beginWindowInteraction(
+            .windowMove, target: fixture.first.token, workspace: workspace, at: start, source: .touchDisplay
+        ))
+        fixture.handler.updateActiveMove(at: end)
+        XCTAssertEqual(fixture.engine.interactiveMove?.currentHoverTarget?.token, fixture.second.token)
+        fixture.handler.completeActiveMove(at: end)
+        XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
+    }
+
+    func testTouchscreenKeepsCornerThroughSynthesizedMouseEventsInEitherOrder() throws {
+        for mouseFirst in [true, false] {
+            let fixture = try makeNiriFixture(pid: 9_156)
+            let handler = fixture.handler
+            let frame = fixture.firstFrame
+            let corner = CGPoint(x: frame.maxX - 4, y: frame.minY + 4)
+            handler.tabWindowStackAtPoint = { _ in [(fixture.first.token.windowId, frame)] }
+            let contact = MultitouchContactSession(generation: 1, slot: 0, session: 1, senderId: nil, isTouchScreen: true)
+            func touch(_ phase: NSEvent.Phase, _ point: CGPoint) {
+                var snapshot = MouseEventHandler.GestureEventSnapshot(
+                    location: point, phaseRawValue: phase.rawValue,
+                    touches: phase == .ended ? [] : [.init(phase: .moved, normalizedPosition: .zero)],
+                    contactSession: contact
+                )
+                snapshot.directDisplayLocation = point
+                XCTAssertTrue(handler.handleDirectTouchDrag(snapshot))
+            }
+            if mouseFirst { XCTAssertTrue(handler.dispatchMouseDown(at: corner, modifiers: [])) }
+            touch(.began, corner)
+            if !mouseFirst { XCTAssertTrue(handler.dispatchMouseDown(at: corner, modifiers: [])) }
+            let mid = CGPoint(x: corner.x + 35, y: corner.y)
+            touch(.changed, mid)
+            handler.receiveTapMouseUp(at: mid)
+            XCTAssertEqual(handler.state.activeInteractionSource, .touchDisplay)
+            let end = CGPoint(x: corner.x + 70, y: corner.y)
+            touch(.changed, end)
+            let liveWidth = try XCTUnwrap(fixture.frames()[fixture.first.token]).width
+            touch(.ended, end)
+            XCTAssertGreaterThan(liveWidth, frame.width)
+            XCTAssertEqual(try XCTUnwrap(fixture.frames()[fixture.first.token]).width, liveWidth)
+        }
+    }
+
+    func testDirectScreenContactReordersTitleBarsAndResizesCornersWithoutAPanel() throws {
+        let fixture = try makeNiriFixture(pid: 9_155)
+        let handler = fixture.handler
+        let frames = [(fixture.first.token.windowId, fixture.firstFrame), (fixture.second.token.windowId, fixture.secondFrame)]
+        handler.tabWindowStackAtPoint = { point in frames.filter { $0.1.contains(point) } }
+        let contact = MultitouchContactSession(generation: 1, slot: 0, session: 1, senderId: nil, isTouchScreen: true)
+        func touch(_ phase: NSEvent.Phase, at point: CGPoint, count: Int = 1) {
+            var snapshot = MouseEventHandler.GestureEventSnapshot(
+                location: .zero, phaseRawValue: phase.rawValue,
+                touches: Array(repeating: .init(phase: .moved, normalizedPosition: .zero), count: count),
+                contactSession: contact
+            )
+            snapshot.directDisplayLocation = point
+            handler.receiveTapGestureEvent(snapshot)
         }
 
-        TouchDisplayWindowGestures.performNavigation(
-            .focusWindow(direction), in: workspace, on: monitor, controller: fixture.controller
-        )
+        let first = fixture.firstFrame
+        let second = fixture.secondFrame
+        let title = CGPoint(x: first.midX, y: first.maxY - 40)
+        let destination = CGPoint(x: second.midX, y: second.maxY - 12)
+        touch(.began, at: first.center)
+        touch(.changed, at: destination)
+        touch(.ended, at: destination, count: 0)
+        XCTAssertNil(handler.state.activeInteractionSource)
+        XCTAssertEqual(fixture.windowOrder(), [fixture.first.token, fixture.second.token])
 
-        XCTAssertEqual(fixture.engine.selectedNode(in: workspace.id)?.windowToken, fixture.second)
-    }
+        touch(.began, at: title)
+        touch(.ended, at: title, count: 0)
+        XCTAssertEqual(fixture.windowOrder(), [fixture.first.token, fixture.second.token])
+        touch(.began, at: title)
+        touch(.changed, at: destination)
+        XCTAssertEqual(handler.state.activeInteractionSource, .touchDisplay)
+        touch(.cancelled, at: destination, count: 0)
+        XCTAssertEqual(fixture.windowOrder(), [fixture.first.token, fixture.second.token])
 
-    func testTouchDisplayNavigatesBetweenColumnsInVerticalNiriLayout() throws {
-        let fixture = try makeNiriFixture(pid: 9_152)
-        let controller = fixture.controller
-        let manager = controller.workspaceManager
-        let workspace = try XCTUnwrap(manager.descriptor(for: fixture.workspaceId))
-        controller.settings.monitors.updateOrientationSettings(
-            MonitorOrientationSettings(
-                monitorName: fixture.monitor.name,
-                monitorDisplayId: fixture.monitor.displayId,
-                orientation: .vertical
-            ),
-            for: fixture.monitor
-        )
-        manager.commitWorkspaceSelection(nodeId: fixture.first.id, focusedToken: fixture.first.token, in: workspace.id)
+        let corner = CGPoint(x: first.maxX + 2, y: first.minY + 5)
+        let end = CGPoint(x: corner.x + 60, y: corner.y)
+        touch(.began, at: corner)
+        touch(.changed, at: end)
+        XCTAssertTrue(handler.state.isResizing)
+        let liveNeighbor = try XCTUnwrap(fixture.frames()[fixture.second.token])
+        XCTAssertGreaterThan(liveNeighbor.minX, second.minX)
+        touch(.ended, at: end, count: 0)
+        XCTAssertGreaterThan(try XCTUnwrap(fixture.frames()[fixture.first.token]).width, first.width)
 
-        TouchDisplayWindowGestures.performNavigation(
-            .focusWindow(.right), in: workspace, on: fixture.monitor.id, controller: controller
-        )
-
-        XCTAssertEqual(manager.niriViewportState(for: workspace.id).selectedNodeId, fixture.second.id)
+        let target = try XCTUnwrap(fixture.frames()[fixture.second.token])
+        let drop = CGPoint(x: target.midX, y: target.maxY - 12)
+        touch(.began, at: title)
+        touch(.changed, at: drop)
+        touch(.ended, at: drop, count: 0)
+        XCTAssertEqual(fixture.engine.columns(in: fixture.workspaceId).map { $0.windowNodes.map(\.token) },
+                       [[fixture.second.token], [fixture.first.token]])
+        XCTAssertNil(handler.state.activeInteractionSource)
     }
 
     func testPauseNativeNavigationSwipesDropsHorizontalAndVerticalDockGesturesWhileEnabled() throws {
@@ -853,7 +943,7 @@ final class TrackpadWindowGestureTests: XCTestCase {
             "Overshoot lost the edge drop target"
         )
         XCTAssertEqual(hoverTarget.token, fixture.second.token)
-        XCTAssertNil(hoverTarget.direction)
+        XCTAssertEqual(hoverTarget.direction, .right)
         gesture.end()
         XCTAssertEqual(fixture.windowOrder(), [fixture.second.token, fixture.first.token])
     }

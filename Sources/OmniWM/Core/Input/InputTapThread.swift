@@ -9,6 +9,7 @@ struct TapFilterSnapshot: Sendable {
     var activeCapture: MouseEventHandler.MouseButton?
     var claimedOtherButtonMask: UInt32 = 0
     var moveModifier: CGEventFlags?
+    var niriResizeFrames: [CGDirectDisplayID: [CGRect]] = [:]
     var adoptNativeResize = false
     var resizeModifier: CGEventFlags = []
     var scrollModifier: CGEventFlags = []
@@ -190,11 +191,11 @@ final class InputTapThread: @unchecked Sendable {
         let location = ScreenCoordinateSpace.toAppKit(point: event.location)
         switch type {
         case .leftMouseDown:
-            evaluateLeftMouseDown(
+            let suppressed = evaluateLeftMouseDown(
                 at: location, modifiers: event.flags, timestamp: event.timestamp,
                 snapshot: snap, captureWindowFrames: Self.captureWindowFrames
             )
-            return event
+            return suppressed ? nil : event
         case .leftMouseDragged:
             guard snap.activeCapture == .left else {
                 EventIntake.post(.mouseDragged(button: .left, location: location))
@@ -355,19 +356,23 @@ final class InputTapThread: @unchecked Sendable {
 }
 
 extension InputTapThread {
+    @discardableResult
     nonisolated func evaluateLeftMouseDown(
         at location: CGPoint,
         modifiers: CGEventFlags,
         timestamp: CGEventTimestamp,
         snapshot: TapFilterSnapshot,
         captureWindowFrames: () -> [WindowToken: CGRect]
-    ) {
+    ) -> Bool {
         let isMoveCandidate = MouseEventHandler.mouseMoveModifiersMatch(modifiers, required: snapshot.moveModifier)
-        if isMoveCandidate {
-            _ = evaluateAuthoritativeTapOnMain(
+        let resizeCandidate = modifiers.isDisjoint(with: MouseEventHandler.relevantModifierFlags)
+            && snapshot.niriResizeFrames.values.contains { frames in
+                frames.contains { !ResizeConfiguration.handleEdges(at: location, in: $0).isEmpty }
+            }
+        if isMoveCandidate || resizeCandidate {
+            return evaluateAuthoritativeTapOnMain(
                 type: .leftMouseDown, location: location, modifiers: modifiers, buttonNumber: 0, scrollPayload: nil
             )
-            return
         }
         let needsNativeResizeBaseline = snapshot.adoptNativeResize
             && modifiers.isDisjoint(with: MouseEventHandler.relevantModifierFlags)
@@ -375,6 +380,7 @@ extension InputTapThread {
         EventIntake.post(.leftMouseDown(.init(
             location: location, modifiers: modifiers, timestamp: timestamp, windowServerFrames: windowServerFrames
         )))
+        return false
     }
 
     private nonisolated static func captureWindowFrames() -> [WindowToken: CGRect] {

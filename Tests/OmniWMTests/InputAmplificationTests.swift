@@ -13,6 +13,8 @@ final class InputAmplificationTests: XCTestCase {
         controller.settings.gestures.workspaceSwipeEnabled = false
         controller.hasStartedServices = true
         let handler = controller.mouseEventHandler
+        var hasTouchDisplay = false
+        handler.touchDisplayAvailable = { hasTouchDisplay }
         var sourceCreations = 0
         handler.multitouchSourceFactory = {
             sourceCreations += 1
@@ -28,7 +30,13 @@ final class InputAmplificationTests: XCTestCase {
         XCTAssertEqual(sourceCreations, 1)
         XCTAssertEqual(handler.multitouchDiagnosticsSnapshot?.state, .unavailable)
 
+        hasTouchDisplay = true
         controller.settings.gestures.workspaceSwipeEnabled = false
+        handler.reconcileMultitouchSource()
+        XCTAssertEqual(sourceCreations, 1)
+        XCTAssertNotNil(handler.multitouchDiagnosticsSnapshot)
+
+        hasTouchDisplay = false
         handler.reconcileMultitouchSource()
         XCTAssertNil(handler.multitouchDiagnosticsSnapshot)
         XCTAssertNil(MultitouchGestureSource.shared)

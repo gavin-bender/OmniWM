@@ -26,7 +26,8 @@ extension MouseEventHandler {
                 windowId: tiledWindow.id,
                 windowToken: tiledWindow.token,
                 startLocation: location,
-                allowsInsertion: source.mouseButton != nil,
+                allowsInsertion: true,
+                reordersStrip: source == .touchDisplay,
                 context: .init(
                     workspaceId: wsId,
                     motion: controller.motionPolicy.snapshot(),
@@ -68,7 +69,8 @@ extension MouseEventHandler {
         engine: NiriLayoutEngine,
         wsId: WorkspaceDescriptor.ID,
         at location: CGPoint,
-        source: MouseInputState.InteractionSource
+        source: MouseInputState.InteractionSource,
+        handleEdges: ResizeEdge? = nil
     ) -> Bool {
         guard let controller,
               let monitor = controller.workspaceManager.monitor(for: wsId),
@@ -76,7 +78,7 @@ extension MouseEventHandler {
               engine.interactiveResizeTarget(windowId: tiledWindow.id, in: wsId) != nil
         else { return false }
 
-        let edges = resizeEdges(for: location, in: frame)
+        let edges = handleEdges ?? resizeEdges(for: location, in: frame)
         let orientation = resolvedNiriOrientation(
             engine: engine,
             workspaceId: wsId,

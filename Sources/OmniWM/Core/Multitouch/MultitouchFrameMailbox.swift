@@ -93,7 +93,7 @@ final class MultitouchFrameMailbox: @unchecked Sendable {
         }
     }
 
-    func offer(_ frame: MultitouchGestureSource.RawFrame, generation: UInt, slot: Int) -> Bool {
+    func offer(_ frame: MultitouchGestureSource.RawFrame, generation: UInt, slot: Int, isTouchScreen: Bool = false) -> Bool {
         state.withLock { value in
             if let counters = value.performanceCounters {
                 _ = counters.rawCallbacks.wrappingAdd(1, ordering: .relaxed)
@@ -122,7 +122,8 @@ final class MultitouchFrameMailbox: @unchecked Sendable {
                 ))
             }
             var scheduled = false
-            if let owner = value.ownerSlot, hasTouches,
+            // The touchscreen can pause reports while a finger rests on a handle.
+            if let owner = value.ownerSlot, hasTouches, !(isTouchScreen && owner == slot),
                frame.timestamp - value.ownerTimestamp > multitouchLiftTimeout
             {
                 value.touchingSlots &= ~(1 << UInt64(owner))
@@ -138,7 +139,7 @@ final class MultitouchFrameMailbox: @unchecked Sendable {
                     in: &value
                 )
             }
-            let routed = route(frame, previous: previousFingerCount, generation: generation, slot: slot, in: &value)
+            let routed = route(frame, previous: previousFingerCount, generation: generation, slot: slot, isTouchScreen: isTouchScreen, in: &value)
             return scheduleDrainIfNeeded(in: &value) || routed || scheduled
         }
     }
@@ -148,6 +149,7 @@ final class MultitouchFrameMailbox: @unchecked Sendable {
         previous previousFingerCount: Int,
         generation: UInt,
         slot: Int,
+        isTouchScreen: Bool,
         in value: inout State
     ) -> Bool {
         let fingerCount = frame.touches.count
@@ -173,7 +175,7 @@ final class MultitouchFrameMailbox: @unchecked Sendable {
         }
         value.ownerTimestamp = frame.timestamp
         let isSteadyBelowFloor = fingerCount == previousFingerCount && fingerCount < value.steadyFrameFloor
-        guard !isSteadyBelowFloor else { return false }
+        guard !isSteadyBelowFloor || (isTouchScreen && fingerCount == 1) else { return false }
         if value.pending.last?.kind == .changed, value.pending.last?.frame.touches.count == frame.touches.count {
             value.pending[value.pending.count - 1] = Delivery(
                 frame: frame,

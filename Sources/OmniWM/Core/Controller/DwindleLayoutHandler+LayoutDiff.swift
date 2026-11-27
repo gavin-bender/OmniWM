@@ -75,7 +75,8 @@ extension DwindleLayoutHandler {
             if window.hiddenState == nil, !context.engine.isWindowFullscreen(token, in: context.workspaceId),
                context.engine.existingState(for: context.workspaceId)?.tabbedMembers != nil {
                 let mouse = controller?.mouseEventHandler
-                if mouse?.state.tabbedTitleDrag?.token == token {
+                let touch = mouse?.directTouchDrag
+                if (touch?.layout == .tabbed && touch?.token == token) || mouse?.state.tabbedTitleDrag?.token == token {
                     continue
                 }
             }

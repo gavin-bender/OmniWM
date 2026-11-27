@@ -378,7 +378,8 @@ extension MultitouchGestureSource {
         generation: UInt,
         location: CGPoint,
         terminalPhase: NSEvent.Phase = .ended,
-        contactSession: MultitouchContactSession? = nil
+        contactSession: MultitouchContactSession? = nil,
+        directDisplayLocation: CGPoint? = nil
     ) {
         lastRawCallbackTimestamp = frame.timestamp
         lastRawCallbackGeneration = generation
@@ -393,7 +394,8 @@ extension MultitouchGestureSource {
             contactSession: contactSession
         )
         previousActiveCount = result.activeCount
-        if let snapshot = result.snapshot {
+        if var snapshot = result.snapshot {
+            snapshot.directDisplayLocation = directDisplayLocation
             onSnapshot?(snapshot)
         }
     }
@@ -415,7 +417,10 @@ extension MultitouchGestureSource {
         for point in UnsafeBufferPointer(start: points, count: Int(count)) {
             touches.append(RawTouch(x: point.x, y: point.y))
         }
-        source.enqueueRawFrame(RawFrame(touches: touches, timestamp: timestamp), token: RegistrationToken(bitPattern: bits))
+        // Kiwi reports distance down from the top. Keep the raw deltas used by swipe
+        // recognition and convert the absolute position when mapping onto the display.
+        let frame = RawFrame(touches: touches, timestamp: timestamp, origin: .topLeft)
+        source.enqueueRawFrame(frame, token: RegistrationToken(bitPattern: bits))
     }
 
     private static let contactCallback: MultitouchBinding.ContactCallback = { _, fingers, count, timestamp, _, refcon in
@@ -427,7 +432,7 @@ extension MultitouchGestureSource {
     }
 
     private nonisolated func enqueueRawFrame(_ frame: RawFrame, token: RegistrationToken) {
-        guard rawFrameMailbox.offer(frame, generation: token.generation, slot: token.slot) else { return }
+        guard rawFrameMailbox.offer(frame, generation: token.generation, slot: token.slot, isTouchScreen: token.isTouchScreen) else { return }
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated {
                 self?.drainRawFrameMailbox()
@@ -465,14 +470,16 @@ extension MultitouchGestureSource {
                 senderId: devices.senderId(at: delivery.slot),
                 isTouchScreen: devices.isTouchScreen(at: delivery.slot)
             )
+            var directDisplayLocation: CGPoint?
             var gestureLocation = cursorLocation
             if contactSession.isTouchScreen, #available(macOS 27.0, *),
-               let screen = TouchDisplayWindowGestures.builtInTouchScreen()
+               let screen = TouchDisplay.builtInTouchScreen()
             {
                 // A direct swipe belongs to the screen under the fingers even when the mouse is on another monitor.
                 if let point = delivery.frame.screenLocation(in: screen.frame) {
                     lastScreenTouchLocation = point
                 }
+                directDisplayLocation = lastScreenTouchLocation
                 gestureLocation = lastScreenTouchLocation ?? CGPoint(x: screen.frame.midX, y: screen.frame.midY)
                 if delivery.kind.isTerminal { lastScreenTouchLocation = nil }
             }
@@ -481,7 +488,7 @@ extension MultitouchGestureSource {
                 generation: delivery.generation,
                 location: gestureLocation,
                 terminalPhase: delivery.kind == .cancelled ? .cancelled : .ended,
-                contactSession: contactSession
+                contactSession: contactSession, directDisplayLocation: directDisplayLocation
             )
         }
     }

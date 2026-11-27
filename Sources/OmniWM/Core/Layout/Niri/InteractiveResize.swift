@@ -102,7 +102,23 @@ struct InteractiveResize {
 }
 
 struct ResizeConfiguration {
-    var edgeThreshold: CGFloat = 8.0
+    static func isCorner(_ point: CGPoint, of frame: CGRect, tolerance: CGFloat = 8) -> Bool {
+        min(abs(point.x - frame.minX), abs(point.x - frame.maxX)) <= tolerance
+            && min(abs(point.y - frame.minY), abs(point.y - frame.maxY)) <= tolerance
+    }
+
+    static func handleEdges(at point: CGPoint, in frame: CGRect, cornerTolerance: CGFloat = 8,
+                            edgeTolerance: CGFloat = 5) -> ResizeEdge {
+        let dx = min(abs(point.x - frame.minX), abs(point.x - frame.maxX))
+        let dy = min(abs(point.y - frame.minY), abs(point.y - frame.maxY))
+        let horizontal: ResizeEdge = point.x < frame.midX ? .left : .right
+        let vertical: ResizeEdge = point.y < frame.midY ? .bottom : .top
+        if max(dx, dy) <= cornerTolerance { return horizontal.union(vertical) }
+        if dx <= edgeTolerance, point.y >= frame.minY, point.y <= frame.maxY { return horizontal }
+        if dy <= edgeTolerance, point.x >= frame.minX, point.x <= frame.maxX { return vertical }
+        return []
+    }
+
     var minWindowWeight: CGFloat = 0.3
     var maxWindowWeight: CGFloat = 3.0
 

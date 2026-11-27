@@ -78,8 +78,11 @@ extension MultitouchGestureSource {
     }
 
     struct RawFrame: Sendable {
+        enum Origin: Sendable { case bottomLeft, topLeft }
+
         let touches: RawTouchBuffer
         let timestamp: Double
+        let origin: Origin
 
         func screenLocation(in frame: CGRect) -> CGPoint? {
             guard !touches.isEmpty else { return nil }
@@ -89,18 +92,21 @@ extension MultitouchGestureSource {
                 center.x += CGFloat(touch.x)
                 center.y += CGFloat(touch.y)
             }
+            let y = center.y / CGFloat(touches.count) * frame.height
             return CGPoint(
                 x: frame.minX + center.x / CGFloat(touches.count) * frame.width,
-                y: frame.minY + center.y / CGFloat(touches.count) * frame.height
+                y: origin == .topLeft ? frame.maxY - y : frame.minY + y
             )
         }
 
         init(touches: [RawTouch], timestamp: Double) {
+            origin = .bottomLeft
             self.touches = RawTouchBuffer(touches)
             self.timestamp = timestamp
         }
 
-        init(touches: consuming RawTouchBuffer, timestamp: Double) {
+        init(touches: consuming RawTouchBuffer, timestamp: Double, origin: Origin = .bottomLeft) {
+            self.origin = origin
             self.touches = consume touches
             self.timestamp = timestamp
         }
