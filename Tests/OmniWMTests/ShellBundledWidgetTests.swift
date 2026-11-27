@@ -883,7 +883,7 @@ final class ShellBundledWidgetTests: XCTestCase {
         for highPower in [false, true] {
             let power = ShellPower(source: "battery", mode: .low, supportsHighPower: highPower)
             let data = base + [("power", value { power.write(into: &$0) })]
-            for widget in ["battery", "battery-details"] {
+            for widget in ["battery", "battery-details", "battery-wifi"] {
                 try renderStyle("default", widget: widget, data: data, inspect: { view, nodes, text in
                     guard view == OMNI_VIEW_POPOUT else { return }
                     let commands = nodes.map { text.string($0.action) }
