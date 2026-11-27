@@ -97,7 +97,7 @@ extension ShellWidgetHost {
                 monitor: monitor,
                 size: config.size(on: monitor),
                 visible: data.visible,
-                level: islandLevel
+                level: overlayDisplays.contains(monitor.id) ? NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 1) : islandLevel
             )
         }
         updateIslandInputMonitoring()

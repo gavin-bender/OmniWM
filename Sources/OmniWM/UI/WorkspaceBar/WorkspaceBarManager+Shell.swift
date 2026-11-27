@@ -23,10 +23,9 @@ extension WorkspaceBarManager {
     func applyIslands(_ islands: [DesiredIslandSurface]) {
         guard let settings = controller?.settings else { return }
         lastIslands = settings.island.enabled ? islands : []
-        let level = lastIslands.reduce(NSWindow.Level.mainMenu.rawValue + 3) { level, island in
-            max(level, settings.workspaceBar.resolved(for: island.monitor).windowLevel.nsWindowLevel.rawValue + 1)
-        }
-        shellHost?.updateIslands(lastIslands, level: NSWindow.Level(rawValue: level))
+        shellHost?.overlayDisplays = overlayDisplays
+        shellHost?.updateIslands(lastIslands, level: WorkspaceBarIslandPanel.islandLevel)
+        updateOverlayMonitoring()
     }
 
     func shellSnapshot(for bar: DesiredBarSurface) -> WorkspaceBarSnapshot {

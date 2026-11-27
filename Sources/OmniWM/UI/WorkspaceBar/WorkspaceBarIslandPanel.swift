@@ -6,6 +6,23 @@ import SwiftUI
 
 @MainActor
 final class WorkspaceBarIslandPanel {
+    static let topBarCeiling = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 2)
+    static let islandLevel = NSWindow.Level(rawValue: topBarCeiling.rawValue + 1)
+    static let overlayCeiling = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 2)
+
+    private var configuredLevel: NSWindow.Level = .normal
+    private var usesTopEdge = false
+    var yieldsToOverlay = false {
+        didSet { updateLevel() }
+    }
+
+    private func updateLevel() {
+        let level = yieldsToOverlay && usesTopEdge
+            ? NSWindow.Level(rawValue: min(configuredLevel.rawValue, Self.overlayCeiling.rawValue))
+            : configuredLevel
+        if panel.level != level { panel.level = level }
+    }
+
     let panel: WorkspaceBarPanel
     let hostingView: NSHostingView<WorkspaceBarView>
     var slice: WorkspaceBarIslandSlice
@@ -33,15 +50,16 @@ final class WorkspaceBarIslandPanel {
             ? [.canJoinAllSpaces, .stationary]
             : [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         let level = resolved.windowLevel.nsWindowLevel
-        let overlapsMenu = WorkspaceBarGeometry.effectivePosition(for: monitor, resolved: resolved) == .overlappingMenuBar
-        panel.level = if fillsMenuBar {
-            NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-        } else if overlapsMenu, resolved.fullWidth || resolved.yieldToNativeMenuBar {
-            // The visible bar receives clicks. An edge reveal orders it out entirely.
-            NSWindow.Level(rawValue: max(level.rawValue, NSWindow.Level.statusBar.rawValue + 1))
+        let position = WorkspaceBarGeometry.effectivePosition(for: monitor, resolved: resolved)
+        usesTopEdge = fillsMenuBar || position.usesNotch
+        if fillsMenuBar || (position == .overlappingMenuBar && (resolved.fullWidth || resolved.yieldToNativeMenuBar)) {
+            configuredLevel = Self.topBarCeiling
+        } else if position.usesNotch {
+            configuredLevel = NSWindow.Level(rawValue: min(level.rawValue, Self.topBarCeiling.rawValue))
         } else {
-            level
+            configuredLevel = level
         }
+        updateLevel()
     }
 
     func applyFrame(

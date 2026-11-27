@@ -20,14 +20,20 @@ final class WorkspaceBarPanelPolicyTests: XCTestCase {
         let normal = makeResolved(notchMode: .off, windowLevel: .screensaver)
         let island = makeIsland(resolved: normal)
         defer { island.panel.close() }
-        XCTAssertEqual(island.panel.level, .screenSaver)
+        XCTAssertEqual(island.panel.level.rawValue, NSWindow.Level.statusBar.rawValue + 2)
+        island.yieldsToOverlay = true
+        XCTAssertLessThan(island.panel.level.rawValue, NSWindow.Level.statusBar.rawValue)
+        island.applySettings(resolved: normal, monitor: monitor)
+        XCTAssertLessThan(island.panel.level.rawValue, NSWindow.Level.statusBar.rawValue)
+        island.yieldsToOverlay = false
+        XCTAssertGreaterThan(island.panel.level.rawValue, NSWindow.Level.statusBar.rawValue)
         XCTAssertEqual(island.panel.collectionBehavior, [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary])
 
         island.applySettings(
             resolved: makeResolved(notchMode: .fillLeftOfNotch, windowLevel: .screensaver),
             monitor: monitor
         )
-        XCTAssertEqual(island.panel.level.rawValue, NSWindow.Level.statusBar.rawValue + 1)
+        XCTAssertEqual(island.panel.level.rawValue, NSWindow.Level.statusBar.rawValue + 2)
         XCTAssertEqual(island.panel.collectionBehavior, [.canJoinAllSpaces, .stationary])
 
         island.applySettings(resolved: makeResolved(notchMode: .off, windowLevel: .floating), monitor: monitor)

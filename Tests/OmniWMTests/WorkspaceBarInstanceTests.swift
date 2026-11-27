@@ -225,13 +225,13 @@ final class WorkspaceBarInstanceTests: XCTestCase {
 
         instance.applyPanelSettings(resolved: makeResolved(notchMode: .fillLeftOfNotch))
         for panel in [instance.primary.panel, secondary.instance.primary.panel] {
-            XCTAssertEqual(panel.level.rawValue, NSWindow.Level.statusBar.rawValue + 1)
+            XCTAssertEqual(panel.level.rawValue, NSWindow.Level.statusBar.rawValue + 2)
             XCTAssertFalse(panel.collectionBehavior.contains(.fullScreenAuxiliary))
         }
 
         instance.applyPanelSettings(resolved: makeResolved())
         for panel in [instance.primary.panel, secondary.instance.primary.panel] {
-            XCTAssertEqual(panel.level, .popUpMenu)
+            XCTAssertEqual(panel.level.rawValue, NSWindow.Level.statusBar.rawValue + 2)
             XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenAuxiliary))
         }
     }

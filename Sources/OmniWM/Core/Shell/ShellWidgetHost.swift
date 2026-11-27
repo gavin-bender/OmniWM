@@ -380,6 +380,7 @@ final class ShellWidgetHost {
     var islandInputGeneration = 0
     var islandDragMonitor: ShellIslandDragMonitor?
     var islandWindows: [Monitor.ID: ShellIsland] = [:]
+    var overlayDisplays: Set<Monitor.ID> = []
     var islandLevel = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
     var placedSlots: [Monitor.ID: [WorkspaceBarShellWidget]] = [:]
     var popout: ShellPopout?

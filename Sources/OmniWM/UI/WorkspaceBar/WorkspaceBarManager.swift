@@ -70,6 +70,8 @@ final class WorkspaceBarManager {
     var menuBarHold: MenuBarAutohideHold?
     let nativeMenuBarReveal = NativeMenuBarReveal()
     var monitorsYieldingToMenuBar: Set<Monitor.ID> = []
+    var overlayDisplays: Set<Monitor.ID> = []
+    let overlayMonitor = NativeMenuBarReveal()
     var revealedMenuMonitor: Monitor.ID?
 
     isolated deinit {
@@ -178,6 +180,7 @@ final class WorkspaceBarManager {
             monitor: monitor
         )
 
+        primary.yieldsToOverlay = overlayDisplays.contains(monitor.id)
         let instance = WorkspaceBarInstance(
             monitor: monitor,
             primary: primary,
@@ -269,6 +272,8 @@ final class WorkspaceBarManager {
     }
 
     func cleanup(keepingShell: Bool = false) {
+        overlayMonitor.stop()
+        overlayDisplays = []
         nativeMenuBarReveal.stop()
         monitorsYieldingToMenuBar = []
         revealedMenuMonitor = nil
@@ -421,6 +426,7 @@ extension WorkspaceBarManager {
             resolved: resolved,
             monitor: instance.monitor
         )
+        island.yieldsToOverlay = overlayDisplays.contains(instance.monitorId)
         surfaceCoordinator.register(
             window: island.panel,
             id: instance.secondarySurfaceId(),
