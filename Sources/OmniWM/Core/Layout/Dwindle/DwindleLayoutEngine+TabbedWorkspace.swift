@@ -38,7 +38,7 @@ extension DwindleLayoutEngine {
     }
 
     func tabbedFrames(
-        state: DwindleWorkspaceState, screen: CGRect, fullscreen: CGRect
+        state: DwindleWorkspaceState, screen: CGRect, fullscreen: CGRect, barTop: CGFloat, touchMovedTab: WindowToken?
     ) -> [WindowToken: CGRect] {
         var frames: [WindowToken: CGRect] = [:]
         for leaf in state.root.collectAllLeaves() {
@@ -47,7 +47,14 @@ extension DwindleLayoutEngine {
             }
             let free = tile.freeFrame ?? screen.insetBy(dx: screen.width * 0.1, dy: screen.height * 0.1)
             let grouped = tile.members.count(where: { !state.excludedTokens.contains($0.token) }) > 1
-            let content = active.isFullscreen ? fullscreen : tabbedBar.contentFrame(fitting: free, in: screen, grouped: grouped)
+            let content: CGRect
+            if active.isFullscreen {
+                content = fullscreen
+            } else if active.token == touchMovedTab || (tile.observedNativePlacement?.frame == free && tile.observedNativePlacement?.token == active.token) {
+                content = free
+            } else {
+                content = tabbedBar.settledWindowFrame(free, in: screen, barTop: barTop, grouped: grouped)
+            }
             tile.freeFrame = free
             leaf.cachedFrame = tabbedBar.tileFrame(around: content, grouped: grouped && !active.isFullscreen)
             leaf.cachedContentFrame = content

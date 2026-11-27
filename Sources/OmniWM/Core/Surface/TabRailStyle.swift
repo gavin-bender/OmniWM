@@ -26,6 +26,14 @@ struct TabbedBarOptions: Equatable, Codable, Sendable {
         position == .left ? (content == .icons ? rowHeight + Self.closeButtonWidth : rowHeight * 4) : rowHeight
     }
 
+    func settledWindowFrame(_ frame: CGRect, in screen: CGRect, barTop: CGFloat, grouped: Bool) -> CGRect {
+        let needsTopBar = grouped && position == .top
+        let ceiling = needsTopBar ? min(screen.maxY, barTop) - thickness : screen.maxY
+        let top = needsTopBar ? min(frame.maxY, ceiling) : frame.maxY
+        let height = min(frame.height, max(1, ceiling - screen.minY))
+        return CGRect(x: frame.minX, y: top - height, width: min(frame.width, screen.width), height: height)
+    }
+
     func contentFrame(fitting frame: CGRect, in screen: CGRect, grouped: Bool) -> CGRect {
         let left = grouped && position == .left ? thickness : 0
         let top = grouped && position == .top ? thickness : 0

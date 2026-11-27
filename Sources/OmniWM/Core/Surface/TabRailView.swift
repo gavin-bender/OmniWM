@@ -43,6 +43,10 @@ final class TabRailView: NSView {
     private var pressedTab: (token: WindowToken, start: CGPoint)?
     private var isDraggingTab = false
     var groupContentFrame: CGRect?
+    var resizingToken: WindowToken? {
+        guard let chromePress, chromePress.drag.handle != .grip else { return nil }
+        return chromePress.token
+    }
     private var chromePress: (token: WindowToken, drag: TabFrameDrag)?
     private var menuToken: WindowToken?
 
@@ -190,7 +194,8 @@ final class TabRailView: NSView {
     }
 
     private func screenPoint(_ event: NSEvent) -> CGPoint {
-        window?.convertToScreen(CGRect(origin: event.locationInWindow, size: .zero)).origin ?? NSEvent.mouseLocation
+        // The rail can move between event capture and dispatch during a corner resize.
+        event.cgEvent.map { ScreenCoordinateSpace.toAppKit(point: $0.location) } ?? NSEvent.mouseLocation
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -210,6 +215,7 @@ final class TabRailView: NSView {
     }
 
     func cancelDrag() -> Bool {
+        if chromePress != nil { chromePress = nil; return true }
         guard isDraggingTab, let press = pressedTab else { return false }
         pressedTab = nil
         isDraggingTab = false

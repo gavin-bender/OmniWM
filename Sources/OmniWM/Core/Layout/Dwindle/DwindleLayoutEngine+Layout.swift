@@ -11,11 +11,14 @@ extension DwindleLayoutEngine {
         screen: CGRect,
         borderSafeFillScreen: CGRect? = nil,
         fullscreenScreen: CGRect? = nil,
-        calculationSettings: DwindleSettings? = nil
+        calculationSettings: DwindleSettings? = nil,
+        tabBarTop: CGFloat? = nil,
+        touchMovedTab: WindowToken? = nil
     ) -> [WindowToken: CGRect] {
         guard let state = existingState(for: workspaceId) else { return [:] }
         if state.tabbedMembers != nil {
-            return tabbedFrames(state: state, screen: screen, fullscreen: fullscreenScreen ?? screen)
+            return tabbedFrames(state: state, screen: screen, fullscreen: fullscreenScreen ?? screen,
+                                barTop: tabBarTop ?? screen.maxY, touchMovedTab: touchMovedTab)
         }
         let calculationSettings = calculationSettings ?? settings
         let excludedTokens = state.excludedTokens

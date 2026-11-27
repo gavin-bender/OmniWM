@@ -76,9 +76,28 @@ extension MouseEventHandler {
               controller.workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
               let tile = engine.tile(containing: token, in: workspace),
               tile.activeToken == token, !tile.activeMember.isFullscreen else { return }
-        let frame = drag.frame(at: point, minimum: engine.minimumSize(for: tile, excluding: []))
-        controller.workspaceManager.withEngineMutationScope { tile.freeFrame = frame }
+        var bounds = CGRect.infinite
+        if drag.handle != .grip, let monitor = controller.workspaceManager.monitor(for: workspace) {
+            let working = controller.layoutRefreshController.buildMonitorSnapshot(for: monitor).tabbedWorkingFrame
+            if !working.isEmpty {
+                bounds = engine.tabbedBar.contentFrame(fitting: working, in: working, grouped: tile.isGrouped)
+            }
+            if let id = UInt32(exactly: token.windowId) {
+                controller.axEventHandler.cancelFrameObservation(windowId: id)
+            }
+        }
+        let frame = drag.frame(at: point, minimum: engine.minimumSize(for: tile, excluding: []), within: bounds)
+        guard released || tile.freeFrame != frame else { return }
+        controller.workspaceManager.withEngineMutationScope {
+            tile.freeFrame = frame
+            if released, touchMovedTab == token {
+                engine.existingState(for: workspace)?.pendingMovementFrameSeeds[token] = frame
+            }
+        }
         if released {
+            if touchMovedTab == token, let id = UInt32(exactly: token.windowId) {
+                controller.axEventHandler.cancelFrameObservation(windowId: id)
+            }
             let operation: LayoutOperation = drag.handle == .grip ? .interactiveMoveEnded(token: token) : .interactiveResizeEnded(token: token)
             controller.dwindleLayoutHandler.recordLayoutOperation(operation, in: workspace, source: .mouse)
         }
@@ -130,6 +149,12 @@ extension MouseEventHandler {
         let drop = resolveTabDrop(at: point, token: source.token, workspace: source.workspaceId,
                                   frame: moved, native: true, stack: stack)
         presentTabDrop(drop, token: source.token, workspace: workspaceIdForPointer(at: point) ?? source.workspaceId, released: released)
+    }
+
+    func updateTouchTabDrop(at point: CGPoint, token: WindowToken, workspace: WorkspaceDescriptor.ID,
+                            frame: CGRect, released: Bool) {
+        let drop = resolveTabDrop(at: point, token: token, workspace: workspace, frame: frame, native: true)
+        presentTabDrop(drop, token: token, workspace: workspaceIdForPointer(at: point) ?? workspace, released: released)
     }
 
     private func presentTabDrop(_ drop: Drop?, token: WindowToken, workspace: WorkspaceDescriptor.ID, released: Bool) {

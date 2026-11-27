@@ -103,13 +103,14 @@ final class TabRailManager {
     func presentSwipeRails(_ infos: [TabRailInfo], offset: CGVector, viewport: CGRect) {
         for info in infos {
             let frame = info.tileFrame.offsetBy(dx: offset.dx, dy: offset.dy)
-            let command = TabRailGeometryCommand(key: info.key, tileFrame: frame, visibleTileFrame: frame, displayFrame: viewport)
+            let visibleFrame = info.visibleTileFrame.offsetBy(dx: offset.dx, dy: offset.dy)
+            let command = TabRailGeometryCommand(key: info.key, tileFrame: frame, visibleTileFrame: visibleFrame, displayFrame: viewport)
             swipeRails.insert(info.key)
             if let window = railWindows[info.key] {
                 window.updateAnimationGeometry(command)
-            } else if frame.intersects(viewport) {
+            } else if visibleFrame.intersects(viewport) {
                 let translated = TabRailInfo(workspaceId: info.workspaceId, owner: info.owner, plannedSeq: info.plannedSeq,
-                                             tileFrame: frame, tabCount: info.tabCount, activeVisualIndex: info.activeVisualIndex,
+                                             tileFrame: frame, visibleTileFrame: visibleFrame, tabCount: info.tabCount, activeVisualIndex: info.activeVisualIndex,
                                              activeWindowId: info.activeWindowId, tabs: info.tabs, displayFrame: viewport,
                                              styleOverride: info.styleOverride)
                 updateRail(translated, forceOrdering: true)
@@ -131,6 +132,10 @@ final class TabRailManager {
             guard info.styleOverride?.options != nil, let window = railWindows[info.key], window.isOrderedIn else { return false }
             return window.appliedFrame.contains(point)
         }
+    }
+
+    func isResizing(_ token: WindowToken, in key: TabRailKey) -> Bool {
+        railWindows[key]?.resizingToken == token
     }
 
     func cancelDrag() -> Bool {

@@ -72,6 +72,13 @@ extension DwindleLayoutHandler {
                 )
             }
             guard let frame = frame?.roundedToPhysicalPixels(scale: effectiveScale) else { continue }
+            if window.hiddenState == nil, !context.engine.isWindowFullscreen(token, in: context.workspaceId),
+               context.engine.existingState(for: context.workspaceId)?.tabbedMembers != nil {
+                let mouse = controller?.mouseEventHandler
+                if mouse?.state.tabbedTitleDrag?.token == token {
+                    continue
+                }
+            }
             diff.frameChanges.append(
                 LayoutFrameChange(
                     token: token,

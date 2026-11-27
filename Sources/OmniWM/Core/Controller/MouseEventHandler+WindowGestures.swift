@@ -107,6 +107,9 @@ extension MouseEventHandler {
                 state.isResizing = true
                 state.resizeLayout = .tabbed
             }
+            if source == .touchDisplay, let id = UInt32(exactly: token.windowId) {
+                controller.axEventHandler.cancelFrameObservation(windowId: id)
+            }
             state.activeInteractionSource = source
             state.tabbedGesture = (token, wsId, TabFrameDrag(start: location, frame: frame, handle: handle), location)
             return true
@@ -140,10 +143,20 @@ extension MouseEventHandler {
         }
     }
 
+    var touchMovedTab: WindowToken? {
+        guard state.activeInteractionSource == .touchDisplay, let session = state.tabbedGesture,
+              session.drag.handle == .grip else { return nil }
+        return session.token
+    }
+
     func updateTabbedGesture(at point: CGPoint, released: Bool = false) {
         guard let session = state.tabbedGesture else { return }
         state.tabbedGesture?.point = point
         updateTabbedFrame(session.drag, at: point, token: session.token, workspace: session.workspace, released: released)
+        if state.activeInteractionSource == .touchDisplay, session.drag.handle == .grip {
+            updateTouchTabDrop(at: point, token: session.token, workspace: session.workspace,
+                               frame: session.drag.frame, released: released)
+        }
     }
 
     func gestureWindowLocation(for lockedContext: MouseInputState.LockedGestureContext) -> CGPoint {

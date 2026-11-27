@@ -14,13 +14,14 @@ extension DwindleLayoutHandler {
     ) -> Bool {
         var movement = transition
         if let state = engine.existingState(for: snapshot.workspaceId), state.tabbedMembers != nil {
-            // Free placement follows the hand directly. Animate only groups displaced to fit their strip.
+            // Free placement follows the hand directly. Animate the return when a released window extends beyond the working area.
             var starts: [WindowToken: CGRect] = [:]
             var previous: [WindowToken: CGRect] = [:]
             for (token, target) in transition.newFrames {
                 guard let leaf = state.leafByToken[token], let tile = leaf.tile else { continue }
-                guard tile.isGrouped, !tile.activeMember.isFullscreen,
-                      let requested = tile.freeFrame, requested != target else {
+                guard !tile.activeMember.isFullscreen,
+                      let requested = tile.freeFrame, requested != target,
+                      tile.isGrouped || transition.previousTargetFrames[token] == requested || leaf.hasActiveAnimations(at: now) else {
                     leaf.clearAnimations()
                     continue
                 }

@@ -61,6 +61,28 @@ final class TabbedWorkspaceTests: XCTestCase {
                        CGRect(x: 400, y: 420, width: 100, height: 80))
     }
 
+    func testCornerResizeStopsAtWorkingAreaWithOppositeCornerFixed() {
+        let frame = CGRect(x: 120, y: 150, width: 400, height: 300)
+        let working = CGRect(x: 30, y: 40, width: 800, height: 600)
+        for position in [TabbedBarOptions.Position.top, .left] {
+            var options = TabbedBarOptions()
+            options.position = position
+            let bounds = options.contentFrame(fitting: working, in: working, grouped: true)
+            let initial = options.contentFrame(fitting: frame, in: working, grouped: true)
+            for (handle, dx, dy) in [(TabChromeHandle.topLeft, -1, 1), (.topRight, 1, 1),
+                                     (.bottomLeft, -1, -1), (.bottomRight, 1, -1)] {
+                let drag = TabFrameDrag(start: .zero, frame: frame, handle: handle)
+                let result = drag.frame(at: CGPoint(x: dx * 1000, y: dy * 1000), minimum: .zero, within: bounds)
+                XCTAssertEqual(result.minX, dx < 0 ? bounds.minX : initial.minX)
+                XCTAssertEqual(result.maxX, dx > 0 ? bounds.maxX : initial.maxX)
+                XCTAssertEqual(result.minY, dy < 0 ? bounds.minY : initial.minY)
+                XCTAssertEqual(result.maxY, dy > 0 ? bounds.maxY : initial.maxY)
+                XCTAssertEqual(result, options.contentFrame(fitting: result, in: working, grouped: true))
+                XCTAssertEqual(result, drag.frame(at: CGPoint(x: dx * 1100, y: dy * 1100), minimum: .zero, within: bounds))
+            }
+        }
+    }
+
     func testWindowTabsUseOneBarAndAnchorPreviewToHoveredTab() throws {
         let manager = TabRailManager(motionPolicy: MotionPolicy(animationsEnabled: false))
         defer { manager.removeAll() }
@@ -141,6 +163,17 @@ final class TabbedWorkspaceTests: XCTestCase {
         manager.updateRails([destination, otherDisplay])
         XCTAssertTrue(manager.existingWindow(for: destination.key) === incoming)
         XCTAssertTrue(manager.existingWindow(for: otherDisplay.key) === otherWindow)
+    }
+
+    func testTopBarMovesWindowDownOnlyByMissingClearance() {
+        let screen = CGRect(x: -1400, y: 100, width: 1200, height: 800)
+        let bar = TabbedBarOptions()
+        let barTop = screen.maxY - 10
+        let frame = CGRect(x: screen.minX - 45, y: barTop - 208, width: 400, height: 200)
+        let target = bar.settledWindowFrame(frame, in: screen, barTop: barTop, grouped: true)
+        XCTAssertEqual(target, frame.offsetBy(dx: 0, dy: 8 - bar.thickness))
+        XCTAssertEqual(bar.settledWindowFrame(target, in: screen, barTop: barTop, grouped: true), target)
+        XCTAssertEqual(bar.settledWindowFrame(frame, in: screen, barTop: barTop, grouped: false), frame)
     }
 
     func testEveryBarSizeFitsAnOversizedWindowOnAnOffsetDisplay() {

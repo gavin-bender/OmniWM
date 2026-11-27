@@ -820,7 +820,7 @@ final class AnimationRegistrationLivenessTests: XCTestCase {
                 fullscreenLayoutFrame: monitorSnapshot.fullscreenLayoutFrame,
                 scale: monitorSnapshot.scale,
                 settings: controller.resolvedDwindleSettings(for: monitor),
-                tabRailWidth: TabRailStyle.compact.reservedWidth
+                tabRailWidth: controller.tabRailStyle.reservedWidth
             ),
             targetFrames: targetFrames
         )

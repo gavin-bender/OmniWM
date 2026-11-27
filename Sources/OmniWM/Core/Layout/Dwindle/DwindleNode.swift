@@ -15,6 +15,7 @@ struct DwindleTileMember: Equatable {
 
 final class DwindleTile {
     var freeFrame: CGRect?
+    var observedNativePlacement: (token: WindowToken, frame: CGRect)?
     let id: DwindleTileId
     private(set) var members: [DwindleTileMember]
     private(set) var activeIndex: Int

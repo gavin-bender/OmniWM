@@ -137,6 +137,10 @@ extension AXEventHandler {
            let leaf = engine.existingState(for: entry.workspaceId)?.leafByToken[entry.token],
            let tile = leaf.tile, tile.activeToken == entry.token, !tile.activeMember.isFullscreen
         {
+            let key = TabRailKey(workspaceId: entry.workspaceId, owner: .dwindleTile(tile.id))
+            let gesture = controller.mouseEventHandler.state.tabbedGesture
+            if (gesture?.token == entry.token && (gesture?.drag.handle != .grip || controller.mouseEventHandler.touchMovedTab == entry.token))
+                || controller.tabRailManager.isResizing(entry.token, in: key) { return }
             let frame = ScreenCoordinateSpace.toAppKit(rect: windowInfo.frame)
             if !controller.axManager.isAwaitingFrameWrite(entry.windowId),
                !shouldSuppressFrameChangedRelayout(for: entry, observedFrame: frame),
@@ -144,14 +148,18 @@ extension AXEventHandler {
                !leaf.hasActiveAnimations(at: controller.animationClock.now()),
                let monitor = controller.workspaceManager.monitor(for: entry.workspaceId), monitor.frame.intersects(frame)
             {
+                tile.observedNativePlacement = nil
                 tile.freeFrame = frame
                 leaf.clearAnimations()
                 leaf.cachedContentFrame = frame
                 leaf.cachedFrame = engine.tabbedBar.tileFrame(around: frame, grouped: tile.isGrouped)
                 controller.surfaceReconciler.noteWorldChanged()
                 frameObservations.tabBoundarySettlements.removeValue(forKey: windowId)?.cancel()
-                let working = controller.insetWorkingFrame(for: monitor).intersection(monitor.visibleFrame)
-                if tile.isGrouped, !working.contains(leaf.cachedFrame ?? frame) {
+                let working = monitor.visibleFrame
+                let barTop = controller.insetWorkingFrame(for: monitor).intersection(working).maxY
+                let target = engine.tabbedBar.settledWindowFrame(frame, in: working, barTop: barTop, grouped: tile.isGrouped)
+                if !target.approximatelyEqual(to: frame, tolerance: 0.01) {
+                    tile.observedNativePlacement = (entry.token, frame)
                     settleTabbedBoundary(windowId: windowId, entry: entry, observed: frame)
                 }
             }
@@ -189,8 +197,13 @@ extension AXEventHandler {
                   current.hiddenState == nil, current.layoutReason == .standard, current.mode == .tiling,
                   let state = controller.dwindleEngine?.existingState(for: workspace),
                   let tile = state.leafByToken[token]?.tile,
-                  tile.activeToken == token, tile.isGrouped, !tile.activeMember.isFullscreen,
+                  tile.activeToken == token, !tile.activeMember.isFullscreen,
                   tile.freeFrame == observed else { return }
+            if controller.mouseEventHandler.pressedMouseButtonsProvider() & 1 != 0 {
+                settleTabbedBoundary(windowId: windowId, entry: current, observed: observed)
+                return
+            }
+            tile.observedNativePlacement = nil
             // The native compositor has already moved the window. Supersede any seed from a previous group operation.
             controller.workspaceManager.withEngineMutationScope(in: workspace) {
                 state.pendingMovementFrameSeeds[token] = observed

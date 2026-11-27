@@ -52,9 +52,11 @@ extension DwindleLayoutHandler {
 
         let newFrames = engine.calculateLayout(
             for: snapshot.workspaceId,
-            screen: isTabbed ? snapshot.monitor.tabbedWorkingFrame : snapshot.monitor.workingFrame,
+            screen: isTabbed ? snapshot.monitor.visibleFrame : snapshot.monitor.workingFrame,
             borderSafeFillScreen: snapshot.monitor.borderSafeFillFrame,
-            fullscreenScreen: snapshot.monitor.fullscreenLayoutFrame
+            fullscreenScreen: snapshot.monitor.fullscreenLayoutFrame,
+            tabBarTop: snapshot.monitor.tabbedWorkingFrame.maxY,
+            touchMovedTab: controller?.mouseEventHandler.touchMovedTab
         )
         if !removedTokens.isEmpty {
             controller?.windowActionHandler.refreshOverviewProjection(

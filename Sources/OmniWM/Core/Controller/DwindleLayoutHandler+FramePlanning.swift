@@ -13,10 +13,12 @@ extension DwindleLayoutHandler {
         let frames = engine.calculateLayout(
             for: snapshot.workspaceId,
             screen: engine.existingState(for: snapshot.workspaceId)?.tabbedMembers != nil
-                ? snapshot.monitor.tabbedWorkingFrame : snapshot.monitor.workingFrame,
+                ? snapshot.monitor.visibleFrame : snapshot.monitor.workingFrame,
             borderSafeFillScreen: snapshot.monitor.borderSafeFillFrame,
             fullscreenScreen: snapshot.monitor.fullscreenLayoutFrame,
-            calculationSettings: calculationSettings(snapshot.settings, from: engine)
+            calculationSettings: calculationSettings(snapshot.settings, from: engine),
+            tabBarTop: snapshot.monitor.tabbedWorkingFrame.maxY,
+            touchMovedTab: controller?.mouseEventHandler.touchMovedTab
         )
         var diff = layoutDiff(
             windows: snapshot.windows,

@@ -344,7 +344,7 @@ extension WorkspaceSwipePreview {
             contents[item.handle, default: []].append(content)
             layer.addSublayer(content.layer)
             if let info = item.tabRail, let style = info.styleOverride {
-                let rect = TabRailPlacement.frame(for: info.tileFrame, tabCount: info.tabCount, style: style)
+                let rect = TabRailPlacement.frame(for: info.visibleTileFrame, tabCount: info.tabCount, style: style, displayFrame: info.displayFrame)
                 let bar = TabRailView(frame: CGRect(origin: .zero, size: rect.size), motionPolicy: MotionPolicy(animationsEnabled: false))
                 bar.update(tabs: info.tabs, activeVisualIndex: info.activeVisualIndex, style: style)
                 bar.layoutSubtreeIfNeeded()

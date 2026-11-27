@@ -436,6 +436,64 @@ final class WorkspaceBarActionsTests: XCTestCase {
         try XCTUnwrap(fixture.controller.niriEngine).columns(in: workspaceId).map { $0.windowNodes.map(\.token) }
     }
 
+    func testMovingAnOrdinarySizedTabGroupPastTheEdgePinsOnlyItsBar() async throws {
+        for count in 1...2 {
+            let fixture = try makeFixture(followsFocus: false)
+            let controller = fixture.controller
+            let workspace = try XCTUnwrap(controller.workspaceManager.descriptor(for: fixture.ws1))
+            let engine = try XCTUnwrap(controller.dwindleEngine)
+            let mouse = controller.mouseEventHandler
+            defer { controller.layoutRefreshController.resetState() }
+            for index in 1...count {
+                _ = try addWindow(pid: pid_t(730_000 + index), windowId: index, to: workspace.id, fixture: fixture)
+            }
+            XCTAssertTrue(controller.commandHandler.setWorkspaceLayout(.tabbed))
+            controller.motionPolicy.animationsEnabled = true
+            func layout() {
+                _ = controller.layoutRefreshController.buildRelayoutEffectPlan(
+                    useScrollAnimationPath: false, recoverFocus: false, affectedWorkspaceIds: [workspace.id]
+                )
+            }
+            layout()
+            let token = try XCTUnwrap(engine.projectedActiveToken(in: workspace.id))
+            let leaf = try XCTUnwrap(engine.findNode(for: token, in: workspace.id))
+            let frame = try XCTUnwrap(leaf.cachedContentFrame)
+            let working = controller.layoutRefreshController.buildMonitorSnapshot(for: fixture.mainMonitor).tabbedWorkingFrame
+            let start = frame.center
+            let dx = working.minX - frame.minX - 80
+            let end = CGPoint(x: start.x + dx, y: start.y)
+            let outside = frame.offsetBy(dx: dx, dy: 0)
+            mouse.tabWindowStackAtPoint = { _ in [] }
+            XCTAssertTrue(mouse.beginWindowInteraction(.windowMove, target: token, workspace: workspace, at: start, source: .touchDisplay))
+            mouse.updateActiveMove(at: end)
+            let id = UInt32(token.windowId)
+            controller.axEventHandler.frameObservations.query = { _ in
+                WindowServerInfo(id: id, pid: token.pid, level: 0, frame: ScreenCoordinateSpace.toWindowServer(rect: frame))
+            }
+            controller.axEventHandler.handleCGSEvent(.frameChanged(windowId: id))
+            await controller.axEventHandler.frameObservations.byWindowId[id]?.task.value
+            XCTAssertNil(controller.axEventHandler.frameObservations.tabBoundarySettlements[id])
+            for _ in 0..<2 {
+                layout()
+                XCTAssertEqual(leaf.cachedContentFrame, outside)
+                XCTAssertNil(leaf.frameAnimation)
+            }
+            mouse.completeActiveMove(at: end)
+            layout()
+            XCTAssertEqual(leaf.cachedContentFrame, outside)
+            XCTAssertNil(leaf.frameAnimation)
+            if count > 1 {
+                let rail = try XCTUnwrap(controller.dwindleLayoutHandler.desiredTabRailInfos().first)
+                let swipe = try XCTUnwrap(controller.dwindleLayoutHandler.swipeTabRail(for: token, frame: outside, in: workspace.id))
+                XCTAssertEqual(swipe.visibleTileFrame, rail.visibleTileFrame)
+                let style = try XCTUnwrap(rail.styleOverride)
+                let panel = TabRailPlacement.frame(for: rail.visibleTileFrame, tabCount: count, style: style, displayFrame: rail.displayFrame)
+                XCTAssertTrue(working.contains(panel))
+                XCTAssertEqual(panel.minX, working.minX)
+            }
+        }
+    }
+
     func testTabbedBoundaryAnimatesAfterNativeFrameChangeWithoutMouseEvents() async throws {
         let fixture = try makeFixture(followsFocus: false)
         let controller = fixture.controller
@@ -464,13 +522,47 @@ final class WorkspaceBarActionsTests: XCTestCase {
             controller.layoutRefreshController.resetState()
         }
         let monitor = controller.layoutRefreshController.buildMonitorSnapshot(for: fixture.mainMonitor)
-        let working = monitor.tabbedWorkingFrame
-        let moved = CGRect(x: working.midX - 200, y: working.maxY - 300, width: 400, height: 300)
+        let working = monitor.visibleFrame
+        let moved = CGRect(x: working.minX, y: working.minY - 80, width: 400, height: working.height + 80)
         let id = UInt32(token.windowId)
         controller.axEventHandler.frameObservations.query = { _ in
             WindowServerInfo(id: id, pid: token.pid, level: 0, frame: ScreenCoordinateSpace.toWindowServer(rect: moved))
         }
         controller.motionPolicy.animationsEnabled = true
+        let mouse = controller.mouseEventHandler
+        mouse.pressedMouseButtonsProvider = { 0 }
+        let descriptor = try XCTUnwrap(controller.workspaceManager.descriptor(for: ws))
+        let original = try XCTUnwrap(leaf.cachedContentFrame)
+        XCTAssertTrue(mouse.beginWindowInteraction(.windowResize, target: token, workspace: descriptor,
+                                                   at: original.origin, source: .touchDisplay))
+        controller.axEventHandler.handleCGSEvent(.frameChanged(windowId: id))
+        await controller.axEventHandler.frameObservations.byWindowId[id]?.task.value
+        XCTAssertEqual(leaf.cachedContentFrame, original)
+        XCTAssertNil(controller.axEventHandler.frameObservations.tabBoundarySettlements[id])
+        mouse.cancelActiveMouseInteraction()
+
+        let nativeTile = CGRect(x: working.minX, y: working.minY, width: working.width / 2, height: working.height)
+        controller.axEventHandler.frameObservations.query = { _ in
+            WindowServerInfo(id: id, pid: token.pid, level: 0, frame: ScreenCoordinateSpace.toWindowServer(rect: nativeTile))
+        }
+        controller.axEventHandler.handleCGSEvent(.frameChanged(windowId: id))
+        await controller.axEventHandler.frameObservations.byWindowId[id]?.task.value
+        layout()
+        XCTAssertEqual(leaf.cachedContentFrame, nativeTile)
+        XCTAssertNil(leaf.frameAnimation)
+        let barTop = monitor.tabbedWorkingFrame.maxY
+        let contentTop = barTop - controller.settings.tabbedBar.thickness
+        let nativeSettlement = try XCTUnwrap(controller.axEventHandler.frameObservations.tabBoundarySettlements[id])
+        await nativeSettlement.value
+        layout()
+        let settled = try XCTUnwrap(leaf.cachedContentFrame)
+        XCTAssertEqual(settled.maxY, contentTop)
+        XCTAssertEqual(settled.minY, working.minY)
+        XCTAssertEqual(settled.width, nativeTile.width)
+        leaf.clearAnimations()
+        controller.axEventHandler.frameObservations.query = { _ in
+            WindowServerInfo(id: id, pid: token.pid, level: 0, frame: ScreenCoordinateSpace.toWindowServer(rect: moved))
+        }
         controller.axEventHandler.handleCGSEvent(.frameChanged(windowId: id))
         await controller.axEventHandler.frameObservations.byWindowId[id]?.task.value
         XCTAssertEqual(leaf.cachedContentFrame, moved)
@@ -480,8 +572,7 @@ final class WorkspaceBarActionsTests: XCTestCase {
         layout()
         let animation = try XCTUnwrap(leaf.frameAnimation)
         XCTAssertEqual(animation.fromFrame, moved)
-        XCTAssertEqual(animation.toFrame, moved.offsetBy(dx: 0, dy: -controller.settings.tabbedBar.thickness))
-        XCTAssertTrue(working.contains(try XCTUnwrap(leaf.cachedFrame)))
+        XCTAssertEqual(animation.toFrame, CGRect(x: moved.minX, y: working.minY, width: moved.width, height: contentTop - working.minY))
     }
 
     func testTabbedWorkspaceMoveCommandsSplitAndJoinGroups() throws {

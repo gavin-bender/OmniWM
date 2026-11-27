@@ -77,25 +77,27 @@ struct TabFrameDrag {
     let frame: CGRect
     let handle: TabChromeHandle
 
-    func frame(at point: CGPoint, minimum: CGSize) -> CGRect {
+    func frame(at point: CGPoint, minimum: CGSize, within bounds: CGRect = .infinite) -> CGRect {
         let dx = point.x - start.x
         let dy = point.y - start.y
         if handle == .grip { return frame.offsetBy(dx: dx, dy: dy) }
-        var result = frame
+        let size = CGSize(width: min(frame.width, bounds.width), height: min(frame.height, bounds.height))
+        let initial = bounds.isInfinite ? frame : FloatingFrameGeometry.clamped(CGRect(origin: frame.origin, size: size), in: bounds)
+        var result = initial
         switch handle {
         case .left, .topLeft, .bottomLeft:
-            result.size.width = max(minimum.width, frame.width - dx)
-            result.origin.x = frame.maxX - result.width
+            result.size.width = min(max(minimum.width, initial.width - dx), max(1, initial.maxX - bounds.minX))
+            result.origin.x = initial.maxX - result.width
         case .right, .topRight, .bottomRight:
-            result.size.width = max(minimum.width, frame.width + dx)
+            result.size.width = min(max(minimum.width, initial.width + dx), max(1, bounds.maxX - initial.minX))
         default: break
         }
         switch handle {
         case .top, .topLeft, .topRight:
-            result.size.height = max(minimum.height, frame.height + dy)
+            result.size.height = min(max(minimum.height, initial.height + dy), max(1, bounds.maxY - initial.minY))
         case .bottomLeft, .bottomRight:
-            result.size.height = max(minimum.height, frame.height - dy)
-            result.origin.y = frame.maxY - result.height
+            result.size.height = min(max(minimum.height, initial.height - dy), max(1, initial.maxY - bounds.minY))
+            result.origin.y = initial.maxY - result.height
         default: break
         }
         return result

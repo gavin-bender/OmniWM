@@ -35,7 +35,7 @@ extension DwindleLayoutHandler {
                     scale: scale
                 )
                 let frame = presentedFrame ?? snapshot.tileFrame ?? .zero
-                let visibleFrame = presentedFrame?.intersection(railBounds) ?? .null
+                let visibleFrame = presentedFrame.map { tabbed ? pinnedTabArea($0, in: railBounds) : $0.intersection(railBounds) } ?? .null
 
                 let tabs = tabInfos(for: snapshot, controller: controller)
 
@@ -50,6 +50,7 @@ extension DwindleLayoutHandler {
                         activeVisualIndex: snapshot.activeIndex,
                         activeWindowId: controller.workspaceManager.entry(for: snapshot.activeToken)?.windowId,
                         tabs: tabs,
+                        displayFrame: tabbed ? railBounds : nil,
                         styleOverride: controller.workspaceManager.activeLayoutKind(for: workspace.id) == .tabbed
                             ? .windowTabs(controller.settings.tabbedBar) : nil
                     )
@@ -59,15 +60,23 @@ extension DwindleLayoutHandler {
         return infos
     }
 
+    private func pinnedTabArea(_ tile: CGRect, in bounds: CGRect) -> CGRect {
+        let size = CGSize(width: min(tile.width, bounds.width), height: min(tile.height, bounds.height))
+        return FloatingFrameGeometry.clamped(CGRect(origin: tile.origin, size: size), in: bounds)
+    }
+
     func swipeTabRail(for token: WindowToken, frame: CGRect, in workspace: WorkspaceDescriptor.ID) -> TabRailInfo? {
         guard let controller, controller.workspaceManager.activeLayoutKind(for: workspace) == .tabbed,
               let tile = controller.dwindleEngine?.tileSnapshot(for: token, in: workspace), tile.isGrouped,
               tile.activeToken == token, !tile.members[tile.activeIndex].isFullscreen else { return nil }
+        guard let monitor = controller.workspaceManager.monitor(for: workspace) else { return nil }
         let options = controller.settings.tabbedBar
+        let tileFrame = options.tileFrame(around: frame, grouped: true)
+        let bounds = controller.insetWorkingFrame(for: monitor).intersection(monitor.visibleFrame)
         return TabRailInfo(workspaceId: workspace, owner: .dwindleTile(tile.id), plannedSeq: controller.workspaceManager.worldSeq,
-                           tileFrame: options.tileFrame(around: frame, grouped: true), tabCount: tile.members.count,
+                           tileFrame: tileFrame, visibleTileFrame: pinnedTabArea(tileFrame, in: bounds), tabCount: tile.members.count,
                            activeVisualIndex: tile.activeIndex, activeWindowId: token.windowId,
-                           tabs: tabInfos(for: tile, controller: controller), styleOverride: .windowTabs(options))
+                           tabs: tabInfos(for: tile, controller: controller), displayFrame: bounds, styleOverride: .windowTabs(options))
     }
 
     private func tabInfos(for snapshot: DwindleTileSnapshot, controller: WMController) -> [TabRailTabInfo] {
@@ -107,7 +116,8 @@ extension DwindleLayoutHandler {
         targetTime: TimeInterval
     ) -> [TabRailGeometryCommand] {
         var commands: [TabRailGeometryCommand] = []
-        let railBounds = engine.existingState(for: workspaceId)?.tabbedMembers != nil ? monitor.tabbedWorkingFrame : monitor.visibleFrame
+        let tabbed = engine.existingState(for: workspaceId)?.tabbedMembers != nil
+        let railBounds = tabbed ? monitor.tabbedWorkingFrame : monitor.visibleFrame
         engine.forEachGroupedTileGeometry(in: workspaceId) { geometry in
             let key = TabRailKey(workspaceId: workspaceId, owner: .dwindleTile(geometry.id))
             guard let frame = presentedTileFrame(
@@ -130,7 +140,8 @@ extension DwindleLayoutHandler {
                 TabRailGeometryCommand(
                     key: key,
                     tileFrame: frame,
-                    visibleTileFrame: frame.intersection(railBounds)
+                    visibleTileFrame: tabbed ? pinnedTabArea(frame, in: railBounds) : frame.intersection(railBounds),
+                    displayFrame: tabbed ? railBounds : nil
                 )
             )
         }

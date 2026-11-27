@@ -87,6 +87,8 @@ class TabRailWindow: NSPanel {
         }
     }
 
+    var resizingToken: WindowToken? { railView.resizingToken }
+
     @discardableResult
     func cancelDrag() -> Bool { railView.cancelDrag() }
 
@@ -206,10 +208,11 @@ class TabRailWindow: NSPanel {
         }
         let orderingWindowId = command.orderingWindowId ?? currentInfo.activeWindowId
         let needsOrdering = !isOrderedIn || lastOrderingWindowId != orderingWindowId
-        if frame != lastFrame || frame != appliedFrame {
+        let alignedFrame = Self.appKitPlacement(of: frame)
+        if frame != lastFrame || alignedFrame != appliedFrame {
             dismissHover()
             animationGeometryNeedsAccessibilityRefresh = true
-            if frame.size != self.frame.size || !placeInWindowServer(frame) {
+            if frame.size != self.frame.size || !placeInWindowServer(alignedFrame) {
                 railView.performWithoutAccessibilityGeometryUpdates {
                     setFrameReconcilingWindowServer(frame)
                     railView.needsDisplay = true
