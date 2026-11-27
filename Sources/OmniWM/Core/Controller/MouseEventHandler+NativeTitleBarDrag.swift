@@ -41,18 +41,26 @@ extension MouseEventHandler {
         return token
     }
 
-    func captureNativeCrossDisplayMove(for token: WindowToken?) {
+    func captureNativeCrossDisplayMove(
+        for token: WindowToken?, pressLocation: CGPoint? = nil, windowServerFrames: [WindowToken: CGRect]? = nil
+    ) {
         guard let controller,
-              controller.settings.gestures.adoptNativeMoveAcrossDisplays,
               let token,
               let entry = controller.workspaceManager.entry(for: token),
               entry.mode == .tiling,
+              controller.settings.gestures.adoptNativeMoveAcrossDisplays
+                  || controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) == .niri,
               !controller.axManager.isAwaitingFrameWrite(token.windowId),
-              let frame = controller.axManager.lastAppliedFrame(for: token.windowId)
+              let applied = controller.axManager.lastAppliedFrame(for: token.windowId)
         else {
             state.nativeCrossDisplayMove = nil
             return
         }
+        // A constrained app can accept a different size from the layout request.
+        // A move preserves the physical size it had when the user grabbed its title bar.
+        let captured = windowServerFrames?[token].map(ScreenCoordinateSpace.toAppKit(rect:))
+        let titlePress = pressLocation.map(Self.tabDropTitleRegion(in: applied).contains) ?? false
+        let frame = captured ?? (titlePress ? fastNativeWindowFrame(for: entry) : nil) ?? applied
         state.nativeCrossDisplayMove = .init(token: token, workspaceId: entry.workspaceId, startFrame: frame)
     }
 
@@ -279,7 +287,7 @@ extension MouseEventHandler {
         needsCorrection: Bool
     ) {
         var drag = drag
-        if settleNativeCrossDisplayMoveIfNeeded(entry, observedFrame: observedFrame) { return }
+        if settleNativeMoveIfNeeded(entry, observedFrame: observedFrame) { return }
         guard needsCorrection || drag.dwindleResizeWorkspaceId != nil else {
             if drag.receivedFrameChange {
                 state.nativeTitleBarDrag = nil
@@ -299,7 +307,8 @@ extension MouseEventHandler {
         requestNativeTitleBarDragCorrection(for: entry)
     }
 
-    func settleNativeCrossDisplayMoveIfNeeded(_ entry: WindowState, observedFrame: CGRect?) -> Bool {
+    func settleNativeMoveIfNeeded(_ entry: WindowState, observedFrame: CGRect?) -> Bool {
+        if settleNativeNiriStripDrop(entry, observedFrame: observedFrame) { return true }
         guard let controller,
               controller.hasStartedServices,
               controller.settings.gestures.adoptNativeMoveAcrossDisplays,
@@ -339,6 +348,52 @@ extension MouseEventHandler {
             [(pid: entry.pid, windowId: entry.windowId)], reason: "native-cross-display-drop"
         )
         controller.performCrossDisplayDrop(plan)
+        return true
+    }
+
+    private func settleNativeNiriStripDrop(_ entry: WindowState, observedFrame: CGRect?) -> Bool {
+        guard let controller, controller.hasStartedServices,
+              let move = state.nativeCrossDisplayMove, move.wasDragged, move.token == entry.token,
+              let point = move.releaseLocation, move.workspaceId == entry.workspaceId,
+              entry.mode == .tiling, entry.hiddenState == nil, entry.layoutReason == .standard,
+              controller.workspaceManager.activeLayoutKind(for: entry.workspaceId) == .niri,
+              let monitor = controller.workspaceManager.monitor(for: entry.workspaceId), monitor.frame.contains(point),
+              let engine = controller.niriEngine, let window = engine.findNode(for: entry.token, in: entry.workspaceId),
+              !window.isFullscreen,
+              let target = engine.hitTestMoveTarget(
+                  point: point, excludingWindowId: window.id, allowsInsertion: true, in: entry.workspaceId
+              )
+        else { return false }
+
+        guard let observedFrame,
+              !observedFrame.approximatelyEqual(to: move.startFrame, tolerance: FrameTolerance.screenMatch)
+        else {
+            var drag = state.nativeTitleBarDrag ?? .init(token: entry.token)
+            drag.phase = .awaitingFrameChange
+            state.nativeTitleBarDrag = drag
+            return true
+        }
+        guard abs(observedFrame.width - move.startFrame.width) <= FrameTolerance.screenMatch,
+              abs(observedFrame.height - move.startFrame.height) <= FrameTolerance.screenMatch,
+              !nativeWindowFrameMatchesManagedTarget(observedFrame, entry: entry)
+        else { return false }
+        let geometry = controller.niriInteractionGeometry(for: monitor)
+        let context = NiriInteractionContext(
+            workspaceId: entry.workspaceId, motion: controller.motionPolicy.snapshot(),
+            workingFrame: geometry.workingFrame, gaps: geometry.innerGap,
+            orientation: resolvedNiriOrientation(engine: engine, workspaceId: entry.workspaceId, monitor: monitor)
+        )
+        var changed = false
+        controller.workspaceManager.withNiriViewportState(for: entry.workspaceId) { state in
+            changed = engine.commitWindowDrop(window.id, onto: target, context: context, state: &state)
+        }
+        guard changed else { return false }
+        discardNativeTitleBarDragState()
+        controller.axManager.forceApplyNextFrame(for: entry.windowId)
+        controller.workspaceManager.recordLayoutOperation(
+            .interactiveMoveEnded(token: entry.token), in: entry.workspaceId, source: .mouse
+        )
+        controller.layoutRefreshController.requestImmediateRelayout(reason: .interactiveGesture)
         return true
     }
 

@@ -110,7 +110,9 @@ extension MouseEventHandler {
         let focusIntentToken = exactToken ?? (windowIdUnderPointer == nil
             ? geometricFocusIntentCandidate(at: location, workspaceId: wsId)
             : nil)
-        captureNativeCrossDisplayMove(for: focusIntentToken)
+        captureNativeCrossDisplayMove(
+            for: focusIntentToken, pressLocation: location, windowServerFrames: windowServerFramesAtMouseDown
+        )
         captureNativeResizeStart(
             for: focusIntentToken,
             at: location,

@@ -511,9 +511,9 @@ extension WorkspaceSwipePresentation {
         }
         if flight.captureFree { settleTabRails(for: flight) }
         flight.liveSlide?.finishHostedWindows(committed: true)
-        if let slide = flight.liveSlide, !slide.followsDisplayLink {
+        if let slide = flight.liveSlide {
             slide.adoptPlacedWindows(in: controller, destination: flight.destination)
-            flight.liveSlide = nil
+            if !slide.followsDisplayLink { flight.liveSlide = nil }
         }
         trace(takesFocus ? "committed" : "committed-background", progress: flight.progress, for: flight)
         let placementSubmitted: LayoutRefreshController.PostLayoutAction = { [weak self, weak flight] in

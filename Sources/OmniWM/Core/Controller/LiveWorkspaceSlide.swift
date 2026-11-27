@@ -36,6 +36,7 @@ final class LiveWorkspaceSlide {
     let members: [Member]
     private let viewport: CGRect
     private var dockSlide: DockWorkspaceSlide?
+    private let accessibilityMembers: [Member]
     var followsDisplayLink: Bool { dockSlide != nil }
     private var minimumHeights: [Int: CGFloat] = [:]
     private var lastFrames: [Int: CGRect] = [:]
@@ -59,6 +60,8 @@ final class LiveWorkspaceSlide {
         if let dockDisplay {
             dockSlide = DockWorkspaceSlide(members: members, display: dockDisplay, writePosition: writeDockPosition)
         }
+        let dock = dockSlide
+        accessibilityMembers = members.filter { dock?.handles($0) != true }
     }
 
     /// AX constrains title bars to the top of the screen. Only the part below that edge
@@ -110,10 +113,8 @@ final class LiveWorkspaceSlide {
                 }
             }
         }
-        if let dockSlide {
-            return dockSlide.update(members, source: source, destination: destination)
-        }
-        for member in members {
+        if let dockSlide, !dockSlide.update(source: source, destination: destination) { return false }
+        for member in accessibilityMembers {
             var frame = Self.displayedFrame(
                 layout: member.layout, offset: member.incoming ? destination : source,
                 viewport: viewport, parkOrigin: member.parkOrigin,
@@ -164,7 +165,7 @@ final class LiveWorkspaceSlide {
     }
 
     func adoptPlacedWindows(in controller: WMController, destination: WorkspaceSwipePresentation.Workspace) {
-        for member in members where member.incoming {
+        for member in accessibilityMembers where member.incoming {
             guard let entry = controller.workspaceManager.entry(for: member.token),
                   entry.workspaceId == destination.id, entry.axRef == member.window,
                   let actual = try? AXWindowService.frame(member.window),
@@ -202,7 +203,7 @@ final class LiveWorkspaceSlide {
         let unresolved = dockSlide?.restore(keepingIncomingPlacement: keepingIncomingPlacement, unparked: &unparked) ?? []
         for member in unparked { retryPark(member) }
         dockSlide = nil
-        for member in members {
+        for member in accessibilityMembers where !keepingIncomingPlacement {
             guard let last = lastFrames[member.window.windowId] else { continue }
             _ = AXWindowService.setFrame(
                 member.window, frame: member.original, currentFrameHint: last,
@@ -261,11 +262,14 @@ extension WorkspaceSwipePresentation {
             cancel(flight, reason: "display-link-unavailable")
             return false
         }
+        // A parked window with its own drawing offset can still overlap the desktop.
+        // Position the first slide frame before making its surface visible.
+        present(flight, at: mediaTimeProvider())
+        guard isCurrent(flight) else { return false }
         for member in members where member.incoming {
             controller.axManager.nativeParks.reveal(member.token)
         }
-        present(flight, at: mediaTimeProvider())
-        if flight.isKeyboard, isCurrent(flight) {
+        if flight.isKeyboard {
             focusIncomingWindow(for: flight)
             flight.motion.animateToDestination(startTime: mediaTimeProvider(), motion: controller.motionPolicy.snapshot())
             flight.phase = .settling
@@ -351,9 +355,10 @@ extension WorkspaceSwipePresentation {
 }
 
 /// Owns only translations installed by this flight. A foreign scaling effect (such as
-/// picture-in-picture) keeps the workspace on the ordinary Accessibility renderer.
+/// picture-in-picture) leaves that window on the ordinary Accessibility renderer.
 @MainActor
 private final class DockWorkspaceSlide {
+    private var members: [LiveWorkspaceSlide.Member] = []
     private var bases: [UInt32: CGRect] = [:]
     private var positions: [UInt32: CGPoint] = [:]
     private var ownedWindows: Set<UInt32> = []
@@ -378,12 +383,18 @@ private final class DockWorkspaceSlide {
                   base.width >= 1, base.height >= 1,
                   base.width.rounded() == base.width, base.height.rounded() == base.height,
                   (base.width / (base.width / base.height)).rounded(.towardZero) == base.height,
-                  omniwm_dock_slide_at_position(matrix, base.origin) else { return nil }
+                  omniwm_dock_slide_at_position(matrix, base.origin) else { continue }
+            self.members.append(member)
             bases[id] = base
         }
+        guard !self.members.isEmpty else { return nil }
     }
 
-    func update(_ members: [LiveWorkspaceSlide.Member], source: CGVector, destination: CGVector) -> Bool {
+    func handles(_ member: LiveWorkspaceSlide.Member) -> Bool {
+        bases[UInt32(member.window.windowId)] != nil
+    }
+
+    func update(source: CGVector, destination: CGVector) -> Bool {
         if needsStaging {
             needsStaging = false
             guard stageIncoming(members, incomingDY: destination.dy - source.dy) else { return false }

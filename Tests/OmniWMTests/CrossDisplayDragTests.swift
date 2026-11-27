@@ -726,6 +726,45 @@ final class CrossDisplayDragTests: XCTestCase {
         }
     }
 
+    func testNativeTitleBarDropReordersTheNiriStripWithCrossDisplayMovesDisabled() throws {
+        let fixture = try makeNativeFixture([.niri, .niri], enabled: false)
+        let first = addWindow(1, to: fixture.source, fixture)
+        let second = addWindow(2, to: fixture.source, fixture)
+        let start = try beginNativeDrag(first, fixture)
+        let destination = try XCTUnwrap(fixture.frame(second)).center
+        fixture.handler.nativeWindowFrameProvider = { _ in
+            start.offsetBy(dx: destination.x - start.midX, dy: destination.y - start.midY)
+        }
+
+        fixture.handler.dispatchMouseUp(at: destination)
+
+        XCTAssertEqual(fixture.columns(fixture.source), [[second], [first]])
+        XCTAssertNil(fixture.handler.state.nativeTitleBarDrag)
+    }
+
+    func testNativeColumnDropUsesTheSizeAcceptedByTheApp() throws {
+        let fixture = try makeNativeFixture([.niri, .niri], enabled: false)
+        let first = addWindow(1, to: fixture.source, fixture)
+        let second = addWindow(2, to: fixture.source, fixture)
+        fixture.layout()
+        let requested = try XCTUnwrap(fixture.frame(first))
+        let accepted = requested.insetBy(dx: 30, dy: 12)
+        fixture.controller.axManager.confirmFrameWrite(for: first.windowId, frame: requested)
+        fixture.controller.hasStartedServices = true
+        fixture.handler.nativeWindowFrameProvider = { _ in accepted }
+        let press = CGPoint(x: accepted.midX, y: accepted.maxY - 20)
+        XCTAssertFalse(fixture.handler.dispatchMouseDown(
+            at: press, modifiers: [], windowIdUnderPointer: first.windowId
+        ))
+        fixture.handler.dispatchMouseDragged(at: CGPoint(x: press.x + 10, y: press.y))
+        let point = try XCTUnwrap(fixture.frame(second)).center
+        fixture.handler.nativeWindowFrameProvider = { _ in
+            accepted.offsetBy(dx: point.x - accepted.midX, dy: point.y - accepted.midY)
+        }
+        fixture.handler.dispatchMouseUp(at: point)
+        XCTAssertEqual(fixture.columns(fixture.source), [[second], [first]])
+    }
+
     func testNativeMoveDefaultsOffAndSameDisplayStillCorrects() throws {
         for layout in [LayoutType.niri, .dwindle] {
             for (enabled, across) in [(false, false), (false, true), (true, false)] {

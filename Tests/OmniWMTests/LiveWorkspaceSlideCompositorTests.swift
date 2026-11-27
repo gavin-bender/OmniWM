@@ -40,6 +40,46 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
         XCTAssertGreaterThan(confirmed, 0)
     }
 
+    func testWindowWithExistingTranslationDoesNotDisableOtherWindowsSlide() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["OMNIWM_LIVE_CHECKS"] == "1")
+        try XCTSkipUnless(omniwm_dock_slide_available())
+        _ = NSApplication.shared
+        let display = try XCTUnwrap(NSScreen.main).frame
+        let frame = CGRect(x: display.midX, y: display.midY, width: 256, height: 256)
+        let panels = (0..<2).map { _ in
+            let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                                backing: .buffered, defer: false)
+            panel.orderFrontRegardless()
+            return panel
+        }
+        defer { for panel in panels { panel.orderOut(nil) } }
+        try await Task.sleep(for: .milliseconds(100))
+        let foreignID = UInt32(panels[0].windowNumber)
+        let base = ScreenCoordinateSpace.toWindowServer(rect: frame)
+        let translated = CGPoint(x: base.minX - 100, y: base.minY)
+        var move = OmniWMDockSlideMove(window: foreignID, baseWidth: 256, baseHeight: 256,
+                                       target: translated, resetFirst: false, apply: true)
+        XCTAssertTrue(omniwm_dock_slide_submit(&move, 1))
+        defer { _ = omniwm_dock_slide_restore_translation(foreignID) }
+
+        let members = panels.enumerated().map { index, panel in
+            LiveWorkspaceSlide.Member(token: .init(pid: getpid(), windowId: panel.windowNumber),
+                                      window: AXWindowRef(element: AXUIElementCreateApplication(getpid()), windowId: panel.windowNumber),
+                                      layout: frame, original: frame, parkOrigin: frame.origin,
+                                      minimumHeight: 1, incoming: index == 1)
+        }
+        let slide = LiveWorkspaceSlide(members: members, viewport: display, dockDisplay: display)
+        XCTAssertTrue(slide.followsDisplayLink)
+        defer { _ = slide.restore(keepingIncomingPlacement: false) { _ in XCTFail("unexpected park") } }
+        XCTAssertTrue(slide.update(source: .zero, destination: CGVector(dx: 0, dy: 40)))
+        XCTAssertFalse(slide.ownsTranslation(for: Int(foreignID)))
+        XCTAssertTrue(slide.ownsTranslation(for: panels[1].windowNumber))
+        var bounds = CGRect.zero
+        var matrix = CGAffineTransform.identity
+        XCTAssertTrue(omniwm_dock_slide_geometry(foreignID, &bounds, &matrix))
+        XCTAssertTrue(omniwm_dock_slide_at_position(matrix, translated))
+    }
+
     func testParkedWindowsFollowAndLandWithDelayedPhysicalMoves() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["OMNIWM_LIVE_CHECKS"] == "1")
         try XCTSkipUnless(omniwm_dock_slide_available())

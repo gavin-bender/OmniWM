@@ -99,17 +99,24 @@ extension NiriLayoutEngine {
             gaps: gaps,
             orientation: move.orientation
         )
+        return commitWindowDrop(move.windowId, onto: target, context: context, state: &state)
+    }
+
+    func commitWindowDrop(
+        _ source: NodeId, onto target: MoveHoverTarget, context: NiriInteractionContext, state: inout ViewportState
+    ) -> Bool {
+        assertSanctionedMutation()
         guard let direction = target.direction else {
             return swapWindowsByMove(
-                sourceWindowId: move.windowId,
+                sourceWindowId: source,
                 targetWindowId: target.nodeId,
                 context: context,
                 state: &state
             )
         }
-        if let step = direction.primaryStep(for: move.orientation) {
+        if let step = direction.primaryStep(for: context.orientation) {
             return insertWindowInNewColumnByMove(
-                sourceWindowId: move.windowId,
+                sourceWindowId: source,
                 targetWindowId: target.nodeId,
                 after: step > 0,
                 context: context,
@@ -117,14 +124,14 @@ extension NiriLayoutEngine {
             )
         }
         let inserted = insertWindowByMove(
-            sourceWindowId: move.windowId,
+            sourceWindowId: source,
             targetWindowId: target.nodeId,
-            position: direction.secondaryStep(for: move.orientation) == 1 ? .after : .before,
+            position: direction.secondaryStep(for: context.orientation) == 1 ? .after : .before,
             context: context,
             state: &state
         )
         if inserted {
-            activateWindow(move.windowId, in: move.workspaceId)
+            activateWindow(source, in: context.workspaceId)
         }
         return inserted
     }
