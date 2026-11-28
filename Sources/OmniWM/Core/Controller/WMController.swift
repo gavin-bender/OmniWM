@@ -428,6 +428,7 @@ extension WMController {
 
     func setMoveMouseToFocusedWindow(_ enabled: Bool) {
         moveMouseToFocusedWindowEnabled = enabled
+        if !enabled { mouseWarpHandler.cancelFocusAnimation() }
     }
 
     func refreshHotkeyFailureSnapshots() {

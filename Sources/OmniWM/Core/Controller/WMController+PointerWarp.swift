@@ -80,6 +80,7 @@ extension WMController {
 
     func moveMouseToWindow(_ token: WindowToken, preferredFrame: CGRect? = nil) {
         guard !axEventHandler.suppressesMouseWarp(for: token) else {
+            mouseWarpHandler.cancelFocusAnimation()
             MouseTrace.record("focus-warp suppressed (pointer-intent) token=\(token)")
             return
         }
@@ -90,7 +91,10 @@ extension WMController {
 
         let center = frame.center
 
-        guard NSScreen.screens.contains(where: { $0.frame.contains(center) }) else {
+        if mouseWarpHandler.isAnimatingFocus(to: token, center: center) { return }
+        mouseWarpHandler.cancelFocusAnimation()
+
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) else {
             MouseTrace.record("focus-warp suppressed (off-screen) token=\(token) center=\(TraceFormat.point(center))")
             return
         }
@@ -104,7 +108,6 @@ extension WMController {
         }
 
         MouseTrace.record("focus-warp token=\(token) center=\(TraceFormat.point(center))")
-        warpMouseCursorPosition(ScreenCoordinateSpace.toWindowServer(point: center))
-        mouseWarpHandler.noteProgrammaticCursorMove(to: center)
+        mouseWarpHandler.moveForFocus(to: center, from: mouse, token: token, screen: screen)
     }
 }

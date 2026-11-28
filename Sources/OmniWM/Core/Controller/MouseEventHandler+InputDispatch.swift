@@ -79,6 +79,7 @@ extension MouseEventHandler {
             return false
         }
         guard controller != nil else { return false }
+        controller?.mouseWarpHandler.cancelFocusAnimation()
         if button == .left { state.tabbedTitleDrag = nil }
         let blocked = shouldBlockOwnWindowInput(at: location, windowIdUnderPointer: windowIdUnderPointer)
         if MouseTrace.shared.isActive {

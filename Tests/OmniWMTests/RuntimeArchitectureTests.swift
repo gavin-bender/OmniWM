@@ -404,6 +404,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             activeRequestId: fixture.requestId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -434,6 +435,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             activeRequestId: fixture.requestId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -586,7 +588,32 @@ final class RuntimeArchitectureTests: XCTestCase {
             activeRequestId: fixture.requestId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertEqual(warpedPoints.count, 1)
+    }
+
+    @MainActor
+    func testFocusWarpPreservesMouseMovementBetweenFrames() throws {
+        let fixture = try Self.managedNiriActivationFixture(
+            origin: .keyboardOrProgrammatic, pid: 765_708, windowId: 765_808
+        )
+        let controller = fixture.controller
+        let center = try XCTUnwrap(controller.preferredKeyboardFocusFrame(for: fixture.entry.token)).center
+        var mouse = CGPoint(x: center.x - 150, y: center.y)
+        controller.currentMouseLocation = { mouse }
+        controller.warpMouseCursorPosition = { mouse = ScreenCoordinateSpace.toAppKit(point: $0) }
+        controller.motionPolicy.animationsEnabled = true
+        controller.motionPolicy.animationSpeed = 1
+        controller.moveMouseToWindow(fixture.entry.token, preferredFrame: CGRect(
+            x: center.x - 50, y: center.y - 50, width: 100, height: 100
+        ))
+        controller.mouseWarpHandler.advanceFocusAnimation(at: controller.animationClock.now() + 0.09)
+        XCTAssertGreaterThan(mouse.x, center.x - 150)
+        XCTAssertLessThan(mouse.x, center.x)
+        mouse.y += 30
+        controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
+        XCTAssertEqual(mouse.x, center.x, accuracy: 0.001)
+        XCTAssertEqual(mouse.y, center.y + 30, accuracy: 0.001)
     }
 
     @MainActor
@@ -608,6 +635,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             activeRequestId: fixture.requestId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -630,6 +658,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             appFullscreen: false
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -651,6 +680,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             appFullscreen: false
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertEqual(warpedPoints.count, 1)
     }
 
@@ -700,6 +730,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             workspaceId: fixture.entry.workspaceId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -724,6 +755,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             workspaceId: fixture.entry.workspaceId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -748,6 +780,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             workspaceId: fixture.entry.workspaceId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertEqual(warpedPoints.count, 1)
     }
 
@@ -770,6 +803,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             activeRequestId: fixture.requestId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -795,6 +829,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             workspaceId: fixture.entry.workspaceId
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 
@@ -826,6 +861,7 @@ final class RuntimeArchitectureTests: XCTestCase {
             appFullscreen: false
         )
 
+        fixture.controller.mouseWarpHandler.advanceFocusAnimation(at: .infinity)
         XCTAssertTrue(warpedPoints.isEmpty)
     }
 

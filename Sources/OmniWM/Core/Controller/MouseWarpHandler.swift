@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import QuartzCore
 
 @MainActor
 final class MouseWarpHandler: NSObject {
@@ -12,6 +13,18 @@ final class MouseWarpHandler: NSObject {
         var lastMonitorId: Monitor.ID?
         var lastSampleAt: Date?
     }
+
+    private struct FocusAnimation {
+        let token: WindowToken
+        let destination: CGPoint
+        let distance: CGVector
+        let start: TimeInterval
+        let duration: TimeInterval
+        var applied = CGVector.zero
+    }
+
+    private var focusAnimation: FocusAnimation?
+    private var focusDisplayLink: CADisplayLink?
 
     static let cooldownSeconds: TimeInterval = 0.05
 
@@ -54,6 +67,11 @@ final class MouseWarpHandler: NSObject {
     }
 
     func cleanup() {
+        resetTransientState()
+    }
+
+    func resetTransientState() {
+        cancelFocusAnimation()
         state.cooldownTimer?.invalidate()
         state.cooldownTimer = nil
         state.isWarping = false
@@ -61,12 +79,70 @@ final class MouseWarpHandler: NSObject {
         state.lastSampleAt = nil
     }
 
-    func resetTransientState() {
-        state.cooldownTimer?.invalidate()
-        state.cooldownTimer = nil
-        state.isWarping = false
-        state.lastMonitorId = nil
-        state.lastSampleAt = nil
+    func cancelFocusAnimation() {
+        focusDisplayLink?.invalidate()
+        focusDisplayLink = nil
+        focusAnimation = nil
+    }
+
+    var isAnimatingFocus: Bool { focusAnimation != nil }
+
+    func isAnimatingFocus(to token: WindowToken, center: CGPoint) -> Bool {
+        focusAnimation?.token == token && focusAnimation?.destination == center
+    }
+
+    func moveForFocus(to center: CGPoint, from mouse: CGPoint, token: WindowToken, screen: NSScreen) {
+        guard let controller else { return }
+        guard controller.motionPolicy.animationsEnabled else {
+            applyFocusMove(to: center)
+            return
+        }
+
+        focusAnimation = FocusAnimation(
+            token: token, destination: center,
+            distance: CGVector(dx: center.x - mouse.x, dy: center.y - mouse.y),
+            start: controller.animationClock.now(), duration: 0.18 / controller.motionPolicy.animationSpeed
+        )
+        let link = screen.displayLink(target: self, selector: #selector(tickFocusAnimation(_:)))
+        focusDisplayLink = link
+        link.add(to: .main, forMode: .common)
+    }
+
+    @objc private func tickFocusAnimation(_: CADisplayLink) {
+        guard let controller else {
+            cancelFocusAnimation()
+            return
+        }
+        advanceFocusAnimation(at: controller.animationClock.now())
+    }
+
+    func advanceFocusAnimation(at time: TimeInterval) {
+        guard let controller, var animation = focusAnimation else { return }
+        let progress = controller.motionPolicy.animationsEnabled
+            ? ((time - animation.start) / animation.duration).clamped(to: 0 ... 1) : 1
+        let eased = progress * progress * (3 - 2 * progress)
+        // Round cumulative offsets so cursor quantization cannot accumulate across frames.
+        let offset = progress == 1 ? animation.distance : CGVector(
+            dx: (animation.distance.dx * eased).rounded(),
+            dy: (animation.distance.dy * eased).rounded()
+        )
+        let mouse = controller.currentMouseLocation()
+        let point = CGPoint(
+            x: mouse.x + (offset.dx - animation.applied.dx),
+            y: mouse.y + (offset.dy - animation.applied.dy)
+        )
+        // Carry the displacement across gaps between displays until the cursor can land.
+        if progress == 1 || NSScreen.screens.contains(where: { $0.frame.contains(point) }) {
+            applyFocusMove(to: point)
+            animation.applied = offset
+            focusAnimation = animation
+        }
+        if progress == 1 { cancelFocusAnimation() }
+    }
+
+    private func applyFocusMove(to point: CGPoint) {
+        controller?.warpMouseCursorPosition(ScreenCoordinateSpace.toWindowServer(point: point))
+        noteProgrammaticCursorMove(to: point)
     }
 
     func handleMouseWarpMoved(at location: CGPoint) {

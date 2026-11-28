@@ -68,7 +68,7 @@ extension MouseEventHandler {
 
     private func shouldHandleFocusFollowsMouse(at location: CGPoint) -> Bool {
         guard !state.isMoving, !state.isResizing, !isTrackpadSwipeSessionActive else { return false }
-        guard let controller else { return false }
+        guard let controller, !controller.mouseWarpHandler.isAnimatingFocus else { return false }
         guard let workspaceId = workspaceIdForPointer(at: location) else {
             return true
         }
