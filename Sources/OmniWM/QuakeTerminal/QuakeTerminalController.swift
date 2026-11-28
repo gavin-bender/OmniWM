@@ -175,8 +175,8 @@ final class QuakeTerminalController: NSObject {
         "quake-terminal"
     }
 
-    private func createSurfaceView(launch: LauncherLaunchRequest? = nil) -> GhosttySurfaceView? {
-        guard let view = ghosttyRuntime.makeSurfaceView(for: self, launch: launch, hasSurfaces: !tabs.isEmpty)
+    private func createSurfaceView(launch: LauncherLaunchRequest? = nil, stagedInput: String? = nil) -> GhosttySurfaceView? {
+        guard let view = ghosttyRuntime.makeSurfaceView(for: self, launch: launch, stagedInput: stagedInput, hasSurfaces: !tabs.isEmpty)
         else { return nil }
         view.onFrameChanged = { [weak self] frame in
             self?.persistCustomFrame(frame)
@@ -448,8 +448,17 @@ extension QuakeTerminalController {
 extension QuakeTerminalController {
     func launch(_ request: LauncherLaunchRequest) -> Bool {
         setup()
-        guard let view = createSurfaceView(launch: request),
-              tabs.createTab(surfaceView: view) != nil else { return false }
+        return presentNewTab(createSurfaceView(launch: request))
+    }
+
+    func stageCommand(_ command: String) -> Bool {
+        guard !command.isEmpty, command.rangeOfCharacter(from: .controlCharacters) == nil else { return false }
+        setup()
+        return presentNewTab(createSurfaceView(stagedInput: command))
+    }
+
+    private func presentNewTab(_ view: GhosttySurfaceView?) -> Bool {
+        guard let view, tabs.createTab(surfaceView: view) != nil else { return false }
         if visible {
             window?.makeFirstResponder(view)
             window?.makeKeyAndOrderFront(nil)

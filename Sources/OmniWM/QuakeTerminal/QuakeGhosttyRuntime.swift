@@ -199,6 +199,7 @@ final class QuakeGhosttyRuntime {
     func makeSurfaceView(
         for controller: QuakeTerminalController,
         launch: LauncherLaunchRequest? = nil,
+        stagedInput: String? = nil,
         hasSurfaces: Bool = true
     ) -> GhosttySurfaceView? {
         guard let ghosttyApp else { return nil }
@@ -210,7 +211,7 @@ final class QuakeGhosttyRuntime {
             ghostty_app_update_config(ghosttyApp, config)
         }
         let context = GhosttySurfaceCallbackContext(controller: controller)
-        let view = GhosttySurfaceView(ghosttyApp: ghosttyApp, callbackContext: context, launch: launch)
+        let view = GhosttySurfaceView(ghosttyApp: ghosttyApp, callbackContext: context, launch: launch, stagedInput: stagedInput)
         guard view.ghosttySurface != nil else {
             if let launchConfig {
                 if let previousConfig { ghostty_app_update_config(ghosttyApp, previousConfig) }

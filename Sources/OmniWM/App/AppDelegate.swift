@@ -406,6 +406,7 @@ extension AppDelegate {
         launchOverlayFinished = true
         settingsConfigNoticeController?.refresh()
         presentWelcomeIfNeeded(runtimeState: runtimeState, controller: controller)
+        recoverDevDockCompositorIfNeeded(controller: controller)
     }
 
     private func presentWelcomeIfNeeded(runtimeState: RuntimeStateStore, controller: WMController) {

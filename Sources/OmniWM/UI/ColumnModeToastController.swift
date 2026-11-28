@@ -40,7 +40,7 @@ final class ColumnModeToastController {
         anchorFrame: CGRect,
         visibleFrame: CGRect,
         motion: MotionSnapshot,
-        source: Source
+        source: Source? = nil
     ) {
         if let visiblePanel = surface?.panel, visiblePanel.isVisible, !visiblePanel.isOnActiveSpace {
             destroy()

@@ -68,7 +68,8 @@ final class GhosttySurfaceView: NSView {
     init(
         ghosttyApp: ghostty_app_t,
         callbackContext: GhosttySurfaceCallbackContext,
-        launch: LauncherLaunchRequest? = nil
+        launch: LauncherLaunchRequest? = nil,
+        stagedInput: String? = nil
     ) {
         keepsCommandOutput = launch != nil
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 400))
@@ -88,6 +89,15 @@ final class GhosttySurfaceView: NSView {
 
         let surface = if let launch {
             Self.makeLaunchSurface(app: ghosttyApp, config: &config, launch: launch)
+        } else if let stagedInput {
+            // Create a dedicated interactive shell, independent of the configured startup command.
+            "/bin/zsh -f -i".withCString { shell in
+                stagedInput.withCString { input in
+                    config.command = shell
+                    config.initial_input = input
+                    return ghostty_surface_new(ghosttyApp, &config)
+                }
+            }
         } else {
             ghostty_surface_new(ghosttyApp, &config)
         }
