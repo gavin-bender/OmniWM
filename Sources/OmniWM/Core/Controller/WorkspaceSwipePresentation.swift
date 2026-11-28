@@ -302,10 +302,22 @@ final class WorkspaceSwipePresentation {
                 }
                 continue
             }
+            // Keep the source stationary until WindowServer observes the last
+            // staging move. Keyboard input has no drag position to catch up to.
+            if flight.isKeyboard, let slide = flight.liveSlide, slide.isStaging, flight.phase == .settling {
+                present(flight, at: timestamp)
+                if isCurrent(flight), flight.liveSlide === slide, !slide.isStaging {
+                    revealIncomingWindows(for: flight)
+                    focusIncomingWindow(for: flight)
+                    flight.motion.startDestinationSpring(at: timestamp, motion: controller?.motionPolicy.snapshot() ?? .enabled)
+                }
+                continue
+            }
             // Hand the last few points to the real window placement. The toggle-based
             // compositor would otherwise expose old frames while chasing a subpixel spring.
             if flight.liveSlide?.followsDisplayLink == true, flight.phase == .settling,
                let target = flight.motion.target,
+               abs(target - flight.progress) * flight.stride <= 3,
                abs(target - flight.motion.progress(at: timestamp)) * flight.stride <= 3 {
                 if target == 1 { commit(flight) } else { cancel(flight, reason: "cancelled") }
                 continue

@@ -84,13 +84,26 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["OMNIWM_LIVE_CHECKS"] == "1")
         try XCTSkipUnless(omniwm_dock_slide_available())
         _ = NSApplication.shared
-        let display = try XCTUnwrap(NSScreen.main).frame
+        XCTAssertFalse(NSScreen.screens.isEmpty)
+        for screen in NSScreen.screens {
+            try await checkParkedWindows(on: screen.frame)
+        }
+    }
+
+    private func checkParkedWindows(on display: CGRect) async throws {
         let size = CGSize(width: 512, height: 512)
-        let park = CGPoint(x: display.maxX - 1, y: display.midY - size.height / 2)
-        let slots = [display.minX - 140, display.midX]
-        let frames = slots.map { CGRect(origin: CGPoint(x: $0, y: park.y), size: size) }
-        let panels = (0..<4).map { index in
-            let frame = index < 2 ? frames[index] : CGRect(origin: park, size: size)
+        func parkedOrigin(for frame: CGRect) -> CGPoint {
+            CGPoint(x: display.maxX - 1, y: frame.minY)
+        }
+        let slots = [display.minX - 140, display.minX + 160, display.midX - 256,
+                     display.midX, display.maxX - 670, display.maxX - 440]
+        var frames = slots.map { CGRect(origin: CGPoint(x: $0, y: display.midY - size.height / 2), size: size) }
+        if display.width >= 7680, display.height >= 2160 {
+            frames[3] = CGRect(x: display.midX, y: display.minY + 8, width: 3832, height: 2116)
+        }
+        let panels = (0..<(2 * frames.count)).map { index in
+            let layout = frames[index % frames.count]
+            let frame = index < frames.count ? layout : CGRect(origin: parkedOrigin(for: layout), size: layout.size)
             let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
                                 backing: .buffered, defer: false)
             panel.level = .floating
@@ -107,7 +120,7 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
             guard omniwm_dock_slide_geometry(UInt32(id), &base, &matrix) else {
                 throw NSError(domain: "Missing test window", code: id)
             }
-            XCTAssertEqual(base.size, size)
+            XCTAssertEqual(base.size, byId[id]?.frame.size)
             XCTAssertEqual(matrix.a, 1)
             XCTAssertEqual(matrix.d, 1)
             return CGPoint(x: -matrix.tx, y: -matrix.ty)
@@ -117,15 +130,17 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
         for turn in 0..<12 {
             let commits = turn % 3 != 1
             let members: [LiveWorkspaceSlide.Member] = panels.enumerated().map { index, panel in
-                let incoming = (index >= 2) == showingFirst
+                let incoming = (index >= frames.count) == showingFirst
+                let layout = frames[index % frames.count]
                 return .init(token: WindowToken(pid: getpid(), windowId: panel.windowNumber),
                              window: AXWindowRef(element: element, windowId: panel.windowNumber),
-                             layout: frames[index % 2], original: panel.frame, parkOrigin: park,
-                             minimumHeight: size.height, incoming: incoming)
+                             layout: layout, original: panel.frame, parkOrigin: parkedOrigin(for: layout),
+                             minimumHeight: layout.height, incoming: incoming)
             }
             // The app owns its test panels. Reproduce the observed AX acknowledgement
             // before the new physical position is published by WindowServer.
             var pending: [Int: Task<Void, Never>] = [:]
+            var placed: Set<Int> = []
             let quickCancel = turn == 4 || turn == 10
             let delay = quickCancel ? 50 : [0, 8, 50][turn % 3]
             let slide = LiveWorkspaceSlide(members: members, viewport: display, dockDisplay: display) { member, frame, verify in
@@ -137,6 +152,7 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
                     pending[id] = Task {
                         do { try await Task.sleep(for: .milliseconds(delay)) } catch { return }
                         byId[id]?.setFrameOrigin(frame.origin)
+                        placed.insert(id)
                     }
                 }
                 return true
@@ -152,12 +168,25 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
             }
             let direction: CGFloat = showingFirst ? 1 : -1
             let stride = display.height * 1.1
+            if !quickCancel {
+                let initial = CGVector(dx: 0, dy: -direction * stride)
+                let deadline = ContinuousClock.now + .seconds(1)
+                repeat {
+                    XCTAssertTrue(slide.update(source: .zero, destination: initial))
+                    if slide.isStaging { try await Task.sleep(for: .milliseconds(8)) }
+                } while slide.isStaging && ContinuousClock.now < deadline
+                XCTAssertFalse(slide.isStaging)
+                for member in members where !member.incoming {
+                    XCTAssertEqual(try drawingOrigin(member.window.windowId),
+                                   ScreenCoordinateSpace.toWindowServer(rect: member.original).origin)
+                }
+            }
             let samples: [CGFloat]
             if commits { samples = [0.06, 0.25, 0.43, 0.6, 0.8, 0.94, 0.998] }
             else if quickCancel { samples = [0.1] }
             else { samples = [0.1, 0.34, 0.62, 0.46, 0.2, 0.03, 0] }
-            let start = ContinuousClock.now
             for (index, progress) in samples.enumerated() {
+                let placedBeforeUpdate = placed
                 let source = CGVector(dx: 0, dy: direction * progress * stride)
                 let destination = CGVector(dx: 0, dy: direction * (progress - 1) * stride)
                 let updated = slide.update(source: source, destination: destination)
@@ -170,18 +199,22 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
                         guard projected.intersects(display) else { continue }
                         let drawing = try drawingOrigin(member.window.windowId)
                         let target = ScreenCoordinateSpace.toWindowServer(rect: projected).origin
-                        let drawingFrame = CGRect(origin: drawing, size: size)
-                        let waitingForApp = member.incoming && start.duration(to: .now) < .milliseconds(delay + 25)
+                        let drawingFrame = CGRect(origin: drawing, size: member.layout.size)
+                        // A staging move that runs during the sleep below is
+                        // picked up by the following display tick.
+                        let waitingForApp = pending[member.window.windowId] != nil &&
+                            !placedBeforeUpdate.contains(member.window.windowId)
                         if waitingForApp, !drawingFrame.intersects(ScreenCoordinateSpace.toWindowServer(rect: display)) { continue }
                         XCTAssertEqual(drawing.x, target.x, accuracy: 1)
-                        XCTAssertEqual(drawing.y, target.y, accuracy: 1)
+                        XCTAssertEqual(drawing.y, target.y, accuracy: 1,
+                                       "display \(display), turn \(turn), sample \(index), incoming \(member.incoming)")
                     }
                 }
             }
             if commits {
                 let task = try XCTUnwrap(slide.beginLanding())
                 for member in members {
-                    byId[member.window.windowId]?.setFrameOrigin(member.incoming ? member.layout.origin : park)
+                    byId[member.window.windowId]?.setFrameOrigin(member.incoming ? member.layout.origin : member.parkOrigin)
                 }
                 for _ in 0..<10 {
                     for member in members where member.incoming {
@@ -196,7 +229,8 @@ final class LiveWorkspaceSlideCompositorTests: XCTestCase {
             XCTAssertTrue(slide.restore(keepingIncomingPlacement: commits) { _ in XCTFail("repark failed") }.isEmpty)
             try await Task.sleep(for: .milliseconds(12))
             for (index, panel) in panels.enumerated() {
-                let expected = (index < 2) == showingFirst ? frames[index % 2].origin : park
+                let layout = frames[index % frames.count]
+                let expected = (index < frames.count) == showingFirst ? layout.origin : parkedOrigin(for: layout)
                 XCTAssertEqual(panel.frame.origin, expected)
                 let drawing = try drawingOrigin(panel.windowNumber)
                 let physical = ScreenCoordinateSpace.toWindowServer(rect: panel.frame).origin

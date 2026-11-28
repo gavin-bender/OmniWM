@@ -5,6 +5,20 @@
 import XCTest
 
 final class WorkspaceSwipeMotionTests: XCTestCase {
+    func testKeyboardSwitchKeepsItsDestinationWhileWaitingForStagedWindows() {
+        let motion = WorkspaceSwipeMotion(cumulativeUnits: 0, timestamp: 1)
+        XCTAssertTrue(motion.animateToDestination(startTime: 1, motion: .enabled, waitingForPlacement: true))
+        XCTAssertEqual(motion.target, 1)
+        XCTAssertFalse(motion.update(cumulativeUnits: 90, timestamp: 1.1))
+        XCTAssertFalse(motion.release(timestamp: 1.1, allowFlick: false, animationTime: 1.1))
+        XCTAssertEqual(motion.progress(at: 1.20), 0)
+        XCTAssertFalse(motion.isComplete(at: 1.20))
+        motion.startDestinationSpring(at: 1.20, motion: .enabled)
+        XCTAssertEqual(motion.progress(at: 1.20), 0)
+        XCTAssertGreaterThan(motion.progress(at: 1.23), 0)
+        XCTAssertTrue(motion.isComplete(at: 3))
+    }
+
     func testRecognitionMovementCommitsSingleFrameFlickWithoutProgressJump() {
         let motion = WorkspaceSwipeMotion(
             cumulativeUnits: 150, timestamp: 1.03125,

@@ -39,6 +39,56 @@ final class NativeParkedWindowsTests: XCTestCase {
         XCTAssertFalse(manager.owns(token))
     }
 
+    func testLateHideIsReversedOnRapidSwitchAndRelaunch() throws {
+        for relaunch in [false, true] {
+            let suite = "NativeParkedWindowsTests-\(UUID())"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let token = WindowToken(pid: 7, windowId: 8)
+            let identity = NativeParkedWindows.Owner(pid: token.pid, launchDate: Date())
+            var orders: [Bool] = []
+            func makeManager() -> NativeParkedWindows {
+                // WindowServer still reports visible while the hide is in the Dock queue.
+                NativeParkedWindows(defaults: defaults, owner: { _ in identity }, orderedIn: { _ in true },
+                                    order: { _, show in
+                                        orders.append(show)
+                                        return show
+                                    }, available: { true })
+            }
+            let manager = makeManager()
+            manager.start()
+            manager.hide(token)
+            XCTAssertTrue(manager.owns(token))
+            let restoring = relaunch ? makeManager() : manager
+            if relaunch { restoring.start() } else { restoring.reveal(token) }
+            XCTAssertEqual(orders, [false, true])
+            XCTAssertFalse(restoring.owns(token))
+        }
+    }
+
+    func testSwitchAwayWhileRevealIsPendingSubmitsAnotherHide() throws {
+        let suite = "NativeParkedWindowsTests-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let token = WindowToken(pid: 7, windowId: 8)
+        let identity = NativeParkedWindows.Owner(pid: token.pid, launchDate: Date())
+        var visible = true
+        var orders: [Bool] = []
+        let manager = NativeParkedWindows(defaults: defaults, owner: { _ in identity },
+                                          orderedIn: { _ in visible }, order: { _, show in
+                                              orders.append(show)
+                                              if !show { visible = false }
+                                              return !show
+                                          }, available: { true })
+        manager.start()
+        manager.hide(token)
+        manager.reveal(token)
+        manager.hide(token)
+        manager.hide(token)
+        XCTAssertEqual(orders, [false, true, false])
+        XCTAssertTrue(manager.owns(token))
+    }
+
     func testHideRevealAndRelaunchRestoreOnlyOwnedWindows() throws {
         let suite = "NativeParkedWindowsTests-\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

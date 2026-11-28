@@ -55,7 +55,7 @@ final class WorkspaceSwipeMotion {
 
     @discardableResult
     func update(cumulativeUnits: Double, timestamp: TimeInterval) -> Bool {
-        guard spring == nil, accepts(cumulativeUnits: cumulativeUnits, timestamp: timestamp) else { return false }
+        guard target == nil, accepts(cumulativeUnits: cumulativeUnits, timestamp: timestamp) else { return false }
         let raw = baselineProgress + (cumulativeUnits - originUnits) / Self.travelUnits
         guard raw.isFinite else { return false }
         let progress = Self.rubberBand(raw)
@@ -72,7 +72,7 @@ final class WorkspaceSwipeMotion {
         animationTime: TimeInterval,
         motion: MotionSnapshot = .enabled
     ) -> Bool {
-        guard spring == nil, timestamp.isFinite, timestamp >= lastTimestamp,
+        guard target == nil, timestamp.isFinite, timestamp >= lastTimestamp,
               animationTime.isFinite else { return false }
         tracker.push(delta: 0, timestamp: timestamp)
         let velocity = allowFlick ? tracker.velocity() : 0
@@ -95,16 +95,22 @@ final class WorkspaceSwipeMotion {
     }
 
     @discardableResult
-    func animateToDestination(startTime: TimeInterval, motion: MotionSnapshot) -> Bool {
+    func animateToDestination(startTime: TimeInterval, motion: MotionSnapshot, waitingForPlacement: Bool = false) -> Bool {
         guard spring == nil, target == nil, startTime.isFinite else { return false }
         target = 1
+        if waitingForPlacement { return true }
+        startDestinationSpring(at: startTime, motion: motion)
+        return true
+    }
+
+    func startDestinationSpring(at startTime: TimeInterval, motion: MotionSnapshot) {
+        guard target == 1, spring == nil else { return }
         spring = SpringAnimation(
             from: trackedProgress,
             to: 1,
             startTime: startTime,
             config: motion.scaled(Self.springConfig)
         )
-        return true
     }
 
     @discardableResult

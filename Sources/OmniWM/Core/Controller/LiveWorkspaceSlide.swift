@@ -38,8 +38,14 @@ final class LiveWorkspaceSlide {
     private var dockSlide: DockWorkspaceSlide?
     private let accessibilityMembers: [Member]
     var followsDisplayLink: Bool { dockSlide != nil }
+    var isStaging: Bool { dockSlide?.isStaging == true }
     private var minimumHeights: [Int: CGFloat] = [:]
     private var lastFrames: [Int: CGRect] = [:]
+    private var accessibilityWriteScopes: [pid_t: AppAXEnhancedUIWriteScope] = [:]
+
+    isolated deinit {
+        finishAccessibilityWrites()
+    }
 
     init(
         members: [Member], viewport: CGRect, dockDisplay: CGRect? = nil,
@@ -127,6 +133,14 @@ final class LiveWorkspaceSlide {
                 frame.size = previous.size
             }
             guard frame != previous else { continue }
+            // Prevent the app from interpolating each AX move while the slide
+            // is already supplying intermediate frames.
+            let pid = member.token.pid
+            if accessibilityWriteScopes[pid] == nil {
+                accessibilityWriteScopes[pid] = AppAXEnhancedUIWriteScope(
+                    axApp: AXUIElementCreateApplication(pid), pid: pid, tracing: false
+                )
+            }
             // Remember before submission so rollback covers a partial size/position write.
             lastFrames[member.window.windowId] = frame
             let result = AXWindowService.setFrame(
@@ -165,6 +179,7 @@ final class LiveWorkspaceSlide {
     }
 
     func adoptPlacedWindows(in controller: WMController, destination: WorkspaceSwipePresentation.Workspace) {
+        defer { finishAccessibilityWrites() }
         for member in accessibilityMembers where member.incoming {
             guard let entry = controller.workspaceManager.entry(for: member.token),
                   entry.workspaceId == destination.id, entry.axRef == member.window,
@@ -211,7 +226,13 @@ final class LiveWorkspaceSlide {
             )
         }
         lastFrames.removeAll()
+        finishAccessibilityWrites()
         return members.filter { unresolved.contains(UInt32($0.window.windowId)) }
+    }
+
+    private func finishAccessibilityWrites() {
+        for scope in accessibilityWriteScopes.values { _ = scope.restore() }
+        accessibilityWriteScopes.removeAll()
     }
 }
 
@@ -266,15 +287,22 @@ extension WorkspaceSwipePresentation {
         // Position the first slide frame before making its surface visible.
         present(flight, at: mediaTimeProvider())
         guard isCurrent(flight) else { return false }
-        for member in members where member.incoming {
-            controller.axManager.nativeParks.reveal(member.token)
-        }
+        let waitingForPlacement = flight.isKeyboard && flight.liveSlide?.isStaging == true
+        if !waitingForPlacement { revealIncomingWindows(for: flight) }
         if flight.isKeyboard {
-            focusIncomingWindow(for: flight)
-            flight.motion.animateToDestination(startTime: mediaTimeProvider(), motion: controller.motionPolicy.snapshot())
+            if !waitingForPlacement { focusIncomingWindow(for: flight) }
+            flight.motion.animateToDestination(startTime: mediaTimeProvider(), motion: controller.motionPolicy.snapshot(),
+                                               waitingForPlacement: waitingForPlacement)
             flight.phase = .settling
         }
         return isCurrent(flight)
+    }
+
+    func revealIncomingWindows(for flight: Flight) {
+        guard let controller, let slide = flight.liveSlide else { return }
+        for member in slide.members where member.incoming {
+            controller.axManager.nativeParks.reveal(member.token)
+        }
     }
 
     func retrySlideResets() {
@@ -368,6 +396,7 @@ private final class DockWorkspaceSlide {
     private var needsStaging = true
     private var stagedIncoming: [LiveWorkspaceSlide.Member] = []
     private var pendingStages: [UInt32: (targetX: CGFloat, deadline: ContinuousClock.Instant)] = [:]
+    var isStaging: Bool { !pendingStages.isEmpty }
 
     private let writePosition: LiveWorkspaceSlide.PositionWriter
 

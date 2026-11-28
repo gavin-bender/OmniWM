@@ -18,6 +18,7 @@ final class NativeParkedWindows {
     private let available: @MainActor () -> Bool
     private let key = "nativeParkedWindowOrders"
     private var records: [UInt32: Owner] = [:]
+    private var unconfirmedOrders: Set<UInt32> = []
     private var active = false
 
     init(defaults: UserDefaults = .standard,
@@ -69,14 +70,21 @@ final class NativeParkedWindows {
     }
 
     func hide(_ token: WindowToken) {
-        guard active, let id = UInt32(exactly: token.windowId), records[id] == nil,
-              orderedIn(id) == true, let identity = owner(id), identity.pid == token.pid else { return }
-        // Persist ownership before dispatch so a relaunch can undo an interrupted hide.
-        records[id] = identity
-        save()
-        if !order(id, false), orderedIn(id) == true {
-            records[id] = nil
+        guard active, let id = UInt32(exactly: token.windowId) else { return }
+        if let saved = records[id] {
+            guard unconfirmedOrders.contains(id), saved.pid == token.pid, owner(id) == saved else { return }
+        } else {
+            guard orderedIn(id) == true, let identity = owner(id), identity.pid == token.pid else { return }
+            // Persist ownership before dispatch so a relaunch can undo an interrupted hide.
+            records[id] = identity
             save()
+        }
+        // The Dock can finish a submitted hide after its reply times out.
+        // Keep ownership until a subsequent reveal has been confirmed.
+        if order(id, false) {
+            unconfirmedOrders.remove(id)
+        } else {
+            unconfirmedOrders.insert(id)
         }
     }
 
@@ -106,13 +114,21 @@ final class NativeParkedWindows {
             // A failed read cannot establish that the saved owner was replaced.
             if NSRunningApplication(processIdentifier: saved.pid)?.launchDate == saved.launchDate { return }
             records[id] = nil
+            unconfirmedOrders.remove(id)
             save()
             return
         }
-        if current == saved, orderedIn(id) != true {
-            guard available(), order(id, true), orderedIn(id) == true else { return }
+        if current == saved {
+            // Queue the reveal behind the hide even if WindowServer still
+            // reports the pre-hide state during a rapid workspace switch.
+            guard available() else { return }
+            guard order(id, true), orderedIn(id) == true else {
+                unconfirmedOrders.insert(id)
+                return
+            }
         }
         records[id] = nil
+        unconfirmedOrders.remove(id)
         save()
     }
 

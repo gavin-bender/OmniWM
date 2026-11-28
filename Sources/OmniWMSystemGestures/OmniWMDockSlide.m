@@ -141,7 +141,7 @@ bool omniwm_dock_scroll_window(uint32_t window, CGRect target) {
         && omniwm_dock_slide_at_position(matrix, target.origin);
 }
 
-static int queueMove(OmniWMDockSlideMove move) {
+static bool writeMove(int fd, OmniWMDockSlideMove move) {
     // Choose scale 1 in do_window_scale, then translate to the requested top-left.
     struct __attribute__((packed)) {
         uint16_t length;
@@ -150,7 +150,7 @@ static int queueMove(OmniWMDockSlideMove move) {
         float x, y, width, height;
     } req = {21, 13, move.window, move.target.x - 3 * move.baseWidth,
              move.target.y, 4 * move.baseWidth, move.baseHeight};
-    return queueRequest(&req, sizeof(req));
+    return write(fd, &req, sizeof(req)) == sizeof(req);
 }
 
 bool omniwm_dock_slide_submit(const OmniWMDockSlideMove *moves, size_t count) {
@@ -163,10 +163,23 @@ bool omniwm_dock_slide_submit(const OmniWMDockSlideMove *moves, size_t count) {
     // then collect replies after all windows are queued, avoiding a round trip per toggle.
     for (size_t i = 0; i < count && ok; ++i) {
         unsigned requests = (unsigned)moves[i].resetFirst + (unsigned)moves[i].apply;
-        for (unsigned j = 0; j < requests; ++j) {
-            int fd = queueMove(moves[i]);
-            if (fd < 0) { ok = false; break; }
-            fds[queued++] = fd;
+        if (!requests) continue;
+        int first = openDock();
+        if (first < 0) { ok = false; break; }
+        // Prepare the replacement connection before clearing the current
+        // translation. A busy display can present the base position while
+        // the socket and its Dock identity are being checked.
+        int second = requests == 2 ? openDock() : -1;
+        if ((requests == 2 && second < 0) || !writeMove(first, moves[i])) {
+            close(first);
+            if (second >= 0) close(second);
+            ok = false;
+            break;
+        }
+        fds[queued++] = first;
+        if (second >= 0) {
+            if (writeMove(second, moves[i])) fds[queued++] = second;
+            else { close(second); ok = false; }
         }
     }
     for (size_t i = 0; i < queued; ++i) {
